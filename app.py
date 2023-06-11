@@ -331,6 +331,11 @@ def dara_authenticationsession():
     data = request.get_json()
     return dara.authenticationsession(data)
 
+@app.route('/dara/getcompany',methods = ['POST', 'GET'])
+def dara_getcompany():
+    data = request.get_json()
+    return dara.getcompany(data)
+
 
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)

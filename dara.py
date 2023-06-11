@@ -170,3 +170,60 @@ def checkcookie(data):
         return json.dumps({'replay':False})
     except:
         return json.dumps({'replay':False})
+    
+def CookieToUser(cookie):
+    try:
+        cookie = cookie
+        user = literal_eval(decrypt(str(cookie).encode()))
+        phone = user['phone']
+        nationalCode = user['nationalCode']
+        registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':nationalCode})
+        if registerNoBours != None:
+            if registerNoBours['شماره تماس'] == phone:
+                return {'replay':True, 'user':user}
+        else:
+            daraRegister = farasahmDb['daraRegister'].find_one({'nationalCode':nationalCode})
+            if daraRegister['phone'] == phone:
+                return {'replay':True,'user':user}
+        return {'replay':False}
+    except:
+        print(0)
+        return {'replay':False}
+    
+def getcompany(data):
+    user = CookieToUser(data['cookie'])
+
+    if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
+    user = user['user']
+    stockBourse = pd.DataFrame(farasahmDb['register'].find({'کد ملی':int(user['nationalCode'])},{'_id':0,'symbol':1,'سهام کل':1,'تاریخ گزارش':1}))
+    stockBourse = stockBourse.rename(columns={'سهام کل':'تعداد سهام','تاریخ گزارش':'date'})
+    listStock = []
+    if len(stockBourse)>0:
+        for i in list(set(stockBourse['symbol'].to_list())):
+            dff = stockBourse[stockBourse['symbol']==i]
+            lastDate = dff['date'].max()
+            dff = dff[dff['date']==lastDate]
+            dff = dff.to_dict('records')[0]
+            listStock.append(dff)
+    stockNoBourse = pd.DataFrame(farasahmDb['registerNoBours'].find({'کد ملی':str(user['nationalCode'])},{'تعداد سهام':1,'_id':0,'symbol':1,'date':1}))
+
+    if len(stockNoBourse)>0:
+        for i in list(set(stockNoBourse['symbol'].to_list())):
+            dff = stockNoBourse[stockNoBourse['symbol']==i]
+            lastDate = dff['date'].max()
+            dff = dff[dff['date']==lastDate]
+            dff = dff.to_dict('records')[0]
+            listStock.append(dff)
+  
+
+    allCompany = pd.DataFrame(farasahmDb['companyList'].find({},{'_id':0}))
+    allCompany = allCompany.set_index('symbol')
+    listStock = pd.DataFrame(listStock)
+    listStock = listStock.set_index('symbol')
+
+    df = allCompany.join(listStock)
+    df = df.drop(columns='date')
+    df = df.fillna(0)
+    df = df.to_dict('records')
+
+    return json.dumps({'replay':True,'df':df})
