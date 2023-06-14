@@ -224,6 +224,15 @@ def getcompany(data):
     df = allCompany.join(listStock)
     df = df.drop(columns='date')
     df = df.fillna(0)
+    df = df.reset_index()
     df = df.to_dict('records')
 
     return json.dumps({'replay':True,'df':df})
+
+
+def gettrade(data):
+    user = CookieToUser(data['cookie'])
+    if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
+    user = user['user']
+
+    return json.dumps({'reply': True})

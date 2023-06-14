@@ -300,6 +300,12 @@ def dara_register():
     data = request.get_json()
     return dara.register(data)
 
+@app.route('/dara/gettrade', methods =['POST', 'GET'])
+def dara_gettrade():
+    data = request.get_json()
+    return dara.gettrade(data)
+
+
 @app.route('/dara/coderegister',methods = ['POST', 'GET'])
 def dara_coderegister():
     data = request.get_json()

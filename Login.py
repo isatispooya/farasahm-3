@@ -56,7 +56,7 @@ def captchaGenerate():
             pt2 = (random.randint(0,250),random.randint(0,50))
             lineColor = (random.randint(0,150),random.randint(0,150),random.randint(0,150))
             cv2.line(captcha,pt1,pt2,lineColor,1)
-    address = f'C:\\Users\\moeen\\Desktop\\project\\pishkar\\Front\\pishkar\\public\\captcha\\'+texcode+'.jpg'
+    address = 'C:\\Users\\moeen\\Desktop\\project\\pishkar\\Front\\pishkar\\public\\captcha\\'+texcode+'.jpg'
     stringImg = base64.b64encode(cv2.imencode('.jpg', captcha)[1]).decode()
     return [texcode,stringImg]
 
