@@ -342,6 +342,13 @@ def dara_getcompany():
     data = request.get_json()
     return dara.getcompany(data)
 
+@app.route('/dara/getsheet',methods = ['POST', 'GET'])
+def dara_getsheet():
+    data = request.get_json()
+    return dara.getsheet(data)
+
+
+
 
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)

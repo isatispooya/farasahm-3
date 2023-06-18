@@ -5,6 +5,7 @@ import pandas as pd
 from io import StringIO
 import pymongo
 from persiantools.jdatetime import JalaliDate
+from persiantools import digits
 import datetime
 from Login import adminCheck
 from sklearn.linear_model import LinearRegression
@@ -234,5 +235,54 @@ def gettrade(data):
     user = CookieToUser(data['cookie'])
     if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
     user = user['user']
+    symbol =  data['symbol']
+    company = farasahmDb['companyList'].find_one(symbol)
+    typeCompany = company['type']
+    if typeCompany == 'Bourse':
+        codeBourse = farasahmDb['register'].find_one({'کد ملی':int(user['nationalCode'])})['کد سهامداری']
+        df = pd.DataFrame(farasahmDb['traders'].find({'کد':codeBourse, 'symbol':symbol['symbol']},
+                                                      {'_id':0, 'کد':0, 'صدور':0, 'fullname':0, 'symbol':0}))
+        if len(df)==0:
+            return json.dumps({'replay': False, 'msg':'معامله ای یافت نشد'})
+        df = df.sort_values('date', ascending = False)
+        df = df.to_dict('records')
+        return json.dumps({'replay':True, 'df':df,'type':'Bourse'})
+    
+    nametrader = farasahmDb['registerNoBours'].find_one({'کد ملی':user['nationalCode']})['نام و نام خانوادگی']
+    sell = pd.DataFrame(farasahmDb['transactions'].find({'sell':nametrader, 'symbol':symbol['symbol']},
+                                                       {'_id':0,'id':0, 'buy':0, 'sell':0, 'symbol':0}))
+    buy = pd.DataFrame(farasahmDb['transactions'].find({'buy':nametrader, 'symbol':symbol['symbol']},
+                                                       {'_id':0,'id':0, 'sell':0, 'buy':0, 'symbol':0}))
+    if len(sell) == 0 and len(buy) == 0:
+        return json.dumps({'replay': False, 'msg': 'معامله ای یافت نشد'})   
+    df = pd.concat([sell, buy])
+    df = df.to_dict('records')
+    return json.dumps({'replay': True, 'df':df, 'type':'NoBourse'})
 
-    return json.dumps({'reply': True})
+def getsheet(data):
+    user = CookieToUser(data['cookie'])
+    if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
+    user = user['user']  
+    symbol = data['symbol']
+    company = farasahmDb['companyList'].find_one(symbol)
+    typeCompany = company['type']
+    if typeCompany == 'Bourse':
+        lastTrade = farasahmDb['trade'].find({'symbol':symbol['symbol']},{"تاریخ معامله":1})
+        lastTrade =[x['تاریخ معامله'] for x in lastTrade]
+        lastTrade = max(lastTrade)
+
+
+        BourseUser = farasahmDb['register'].find_one(
+                                {'کد ملی': int(user['nationalCode']), 'symbol': symbol['symbol'],'تاریخ گزارش': lastTrade},
+                                {'_id':0, 'fullName':1, 'نام پدر':1, 'کد ملی':1,'سهام کل':1})
+        if BourseUser == None:
+            return json.dumps({'replay': False, 'msg':'سهامی ندارید'})
+        
+
+        BourseUser['stockword'] = digits.to_word(BourseUser['سهام کل'])
+        BourseUser['company'] = company['fullname']
+        return json.dumps({'replay': True, 'sheet': BourseUser})
+    
+        
+
+    return json.dumps({'replay': True})
