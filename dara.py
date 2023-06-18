@@ -234,5 +234,6 @@ def gettrade(data):
     user = CookieToUser(data['cookie'])
     if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
     user = user['user']
+    print(data)
 
     return json.dumps({'reply': True})
