@@ -279,6 +279,11 @@ def getreportmetric():
     data = request.get_json()
     return report.getreportmetric(data)
 
+@app.route('/createassembly',methods = ['POST', 'GET'])
+def createassembly():
+    data = request.get_json()
+    return dataManagment.createassembly(data)
+
 
 @app.route('/dara/applynationalcode',methods = ['POST', 'GET'])
 def dara_applynationalcode():

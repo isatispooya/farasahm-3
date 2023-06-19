@@ -509,3 +509,15 @@ def syncbook(data):
         df = pd.DataFrame(farasahmDb['registerNoBours'].find())
         symbols = list(set(df['symbol']))
     return json.dumps({'replay':True})
+
+def createassembly(data):
+    symbol = data['access'][1]
+    date = data['date']/1000
+    date = datetime.datetime.fromtimestamp(date)
+    if date<= datetime.datetime.now():
+        return json.dumps({'replay':False, 'msg': 'تاریخ نمیتواند ماقبل اکنون باشد'})
+    dic = data['dict']
+    dic['symbol'] = symbol
+    dic['date'] = date
+    farasahmDb['assembly'].insert_one(dic)
+    return json.dumps({'replay':True})
