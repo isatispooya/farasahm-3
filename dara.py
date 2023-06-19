@@ -286,6 +286,21 @@ def getsheet(data):
         BourseUser['company'] = company['fullname']
         return json.dumps({'replay': True, 'sheet': BourseUser})
     
+    userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': user['nationalCode'], 'symbol':symbol['symbol']},
+                                                          sort=[('date',-1)])
+    userNoBourse['stockword'] = digits.to_word(userNoBourse['تعداد سهام']) 
+    userNoBourse['company'] = company['fullname']
+    userNoBourse['fullName'] = userNoBourse['نام و نام خانوادگی']
+    userNoBourse['سهام کل'] = userNoBourse['تعداد سهام']
+    del userNoBourse['_id']
+    for i in userNoBourse:
+        userNoBourse[i] = str(userNoBourse[i])
+        
+    #del userNoBourse['rate']
+    #del userNoBourse['شماره حساب']
+    #del userNoBourse['صادره']
+    
+    print(userNoBourse)
         
 
-    return json.dumps({'replay': True})
+    return json.dumps({'replay': True, 'sheet': userNoBourse})
