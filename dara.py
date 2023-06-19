@@ -259,6 +259,9 @@ def gettrade(data):
     df = df.to_dict('records')
     return json.dumps({'replay': True, 'df':df, 'type':'NoBourse'})
 
+    print(data)
+
+
 def getsheet(data):
     user = CookieToUser(data['cookie'])
     if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
