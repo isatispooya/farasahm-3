@@ -72,6 +72,7 @@ def encrypt(msg):
     return msg
 
 def decrypt(msg):
+    print(msg)
     msg = f.decrypt(msg)
     msg = msg.decode()
     return msg
