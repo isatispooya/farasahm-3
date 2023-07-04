@@ -223,7 +223,7 @@ def getnav(data):
     history['rate'] = ((history['nav'] / history['final_price'])-1)*100
     history['rate'] = [round(x,2) for x in history['rate']]
     history['trade_volume'] = [int(x) for x in history['trade_volume']]
-    history['date'] = [str(x).replace('/','') for x in history['date']]
+    history['date'] = [int(str(x).replace('/','')) for x in history['date']]
     history = history.sort_values(by=['date'],ascending=False)
     dic = {'diff':float(history['diff'].max()), 'rate':float(history['rate'].max()),'volume':float(history['trade_volume'].max())}
     history = history.to_dict('records')
@@ -764,3 +764,15 @@ def getreportmetric(data):
            }
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df,'dic':dic})
+
+
+
+def getassembly(data):
+    symbol = data['access'][1]
+    df = pd.DataFrame(farasahmDb['assembly'].find({'symbol':symbol},{'_id':0}))
+    if len(df)==0:
+        return json.dumps({'replay':False,'msg':'مجمع یافت نشد'})
+    df['date'] = [str(JalaliDate(x)) for x in df['date']]  
+    df = df.to_dict('records')
+    print(df)
+    return json.dumps({'replay':True,'df':df})

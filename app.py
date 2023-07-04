@@ -284,7 +284,10 @@ def createassembly():
     data = request.get_json()
     return dataManagment.createassembly(data)
 
-
+@app.route('/getassembly',methods = ['POST', 'GET'])
+def mgetassembly():
+    data = request.get_json()
+    return report.getassembly(data)
 
 
 @app.route('/dara/applynationalcode',methods = ['POST', 'GET'])
@@ -347,7 +350,6 @@ def dara_authenticationsession():
 def dara_getcompany():
     data = request.get_json()
     return dara.getcompany(data)
-
 
 @app.route('/dara/getassembly',methods = ['POST', 'GET'])
 def getassembly():
