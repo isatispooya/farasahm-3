@@ -2,7 +2,9 @@
 import json
 import zipfile
 import pandas as pd
-from io import StringIO
+from io import StringIO 
+from bson import ObjectId
+
 import pymongo
 from persiantools.jdatetime import JalaliDate
 import datetime
@@ -482,7 +484,6 @@ def delshareholders(data):
     return json.dumps({'replay':True})
 
 def setinformationcompany(data):
-
     print(data)
     symbol = data['access'][1]
     dic = data['information']
@@ -521,3 +522,11 @@ def createassembly(data):
     dic['date'] = date
     farasahmDb['assembly'].insert_one(dic)
     return json.dumps({'replay':True})
+
+
+def delassembly(data):
+    symbol = data['access'][1]
+    assembly = data['idassembly']
+    farasahmDb['assembly'].delete_one({'_id':ObjectId(data['_id'])})
+    return json.dumps({'replay':True})
+

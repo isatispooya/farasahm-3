@@ -769,10 +769,12 @@ def getreportmetric(data):
 
 def getassembly(data):
     symbol = data['access'][1]
-    df = pd.DataFrame(farasahmDb['assembly'].find({'symbol':symbol},{'_id':0}))
+    df = pd.DataFrame(farasahmDb['assembly'].find({'symbol':symbol}))
+    print(df)
     if len(df)==0:
         return json.dumps({'replay':False,'msg':'مجمع یافت نشد'})
     df['date'] = [str(JalaliDate(x)) for x in df['date']]  
+    df['_id'] = [str(x) for x in df['_id']]  
+    
     df = df.to_dict('records')
-    print(df)
     return json.dumps({'replay':True,'df':df})

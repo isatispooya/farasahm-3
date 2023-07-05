@@ -284,6 +284,12 @@ def createassembly():
     data = request.get_json()
     return dataManagment.createassembly(data)
 
+@app.route('/delassembly',methods = ['POST', 'GET'])
+def delassembly():
+    data = request.get_json()
+    return dataManagment.delassembly(data)
+
+
 @app.route('/getassembly',methods = ['POST', 'GET'])
 def mgetassembly():
     data = request.get_json()
