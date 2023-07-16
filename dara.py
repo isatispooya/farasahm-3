@@ -46,6 +46,7 @@ def questionauth(data):
     basic = farasahmDb['register'].find_one({'کد ملی':int(nationalCode),'symbol':'visa'},{'_id':0})
 
     boursiCode = list(set(register['کد سهامداری'].to_list()))[:4]
+    
     boursiCode.append(basic['کد سهامداری'])
     random.shuffle(boursiCode)
 
@@ -313,16 +314,12 @@ def getassembly(data):
     if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
     user = user['user']  
     symbol = data['symbol']
-    print(symbol)
     assembly = farasahmDb['assembly'].find_one({'symbol':symbol['symbol']}, sort = [('data', -1)])
     if assembly == None:
         return json.dumps({'replay':False, 'msg': 'مجمعی یافت نشد'})
-    
     if assembly['date'] < datetime.datetime.now():
         return json.dumps({'replay':False, 'msg':'تاریخ مجمع پایان یافته است'})
-    
     del assembly['_id']
-
     assembly['date_jalali'] = str(JalaliDate.to_jalali(assembly['date'].year, assembly['date'].month, assembly['date'].day))
     assembly['date'] = str(assembly['date'])
     return json.dumps({'replay':True, 'assembly': assembly})

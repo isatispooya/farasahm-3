@@ -1,25 +1,16 @@
 import pandas as pd
+import pymongo
+client = pymongo.MongoClient()
+farasahmDb = client['farasahm2']
 
-# تعیین مسیر فایل و رمز آن
-file_path = '"C:\Users\isatis pouya\Desktop\New folder (3)\ww.xlsx"'
-password = 'your_password'
 
-# خواندن داده‌ها از فایل اکسل با رمز
-try:
-    df = pd.read_excel(file_path, engine='openpyxl', sheet_name='Sheet1', password=password)
-except Exception as e:
-    print("خطا در باز کردن فایل: ", e)
-    exit(1)
-
-# اکنون داده‌ها بدون رمز در دیتافریم `df` ذخیره شده‌اند و می‌توانید مراحل دیگر را با آن انجام دهید
-
-# برای نمایش دیتافریم بدون رمز
-print(df)
-
-# برای ذخیره دیتافریم در فایل جدید بدون رمز
-output_file_path = 'output_file.xlsx'
-try:
-    df.to_excel(output_file_path, index=False, engine='openpyxl')
-    print("فایل بدون رمز با موفقیت ذخیره شد.")
-except Exception as e:
-    print("خطا در ذخیره فایل: ", e)
+df =pd.read_excel(r"C:\Users\isatis pouya\Desktop\New folder\Book2.xlsx",dtype=str)
+df = df.fillna('')
+df['تعداد سهام'] = [int(x) for x in df['تعداد سهام']]
+df['symbol'] = 'devisa'
+df['date'] = 14020420
+df['rate'] = df['تعداد سهام'] / df['تعداد سهام'].sum()
+df['rate'] = [int(x*10000)/100 for x in df['rate']]
+df = df.to_dict('records')
+farasahmDb['registerNoBours'].delete_many({'symbol':'devisa'})
+farasahmDb['registerNoBours'].insert_many(df)

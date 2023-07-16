@@ -10,7 +10,6 @@ from persiantools.jdatetime import JalaliDate
 import datetime
 from Login import adminCheck
 from sklearn.linear_model import LinearRegression
-import re
 
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
@@ -517,16 +516,35 @@ def createassembly(data):
     date = datetime.datetime.fromtimestamp(date)
     if date<= datetime.datetime.now():
         return json.dumps({'replay':False, 'msg': 'تاریخ نمیتواند ماقبل اکنون باشد'})
-    dic = data['dict']
+    dic = data['dict'].copy()
     dic['symbol'] = symbol
     dic['date'] = date
-    farasahmDb['assembly'].insert_one(dic)
+    dic['controller'] = data['controller']
+    if '_id' in data['dict'].keys():
+        del dic['_id']
+        farasahmDb['assembly'].update_one({'_id':ObjectId(data['dict']['_id'])},{'$set':dic})
+    else:
+        farasahmDb['assembly'].insert_one(dic)
     return json.dumps({'replay':True})
 
 
 def delassembly(data):
     symbol = data['access'][1]
     assembly = data['idassembly']
-    farasahmDb['assembly'].delete_one({'_id':ObjectId(data['_id'])})
+    farasahmDb['assembly'].delete_one({'_id':ObjectId(assembly['_id'])})
     return json.dumps({'replay':True})
 
+def addpersonalassembly(data):
+    symbol = data['access'][1]
+    dic = data['dataPersonal']
+    dic['symbol'] = symbol
+    check = farasahmDb['personalAssembly'].find_one({'کد ملی':dic['کد ملی'],'symbol':symbol})
+    if check != None:
+        return json.dumps({'replay':False,'msg':'فرد قبلا به حاضرین اضافه شده'})
+    farasahmDb['personalAssembly'].insert_one(dic)
+    return json.dumps({'replay':True})
+
+def delpersonalassembly(data):
+    symbol = data['access'][1]
+    check = farasahmDb['personalAssembly'].delete_one({'کد ملی':int(data['row']),'symbol':symbol})
+    return json.dumps({'replay':True})

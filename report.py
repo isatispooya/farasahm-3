@@ -1,4 +1,5 @@
 
+
 import json
 import pandas as pd
 from io import StringIO
@@ -778,3 +779,98 @@ def getassembly(data):
     
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df})
+
+
+
+# نا قص
+def getpersonaldata(data):
+    symbol = data['access'][1]
+    companyType = farasahmDb['companyList'].find_one({'symbol':symbol},{'type':1,'_id':0})['type']
+    if companyType == 'Bourse':
+        lastupdate = farasahmDb['register'].find_one({},sort=[('تاریخ گزارش',-1)])['تاریخ گزارش']
+        register = farasahmDb['register'].find_one({'کد ملی':int(data['idPersonal']),'تاریخ گزارش':int(lastupdate)},{'_id':0})
+        if register == None:
+            return json.dumps({'replay':False,'msg':'فرد در حال حاضر سهامدار نیست'})
+        else:
+            return json.dumps({'replay':True,'df':register})
+
+    return json.dumps({'replay':True,'df':'df'})
+
+
+def personalinassembly(data):
+    symbol = data['access'][1]
+    df = pd.DataFrame(farasahmDb['personalAssembly'].find({'symbol':symbol},{'_id':0,'کد سهامداری':1,'سهام کل':1,'fullName':1,'کد ملی':1,'تاریخ تولد':1,'نام پدر':1,'محل صدور':1}))
+    total = farasahmDb['companyBasicInformation'].find_one({'symbol':symbol},{'_id':0,'تعداد سهام':1})['تعداد سهام']
+    if len(df)==0:
+        return json.dumps({'replay':False,'msg':'فردی به حاضرین مجمع افزوده نشده'})
+    df['rate'] = (df['سهام کل'] / int(total)) *100
+    df['rate'] = [int(x*1000)/1000 for x in df['rate']]
+    votes = pd.DataFrame(farasahmDb['votes'].find({'symbol':symbol,'type':'controller'},sort=[('date',-1)]))
+    if len(votes)>0:
+        votes = votes[['nc','opt']]
+        votes = votes.drop_duplicates(subset=['nc'])
+        votes = votes.rename(columns={'nc':'کد ملی'})
+        votes = votes.set_index('کد ملی')
+        df = df.set_index('کد ملی')
+        df = df.join(votes).reset_index()
+        df['opt'] = df['opt'].fillna('')
+    else:
+        df['opt'] = ''
+
+    df = df.to_dict('records')
+    return json.dumps({'replay':True,'df':df})
+
+
+def getsheetassembly(data):
+    symbol = data['symbol']
+    nc = data['nc']
+    assembly = farasahmDb['assembly'].find_one({'symbol':symbol},sort=[('date',-1)])
+    if assembly ==None: return json.dumps({'replay':False,'msg':'هیچ مجمعی یافت نشد'})
+    del assembly['_id']
+    del assembly['date']
+    company = farasahmDb['companyList'].find_one({'symbol':symbol},{'type':1,'_id':0,'fullname':1})
+    companyType = company['type']
+    if companyType == 'Bourse':
+        lastupdate = farasahmDb['register'].find_one({},sort=[('تاریخ گزارش',-1)])['تاریخ گزارش']
+        register = farasahmDb['register'].find_one({'کد ملی':int(nc),'تاریخ گزارش':int(lastupdate)},{'_id':0})
+        if register == None:
+            return json.dumps({'replay':False,'msg':'فرد در حال حاضر سهامدار نیست'})
+    response = {'register':register,'assembly':assembly,'company':company}
+    return json.dumps({'replay':True,'data':response})
+
+
+def getdatavotes(data):
+    symbol = data['access'][1]
+    assembly = farasahmDb['assembly'].find_one({'symbol':symbol},sort=[('date',-1)])
+
+    del assembly['_id']
+    del assembly['date']
+
+    return json.dumps({'replay':True,'data':assembly})
+
+
+def addvoteasemboly(data):
+    symbol = data['access'][1]
+    vote = data['controllerVotes']
+    vote['date'] = int(str(JalaliDate(datetime.datetime.now())).replace('-',''))
+    vote['symbol'] = symbol
+    vote['type'] = 'controller'
+    if farasahmDb['votes'].find_one({'nc':vote['nc'],'date':vote['date'],'symbol':symbol,'type':vote['type']}) != None:
+        farasahmDb['votes'].update_one({'nc':vote['nc'],'date':vote['date'],'symbol':symbol,'type':vote['type']},{'$set':{'opt':vote['opt']}})
+    else:
+        farasahmDb['votes'].insert_one(vote)
+    return json.dumps({'replay':True})
+
+
+def getresultvotes(data):
+    df = pd.DataFrame(farasahmDb['votes'].find({'symbol':data['symbol'],'type':'controller'},{'_id':0}))
+    df['count'] = 1
+    df = df[['opt','count']].groupby('opt').sum()
+    df = df.sort_values(by=['count'],ascending=False).reset_index()
+    df['status'] = '-'
+    df['status'][0] = 'منتخب'
+    df['status'][1] = 'علی البدل'
+    df = df.to_dict('records')
+    company = farasahmDb['companyList'].find_one({'symbol':data['symbol']},{'type':1,'_id':0,'fullname':1})
+
+    return json.dumps({'replay':True, 'df':df,'company':company})

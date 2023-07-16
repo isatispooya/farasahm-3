@@ -212,6 +212,21 @@ def setTransaction():
     data = request.get_json()
     return dataManagment.setTransaction(data)
 
+@app.route('/getpersonaldata',methods = ['POST', 'GET'])
+def getpersonaldata():
+    data = request.get_json()
+    return report.getpersonaldata(data)
+
+@app.route('/personalinassembly',methods = ['POST', 'GET'])
+def personalinassembly():
+    data = request.get_json()
+    return report.personalinassembly(data)
+
+@app.route('/addpersonalassembly',methods = ['POST', 'GET'])
+def addpersonalassembly():
+    data = request.get_json()
+    return dataManagment.addpersonalassembly(data)
+
 
 @app.route('/gettransactions',methods = ['POST', 'GET'])
 def gettransactions():
@@ -289,11 +304,36 @@ def delassembly():
     data = request.get_json()
     return dataManagment.delassembly(data)
 
+@app.route('/delpersonalassembly',methods = ['POST', 'GET'])
+def delpersonalassembly():
+    data = request.get_json()
+    return dataManagment.delpersonalassembly(data)
+
+@app.route('/getdatavotes',methods = ['POST', 'GET'])
+def getdatavotes():
+    data = request.get_json()
+    return report.getdatavotes(data)
+
+@app.route('/addvoteasemboly',methods = ['POST', 'GET'])
+def addvoteasemboly():
+    data = request.get_json()
+    return report.addvoteasemboly(data)
+
 
 @app.route('/getassembly',methods = ['POST', 'GET'])
 def mgetassembly():
     data = request.get_json()
     return report.getassembly(data)
+
+@app.route('/getsheetassembly',methods = ['POST', 'GET'])
+def getsheetassembly():
+    data = request.get_json()
+    return report.getsheetassembly(data)
+
+@app.route('/getresultvotes',methods = ['POST', 'GET'])
+def getresultvotes():
+    data = request.get_json()
+    return report.getresultvotes(data)
 
 
 @app.route('/dara/applynationalcode',methods = ['POST', 'GET'])
