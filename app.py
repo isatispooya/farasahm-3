@@ -227,12 +227,10 @@ def addpersonalassembly():
     data = request.get_json()
     return dataManagment.addpersonalassembly(data)
 
-
 @app.route('/gettransactions',methods = ['POST', 'GET'])
 def gettransactions():
     data = request.get_json()
     return report.gettransactions(data)
-
 
 @app.route('/addtradernobourse',methods = ['POST', 'GET'])
 def addtradernobourse():
