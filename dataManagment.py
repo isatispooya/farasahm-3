@@ -548,3 +548,77 @@ def delpersonalassembly(data):
     symbol = data['access'][1]
     check = farasahmDb['personalAssembly'].delete_one({'کد ملی':int(data['row']),'symbol':symbol})
     return json.dumps({'replay':True})
+
+
+
+def addcapitalincrease(data):
+    symbol = data['access'][1]
+    company = farasahmDb['companyList'].find_one({'symbol':symbol})
+    if company['type']=='NoBourse':
+        df = pd.DataFrame(farasahmDb['registerNoBours'].find({'symbol':symbol}))
+        df = df[df['date']==df['date'].max()]
+        if data['data']['methode'] == 'آورده سهامداران':
+            total = df['تعداد سهام'].sum()
+            grow = (int(data['data']['cuont'])/total)-1
+            dff = df[['نام و نام خانوادگی','کد ملی','نام پدر','تعداد سهام','symbol']]
+            dff['حق تقدم'] = dff['تعداد سهام'] * grow
+            dff['حق تقدم'] = dff['حق تقدم'].astype(int)
+            dff['تاریخ'] = str(JalaliDate(datetime.datetime.fromtimestamp(int(data['dateSelection'])/1000))).replace('-','/')
+            dff['dateInt'] = int(str(JalaliDate(datetime.datetime.fromtimestamp(int(data['dateSelection'])/1000))).replace('-',''))
+            dff = dff.drop(columns=['تعداد سهام'])
+            semi = int(data['data']['cuont']) - dff['حق تقدم'].sum() - total
+            if 'پاره سهم' in dff['نام و نام خانوادگی'].to_list():
+                dff.loc[df['نام و نام خانوادگی'] == 'پاره سهم', 'تعداد سهام'] = df[df['نام و نام خانوادگی'] == 'پاره سهم']['تعداد سهام'] + semi
+            else:
+                semiDf = pd.DataFrame([{'نام و نام خانوادگی':'پاره سهم',"کد ملی":"99","حق تقدم":semi,'نام پدر':''}])
+                farasahmDb['registerNoBours'].insert_one({'نام و نام خانوادگی':'پاره سهم',"کد ملی":"99","تعداد سهام":0,'نام پدر':'','شماره تماس':'','symbol':symbol,'date':int(df['date'].max()),'rate':0,'صادره':''})
+                dff = pd.concat([dff,semiDf])
+            dff = dff.fillna(method='ffill').reset_index().drop(columns=['index'])
+            dff['حق تقدم استفاده شده'] = 0
+            
+            dff = dff.to_dict('records')
+            farasahmDb['Priority'].insert_many(dff)
+            dic = {'date':str(JalaliDate(datetime.datetime.fromtimestamp(int(data['dateSelection'])/1000))).replace('-','/'),
+                   'newCount':int(data['data']['cuont']),'newCapitalIns':int(data['data']['capital']),'symbol':symbol,'methode':data['data']['methode'],'rate':grow*100}
+            farasahmDb['capitalIns'].insert_one(dic)
+    return json.dumps({'replay':True})
+
+
+def delcapitalincrease(data):
+    symbol = data['access'][1]
+    id = ObjectId(data['id'])
+    dic = farasahmDb['capitalIns'].find_one({'_id':id})
+    farasahmDb['Priority'].delete_many({'symbol':symbol,'تاریخ':dic['date']})
+    farasahmDb['capitalIns'].delete_many({'_id':id})
+    return json.dumps({'replay':True})
+
+
+
+def settransactionpriority(data):
+    symbol = data['access'][1]
+    transaction = data['transaction']
+    frmBalance = farasahmDb['Priority'].find_one({'symbol':symbol,'نام و نام خانوادگی':transaction['frm']})
+    if frmBalance == None: return json.dumps({'replay':False,'msg':'فروشنده یافت نشد'})
+    frmBalance = int(frmBalance['حق تقدم'])
+    if frmBalance<int(transaction['count']):return json.dumps({'replay':False,'msg':'تعداد حق تقدم فروشنده کافی نیست'})
+    frmBalance = frmBalance - int(transaction['count'])
+    toBalance = farasahmDb['Priority'].find_one({'symbol':symbol,'نام و نام خانوادگی':transaction['to']})
+    if toBalance == None: return json.dumps({'replay':False,'msg':'خریدار یافت نشد'})
+    toBalance = int(toBalance['حق تقدم'])
+    toBalance = toBalance + int(transaction['count'])
+    farasahmDb['Priority'].update_one({'symbol':symbol,'نام و نام خانوادگی':transaction['frm']},{'$set':{'حق تقدم':frmBalance}})
+    farasahmDb['Priority'].update_one({'symbol':symbol,'نام و نام خانوادگی':transaction['to']},{'$set':{'حق تقدم':toBalance}})
+    return json.dumps({'replay':True})
+
+
+def setpayprority(data):
+    symbol = data['access'][1]
+    pay = data['pay']
+    frmBalance = farasahmDb['Priority'].find_one({'symbol':symbol,'نام و نام خانوادگی':pay['frm']})
+    if frmBalance == None: return json.dumps({'replay':False,'msg':'سهامدار یافت نشد'})
+    frmBalance = int(frmBalance['حق تقدم'])
+    if frmBalance<int(pay['count']):return json.dumps({'replay':False,'msg':'تعداد حق تقدم سهامدار کافی نیست'})
+    frmBalance = frmBalance - int(pay['count'])
+    farasahmDb['Priority'].update_one({'symbol':symbol,'نام و نام خانوادگی':pay['frm']},{'$set':{'حق تقدم':frmBalance,'حق تقدم استفاده شده':int(pay['count'])}})
+    return json.dumps({'replay':True})
+

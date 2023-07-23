@@ -13,8 +13,6 @@ from persiantools.jdatetime import JalaliDate
 
 farasahmDb = client['farasahm2']
 
-
-
 def Day_list():  
     yaer = ['1399','1400','1401','1402']
     mon = ['01','02','03','04','05','06','07','08','09','10','11','12']
@@ -880,3 +878,23 @@ def getresultvotes(data):
     company = farasahmDb['companyList'].find_one({'symbol':data['symbol']},{'type':1,'_id':0,'fullname':1})
 
     return json.dumps({'replay':True, 'df':df,'company':company})
+
+
+
+def getcapitalincrease(data):
+    symbol = data['access'][1]
+    df = pd.DataFrame(farasahmDb['capitalIns'].find({'symbol':symbol}))
+    df['_id'] = df['_id'].astype(str)
+    df = df.to_dict('records')
+    return json.dumps({'replay':True, 'df':df})
+
+
+
+
+def getpriority(data):
+    symbol = data['access'][1]
+    df = pd.DataFrame(farasahmDb['Priority'].find({'symbol':symbol}))
+    df['_id'] = df['_id'].astype(str)
+    df = df.fillna(0)
+    df = df.to_dict('records')
+    return json.dumps({'replay':True,'df':df})

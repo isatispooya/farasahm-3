@@ -333,6 +333,35 @@ def getresultvotes():
     data = request.get_json()
     return report.getresultvotes(data)
 
+@app.route('/addcapitalincrease',methods = ['POST', 'GET'])
+def addcapitalincrease():
+    data = request.get_json()
+    return dataManagment.addcapitalincrease(data)
+
+@app.route('/getcapitalincrease',methods = ['POST', 'GET'])
+def getcapitalincrease():
+    data = request.get_json()
+    return report.getcapitalincrease(data)
+
+@app.route('/delcapitalincrease',methods = ['POST', 'GET'])
+def delcapitalincrease():
+    data = request.get_json()
+    return dataManagment.delcapitalincrease(data)
+
+@app.route('/getpriority',methods = ['POST', 'GET'])
+def getpriority():
+    data = request.get_json()
+    return report.getpriority(data)
+
+@app.route('/settransactionpriority',methods = ['POST', 'GET'])
+def settransactionpriority():
+    data = request.get_json()
+    return dataManagment.settransactionpriority(data)
+
+@app.route('/setpayprority',methods = ['POST', 'GET'])
+def setpayprority():
+    data = request.get_json()
+    return dataManagment.setpayprority(data)
 
 @app.route('/dara/applynationalcode',methods = ['POST', 'GET'])
 def dara_applynationalcode():
