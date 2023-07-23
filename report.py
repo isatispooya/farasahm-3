@@ -863,20 +863,16 @@ def addvoteasemboly(data):
 def getresultvotes(data):
     df = pd.DataFrame(farasahmDb['votes'].find({'symbol':data['symbol'],'type':'controller'},{'_id':0}))
     dff = pd.DataFrame(farasahmDb['personalAssembly'].find({'symbol':data['symbol']},sort=[('تاریخ گزارش',-1)]))[['کد ملی','سهام کل']]
-
     allVote = dff['سهام کل'].sum()
     df = df.set_index('nc').join(dff.set_index('کد ملی'))
     df = df[['opt','سهام کل']].groupby('opt').sum()
-
     df = df.sort_values(by=['سهام کل'],ascending=False).reset_index()
-
     df['status'] = '-'
     df['status'][0] = 'منتخب'
     df['status'][1] = 'علی البدل'
     df = pd.concat([df,pd.DataFrame([{'opt':'باطله','سهام کل':dff['سهام کل'].sum()-df['سهام کل'].sum(),'status':'-'}])])
     df = df.to_dict('records')
     company = farasahmDb['companyList'].find_one({'symbol':data['symbol']},{'type':1,'_id':0,'fullname':1})
-
     return json.dumps({'replay':True, 'df':df,'company':company})
 
 
@@ -887,9 +883,6 @@ def getcapitalincrease(data):
     df['_id'] = df['_id'].astype(str)
     df = df.to_dict('records')
     return json.dumps({'replay':True, 'df':df})
-
-
-
 
 def getpriority(data):
     symbol = data['access'][1]
