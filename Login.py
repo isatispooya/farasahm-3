@@ -101,10 +101,19 @@ def applyCode(data):
 
 def access(data):
     _id= ObjectId(data['id'])
-    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0,'app':1,'disable':1,'admin':1})
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc==None:
         return json.dumps({'replay':False})
-    return json.dumps({'replay':True,'acc':acc['app'],'disable':acc['disable'],'admin':acc['admin']})
+    menu = [x for x in farasahmDb['menu'].find({},{'_id':0})]
+    enabled = []
+    disabled = []
+    if acc['enabled']['all'] == True:
+        enabled = menu
+
+
+    del acc['enabled']
+    del acc['disabled']
+    return json.dumps({'replay':True,'acc':acc, 'enabled':enabled, 'disabled':disabled})
 
 def adminCheck(id):
     _id= ObjectId(id)
@@ -112,3 +121,17 @@ def adminCheck(id):
     if acc==None:
         return False
     return acc['admin']
+
+
+def getApp(data):
+    _id= ObjectId(data['id'])
+    acc = farasahmDb['user'].find_one({'_id':_id})
+    if acc==None:
+        return json.dumps({'reply':False})
+    app = farasahmDb['menu'].find_one({'name':data['symbol']},{'_id':0})
+    if app==None:
+        return json.dumps({'reply':False})
+    if acc['enabled']['all'] == True:
+        return json.dumps({'reply':True, 'app':app})
+        
+    return json.dumps({'reply':True, 'app':app})

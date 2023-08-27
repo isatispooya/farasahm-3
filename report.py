@@ -1,4 +1,5 @@
 
+from flask import send_file
 
 import json
 import pandas as pd
@@ -10,6 +11,13 @@ from dataManagment import lastupdate
 import numpy as np
 client = pymongo.MongoClient()
 from persiantools.jdatetime import JalaliDate
+from PIL import Image, ImageDraw, ImageFont
+import arabic_reshaper
+from bidi.algorithm import get_display
+from persiantools import characters, digits
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from bson import ObjectId
 
 farasahmDb = client['farasahm2']
 
@@ -859,7 +867,6 @@ def addvoteasemboly(data):
         farasahmDb['votes'].insert_one(vote)
     return json.dumps({'replay':True})
 
-
 def getresultvotes(data):
     df = pd.DataFrame(farasahmDb['votes'].find({'symbol':data['symbol'],'type':'controller'},{'_id':0}))
     dff = pd.DataFrame(farasahmDb['personalAssembly'].find({'symbol':data['symbol']},sort=[('تاریخ گزارش',-1)]))[['کد ملی','سهام کل']]
@@ -875,8 +882,6 @@ def getresultvotes(data):
     company = farasahmDb['companyList'].find_one({'symbol':data['symbol']},{'type':1,'_id':0,'fullname':1})
     return json.dumps({'replay':True, 'df':df,'company':company})
 
-
-
 def getcapitalincrease(data):
     symbol = data['access'][1]
     df = pd.DataFrame(farasahmDb['capitalIns'].find({'symbol':symbol}))
@@ -891,3 +896,130 @@ def getpriority(data):
     df = df.fillna(0)
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df})
+
+
+
+def getprioritytransaction(data):
+    symbol = data['access'][1]
+    df = pd.DataFrame(farasahmDb['PriorityTransaction'].find({'symbol':symbol},{'popUp':False}))
+    df['_id'] = df['_id'].apply(str)
+    df['date'] = df['date'].apply(JalaliDate.to_gregorian)
+    df['date'] = df['date'].apply(str)
+    df = df.to_dict('records')
+
+    return json.dumps({'replay':True,'df':df})
+
+
+
+def preemptioncard(data):
+    dt = farasahmDb['Priority'].find_one({'symbol':data['sym'],'کد ملی':data['nc']},{'_id':0,'تعداد سهام':0})
+    if dt == None:return json.dumps({'replay':False})
+    return json.dumps({'replay':True})
+
+
+
+def preemptioncardjpg(data):
+    dt = farasahmDb['Priority'].find_one({'symbol':data['sym'],'کد ملی':data['nc']},{'_id':0})
+    saham = farasahmDb['registerNoBours'].find_one({'کد ملی':data['nc'],'symbol':data['sym']})
+    if dt == None:return json.dumps({'replay':False})
+    a4_width, a4_height = int(210 * 3.779527559), int(297 * 3.779527559)
+    a4_image = Image.new("RGB", (a4_width, a4_height), "white")
+    logo_path = "public/logo.jpg"
+    logo_image = Image.open(logo_path)
+    logo_width_new = int(a4_width * 0.2)
+    logo_height_new = int(logo_image.height * (logo_width_new / logo_image.width))
+    logo_image = logo_image.resize((logo_width_new, logo_height_new))
+    x_position_logo = (a4_width - logo_width_new) // 2
+    y_position_logo = 30  
+    a4_image.paste(logo_image, (x_position_logo, y_position_logo))
+    draw = ImageDraw.Draw(a4_image)
+    textRow1 = "سهامدار گرامی " + dt['نام و نام خانوادگی'] + " با کد/شناسه ملی " + digits.en_to_fa(str(dt['کد ملی'])) + ' دارای تعداد ' + digits.en_to_fa(str(dt['تعداد سهام'])) + 'سهم'
+    textRow1 = arabic_reshaper.reshape(textRow1)
+    textRow1 = get_display(textRow1)
+    font_size = 15
+    font_path = "public/Peyda-Medium.ttf" 
+    font = ImageFont.truetype(font_path, font_size)
+    text_width, text_height = draw.textsize(textRow1, font=font)
+    x_position_text = (a4_width - text_width) - 10
+    y_position_text = y_position_logo + logo_height_new + 25 
+    text_color = (0, 0, 0)
+    draw.text((x_position_text, y_position_text), textRow1, fill=text_color, font=font)
+    textRow2 = 'بنا به تصمیم مجمع عمومی فوق العاده مورخ 1401/08/09 شرکت مبنی بر افزایش سرمایه شرکت از '+ digits.en_to_fa('2000000000000')+ ' ريال \n'
+    textRow2 = textRow2 + digits.to_word(2000000000000) + ' به ' + digits.en_to_fa('6000000000000')  +  digits.to_word(6000000000000) + ' ریال ،' + ' شما میتوانید از حق تقدم خود معادل ' + digits.en_to_fa(str(dt['حق تقدم'])) + ' سهم به ارزش اسمی \n' 
+    textRow2 = textRow2 + digits.en_to_fa('1000') + ' ریال استفاده نمایید.'  + ' لذا خواهشمند است با توجه به مصوبات موجود که مبلغ ' + digits.en_to_fa(str(int(dt['حق تقدم'])*1000)) + ' ریال به صورت آورده' + '\n'
+    textRow2 = textRow2 + ' نقدی طبق اعلامیه پذیرش نویسی در روز نامه پیمان یزد به شماره 5848 مورخ 1402/04/21 و به مدت ' + digits.en_to_fa('60') 
+    textRow2 = textRow2 + '\n' + ' روز نسبت به استفاده' + ' حق تقدم و پذیره نویسی تا تاریخ 1402/06/19 اقدام نمایید.'
+    textRow2 = arabic_reshaper.reshape(textRow2)
+    textRow2 = get_display(textRow2)
+    font = ImageFont.truetype(font_path, font_size)
+    text_width, text_height = draw.textsize(textRow2, font=font)
+    x_position_text = (a4_width - text_width) - 30
+    y_position_text = y_position_logo + logo_height_new + 55
+    draw.text((x_position_text, y_position_text), textRow2, fill=text_color, font=font,align='right')
+    textRow3 = 'بنابر این مبلغ ....................... ريال بر اساس فیش نقدی به شماره ................بانک صادرات حساب شماره \n 0116875409002 به نام شرکت صنایع مفتول ایساتیس پویا به پیوست ارائه میگردد.'
+    textRow3 = arabic_reshaper.reshape(textRow3)
+    textRow3 = get_display(textRow3)
+    text_width, text_height = draw.textsize(textRow3, font=font)
+    x_position_text = (a4_width - text_width) - 50
+    y_position_text = y_position_logo + logo_height_new + 160
+    draw.text((x_position_text, y_position_text), textRow3, fill=text_color, font=font,align='right')
+    textRow3 = 'امضا'
+    textRow3 = arabic_reshaper.reshape(textRow3)
+    textRow3 = get_display(textRow3)
+    text_width, text_height = draw.textsize(textRow3, font=font)
+    x_position_text = (a4_width - 100)
+    y_position_text = y_position_logo + logo_height_new + 240
+    draw.text((200, y_position_text), textRow3, fill=text_color, font=font)
+    textRow3 = 'اینجانب استفاده از حق تقدم خود جهت شرکت در افزایش  سرمایه به آقا/خانم/شرکت ....................... واگذار میکنم\nکه تصاویر مدارک هویتی نامبرده به پیوست ارائه میگردد. '
+    textRow3 = arabic_reshaper.reshape(textRow3)
+    textRow3 = get_display(textRow3)
+    text_width, text_height = draw.textsize(textRow3, font=font)
+    x_position_text = (a4_width - text_width) - 50
+    y_position_text = y_position_logo + logo_height_new + 290
+    draw.text((x_position_text, y_position_text), textRow3, fill=text_color, font=font,align='right')
+    textRow4 = 'امضای استفاده کننده حق تقدم' + (' '*120) +'امضای سهامدار'
+    textRow4 = arabic_reshaper.reshape(textRow4)
+    textRow4 = get_display(textRow4)
+    text_width, text_height = draw.textsize(textRow4, font=font)
+    x_position_text = (a4_width - text_width) /2
+    y_position_text = y_position_logo + logo_height_new + 380
+    draw.text((x_position_text, y_position_text), textRow4, fill=text_color, font=font,align='right')
+    font_size = 11
+    font = ImageFont.truetype(font_path, font_size)
+    textRow4 = 'لطفا با تکمیل نمودن فرم، آن را به امور سهام شرکت واقع در بلوار جمهوری ساختمان آنا طبقه 6 واحد 61 تحویل نمایید\nجهت کسب اطلاعات بیشتر با شماره 5233366-035'
+    textRow4 = arabic_reshaper.reshape(textRow4)
+    textRow4 = get_display(textRow4)
+    text_width, text_height = draw.textsize(textRow4, font=font)
+    x_position_text = (a4_width - text_width) -20
+    y_position_text = y_position_logo + logo_height_new + 430
+    draw.text((x_position_text, y_position_text), textRow4, fill=text_color, font=font,align='right')
+    #dic = {'nc':data['nc'],'name':dt['نام و نام خانوادگی'],'symbol':data['sym'],'date':datetime.datetime.now()}
+    #farasahmDb['GetCardPreemption'].insert_many(dic)
+    a4_image.save("public/final_a4_image.png")
+    return send_file("public/final_a4_image.png", as_attachment=True, mimetype="image/png")
+
+
+def preemptioncardpdf(data):
+    preemptioncardjpg(data)
+    image = Image.open('public/final_a4_image.png')
+
+    page_width, page_height = A4
+    image_width, image_height = image.size
+    scale = min(page_width / image_width, page_height / image_height)
+    image_width_scaled = image_width * scale
+    image_height_scaled = image_height * scale
+    pdf = canvas.Canvas('public/final_a4_image.pdf', pagesize=A4)
+    pdf.drawImage('public/final_a4_image.png', 0, 0, width=image_width_scaled, height=image_height_scaled)
+    pdf.save()
+    return send_file("public/final_a4_image.pdf", as_attachment=True)
+
+
+def getxlsxpriority(data):
+    symbol = data['access'][1]
+    date = farasahmDb['capitalIns'].find_one({'_id':ObjectId(data['id'])})['date']
+    df = pd.DataFrame(farasahmDb['Priority'].find({'symbol':symbol,'تاریخ':date}))
+    df = df[df['کد ملی']!='99']
+    df['url'] = 'farasahm.fidip.ir/pbl/pc/'+ symbol +'/'+ df['کد ملی'].astype(str)
+    df = df.rename(columns={'نام و نام خانوادگی':'fullName','کد ملی':'nationalCode','نام پدر':'fathersName','حق تقدم':'countPriority','تاریخ':'date','حق تقدم استفاده شده':'usedCountPriority'})
+    df.to_excel('public/df.xlsx',index=False)
+    return send_file("public/df.xlsx", as_attachment=True)

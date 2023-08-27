@@ -42,6 +42,12 @@ def applyCode():
     data = request.get_json()
     return Login.applyCode(data)
 
+@app.route('/getapp',methods = ['POST', 'GET'])
+def getApp():
+    data = request.get_json()
+    return Login.getApp(data)
+
+
 @app.route('/access',methods = ['POST', 'GET'])
 def access():
     data = request.get_json()
@@ -362,6 +368,44 @@ def settransactionpriority():
 def setpayprority():
     data = request.get_json()
     return dataManagment.setpayprority(data)
+
+@app.route('/getprioritypay',methods = ['POST', 'GET'])
+def getprioritypay():
+    data = request.get_json()
+    return dataManagment.getprioritypay(data)
+
+
+@app.route('/delprioritypay',methods = ['POST', 'GET'])
+def delprioritypay():
+    data = request.get_json()
+    return dataManagment.delprioritypay(data)
+
+
+@app.route('/getprioritytransaction',methods = ['POST', 'GET'])
+def getprioritytransaction():
+    data = request.get_json()
+    return report.getprioritytransaction(data)
+
+@app.route('/preemptioncard',methods = ['POST', 'GET'])
+def preemptioncard():
+    data = request.get_json()
+    return report.preemptioncard(data)
+
+@app.route('/preemptioncardjpg',methods = ['POST', 'GET'])
+def preemptioncardjpg():
+    data = request.get_json()
+    return report.preemptioncardjpg(data)
+
+@app.route('/preemptioncardpdf',methods = ['POST', 'GET'])
+def preemptioncardpdf():
+    data = request.get_json()
+    return report.preemptioncardpdf(data)
+
+@app.route('/getxlsxpriority',methods = ['POST', 'GET'])
+def getxlsxpriority():
+    data = request.get_json()
+    return report.getxlsxpriority(data)
+
 
 @app.route('/dara/applynationalcode',methods = ['POST', 'GET'])
 def dara_applynationalcode():
