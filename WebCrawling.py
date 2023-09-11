@@ -74,14 +74,13 @@ def WC():
                 df[0]['nav'] = nav
                 farasahm_db['fixIncomeHistori'].insert_many(df)
         except:
-            print('ee')
             pass
 
 
     driver.quit()
 
 
-WC()
+
 
 #schedule.every().day.at("19:30").do(WC)
 #

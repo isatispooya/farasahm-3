@@ -200,7 +200,6 @@ def getcompany(data):
     if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
     user = user['user']
     stockBourse = pd.DataFrame(farasahmDb['register'].find({'کد ملی':int(user['nationalCode'])},{'_id':0,'symbol':1,'سهام کل':1,'تاریخ گزارش':1}))
-    print(stockBourse)
     stockBourse = stockBourse.rename(columns={'سهام کل':'تعداد سهام','تاریخ گزارش':'date'})
     listStock = []
     if len(stockBourse)>0:
@@ -219,7 +218,6 @@ def getcompany(data):
             dff = dff.to_dict('records')[0]
             listStock.append(dff)
             
-    print(listStock)
   
     allCompany = pd.DataFrame(farasahmDb['companyList'].find({},{'_id':0}))
     allStockCompany = pd.DataFrame(farasahmDb['companyBasicInformation'].find({},{'_id':0,'تعداد سهام':1,'symbol':1}))

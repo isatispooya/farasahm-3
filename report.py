@@ -18,6 +18,7 @@ from persiantools import characters, digits
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from bson import ObjectId
+import function
 
 farasahmDb = client['farasahm2']
 
@@ -347,8 +348,6 @@ def getcompare(data):
                     del dic["final_price"]
                     df = pd.DataFrame(dic.items(),columns=['period','ptp'])
                     df = df[df['period']!="dateInt"]
-                    print(df)
-                    print(periodList)
                     df['periodint'] = [365/int(x) for x in periodList]
                     df['yearly'] = round(((((df['ptp']+1)**df['periodint'])-1)*100),2)
                     df['ptp'] = [round((x*100),2) for x in df['ptp']]
@@ -551,7 +550,6 @@ def getinformationcompany(data):
     dic = farasahmDb['companyBasicInformation'].find_one({'symbol':symbol},{'_id':0,'symbol':0})
     if dic == None:
         return json.dumps({'replay':True,'dic':{}})
-    print(dic)
     return json.dumps({'replay':True,'dic':dic})
 
 
@@ -723,7 +721,6 @@ def excerpttrader(data):
             dic[f'status_{prid}'] = status
         else:
             dic[f'status_{prid}'] = {'avalibale':False}
-    print(dic)
     return json.dumps({'replay':True,'dic':dic})
 
 
@@ -731,7 +728,6 @@ def excerpttrader(data):
 def getformerstockman(data):
     symbol = data['access'][1]
     df = pd.DataFrame(farasahmDb['register'].find({'symbol':symbol}))
-    print(df)
     return json.dumps({'replay':True,'dic':'dic'})
 
 
@@ -777,7 +773,6 @@ def getreportmetric(data):
 def getassembly(data):
     symbol = data['access'][1]
     df = pd.DataFrame(farasahmDb['assembly'].find({'symbol':symbol}))
-    print(df)
     if len(df)==0:
         return json.dumps({'replay':False,'msg':'مجمع یافت نشد'})
     df['date'] = [str(JalaliDate(x)) for x in df['date']]  
@@ -901,12 +896,13 @@ def getpriority(data):
 
 def getprioritytransaction(data):
     symbol = data['access'][1]
-    df = pd.DataFrame(farasahmDb['PriorityTransaction'].find({'symbol':symbol},{'popUp':False}))
+    df = pd.DataFrame(farasahmDb['PriorityTransaction'].find({'symbol':symbol},{'popUp':0,'symbol':0}))
+    if len(df)==0:
+        return json.dumps({'replay':False,'msg':'تراکنشی یافت نشد'})
     df['_id'] = df['_id'].apply(str)
-    df['date'] = df['date'].apply(JalaliDate.to_gregorian)
+    df['date'] = df['date'].apply(JalaliDate.to_jalali)
     df['date'] = df['date'].apply(str)
     df = df.to_dict('records')
-
     return json.dumps({'replay':True,'df':df})
 
 
@@ -986,7 +982,7 @@ def preemptioncardjpg(data):
     draw.text((x_position_text, y_position_text), textRow4, fill=text_color, font=font,align='right')
     font_size = 11
     font = ImageFont.truetype(font_path, font_size)
-    textRow4 = 'لطفا با تکمیل نمودن فرم، آن را به امور سهام شرکت واقع در بلوار جمهوری ساختمان آنا طبقه 6 واحد 61 تحویل نمایید\nجهت کسب اطلاعات بیشتر با شماره 5233366-035'
+    textRow4 = 'لطفا با تکمیل نمودن فرم، آن را به امور سهام شرکت واقع در بلوار جمهوری ساختمان آنا طبقه 6 واحد 61 تحویل نمایید\nجهت کسب اطلاعات بیشتر با شماره 35233366-035'
     textRow4 = arabic_reshaper.reshape(textRow4)
     textRow4 = get_display(textRow4)
     text_width, text_height = draw.textsize(textRow4, font=font)
@@ -1023,3 +1019,103 @@ def getxlsxpriority(data):
     df = df.rename(columns={'نام و نام خانوادگی':'fullName','کد ملی':'nationalCode','نام پدر':'fathersName','حق تقدم':'countPriority','تاریخ':'date','حق تقدم استفاده شده':'usedCountPriority'})
     df.to_excel('public/df.xlsx',index=False)
     return send_file("public/df.xlsx", as_attachment=True)
+
+
+
+def desk_broker_volumeTrade(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'replay':False})
+    df = farasahmDb['TradeListBroker']
+    dateTo = data['date'][1]
+    dateFrom = data['date'][0]
+    pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
+    pipelineTse = [{"$match": {"dataInt": {"$gte": 14020101}}},{"$group":{ "_id": {"fund": "$صندوق","date": "$dataInt","InstrumentCategory":"$InstrumentCategory"},"totalNetPrice": {"$sum": "$ارزش"}}}]
+    df = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
+    df = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in df]
+    df = pd.DataFrame(df).sort_values(by=['date'])
+    if len(df)==0:
+        return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
+    df_oragh = df[df['type']=='true'][['date','value']].rename(columns={'value':'اوراق'}).set_index('date')
+    df = df[df['type']=='false']
+    df_fund = df[df['fund']==True][['date','value']].rename(columns={'value':'صندوق'}).set_index('date')
+    df_stock = df[df['fund']==False][['date','value']].rename(columns={'value':'سهام'}).set_index('date')
+    df = df_stock.join(df_fund,how='outer').join(df_oragh,how='outer').fillna(0)
+    tse = list(farasahmDb['tse'].aggregate(pipelineTse))
+    tse = [{ 'date':x['_id']['date'] , 'type':x['_id']['InstrumentCategory'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in tse]
+    tse = pd.DataFrame(tse)
+    tse_oragh = tse[tse['type']==True][['date','value']].rename(columns={'value':'کل اوراق'}).set_index('date')
+    tse = tse[tse['type']==False]
+    tse_fund = tse[tse['fund']==True][['date','value']].rename(columns={'value':'کل صندوق ها'}).set_index('date')
+    tse_stoke = tse[tse['fund']==False][['date','value']].rename(columns={'value':'کل سهام'}).set_index('date')
+    df = df.join(tse_oragh).join(tse_fund).join(tse_stoke)
+    df['کل'] = df['سهام'] + df['اوراق'] + df['صندوق']
+    df['کل بازار'] = df['کل سهام'] + df['کل صندوق ها'] + df['کل اوراق']
+    df['نسبت کل'] = df['کل'] / df['کل بازار']
+    df['نسبت اوراق'] = df['اوراق'] / df['کل اوراق']
+    df['نسبت صندوق'] = df['صندوق'] / df['کل صندوق ها']
+    df['نسبت سهام'] = df['سهام'] / df['کل سهام']
+    tse_mean = {'نسبت اوراق':df['نسبت اوراق'].mean(), 'نسبت صندوق':df['نسبت صندوق'].mean(), 'نسبت سهام':df['نسبت سهام'].mean(), 'نسبت کل':df['نسبت کل'].mean()}
+    if dateFrom != None and dateTo != None:
+        dateFrom = function.timestumpToJalalInt(dateFrom)
+        dateTo = function.timestumpToJalalInt(dateTo)
+        df = df[df.index<=dateTo]
+        df = df[df.index>=dateFrom]
+    elif dateFrom != None:
+        dateFrom = function.timestumpToJalalInt(dateFrom)
+        df = df[df.index>=dateFrom]
+    elif dateTo != None:
+        dateTo = function.timestumpToJalalInt(dateTo)
+        df = df[df.index<=dateTo]
+    dic = {}
+    df = df.fillna(0)
+    for c in df.columns:
+        if c in ['نسبت کل','نسبت اوراق','نسبت صندوق','نسبت سهام']:
+            df[c] = df[c].apply(function.floatTo2decimal)
+            df[f'{c} انحراف'] = df[c] - float(function.floatTo2decimal(tse_mean[c]))
+            df[f'{c} انحراف'] = df[f'{c} انحراف'].apply(function.floatTo2decimalNormal)
+        else:
+            df[c] = df[c].apply(function.toBillionRial)
+    for c in df.columns:
+        dic[c] = float(df[c].max())
+    df = df.reset_index()
+    df = df.sort_values(by='date',ascending=False)
+    df = df.to_dict('records')
+    return json.dumps({'replay':True,'df':df,'dic':dic})
+
+
+def desk_broker_dateavalibale(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'replay':False})
+    dataList = farasahmDb['TradeListBroker'].distinct('dateInt')
+    dataList = [str(x) for x in dataList]
+    lastDate = str(max(dataList))
+    lastDate = JalaliDate(int(lastDate[:4]), int(lastDate[4:6]), int(lastDate[6:8])).to_gregorian()
+    weekDate = lastDate - datetime.timedelta(days=7)
+    lastDate = str(JalaliDate.to_jalali(lastDate.year, lastDate.month, lastDate.day))
+    weekDate = str(JalaliDate.to_jalali(weekDate.year, weekDate.month, weekDate.day))
+    return json.dumps({'dataList':dataList,'lastDate':lastDate,'weekDate':weekDate})
+
+def desk_broker_gettraders(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'replay':False})
+    symbol = farasahmDb['menu'].find_one({'name':data['access'][1]})['symbol']
+    date = function.timestumpToJalalInt(data['date'])
+    df = pd.DataFrame(farasahmDb['TradeListBroker'].find(
+        {'dateInt':date,'TradeSymbolAbs':symbol},
+        {'_id':0,'AddedValueTax':0,'BondDividend':0,'BranchID':0,'Discount':0,'InstrumentCategory':0,'MarketInstrumentISIN':0,'page':0,'Update':0,'dateInt':0,
+         'صندوق':0,'DateYrInt':0,'DateMnInt':0,'DateDyInt':0,'TradeSymbolAbs':0,'TradeItemBroker':0,'TradeItemRayanBourse':0,'TradeNumber':0,'TradeSymbol':0,'نام':0}))
+    
+    df = df.groupby(by=['TradeCode']).apply(function.Apply_Trade_Symbol,symbol = symbol)
+    dic = {'Volume_Buy':int(df['Volume_Buy'].max()),'Volume_Sell':int(df['Volume_Buy'].max())}
+    df = df.to_dict('records')
+
+    return json.dumps({'replay':True,'df':df,'dic':dic})

@@ -3,6 +3,18 @@ import json
 import base64
 import pandas as pd
 
+import random
+import string
+
+
+
+
+def generate_random_key(length=32):
+    characters = string.ascii_letters + string.digits + string.punctuation + string.ascii_letters + string.ascii_letters + string.ascii_letters + string.digits
+    random_key = ''.join(random.choice(characters) for _ in range(length))
+    return random_key
+
+
 def generate_cipher_suite(key):
     code_bytes = key.encode("utf-8")
     key = base64.urlsafe_b64encode(code_bytes.ljust(32)[:32])

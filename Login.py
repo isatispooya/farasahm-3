@@ -109,8 +109,19 @@ def access(data):
     disabled = []
     if acc['enabled']['all'] == True:
         enabled = menu
-
-
+    else:
+        for i in menu:
+            if i['name'] in acc['enabled'].keys():
+                if acc['enabled'][i['name']]['all']:
+                    enabled.append(i)
+                else:
+                    dicMenu = i
+                    for j in i['menu']:
+                        if j['url'] not in acc['enabled'][i['name']]['mainMenu']:
+                            dicMenu['menu'].remove(j)
+                    enabled.append(dicMenu)
+            elif i['name'] in acc['disabled']:
+                disabled.append(i)
     del acc['enabled']
     del acc['disabled']
     return json.dumps({'replay':True,'acc':acc, 'enabled':enabled, 'disabled':disabled})
@@ -133,5 +144,11 @@ def getApp(data):
         return json.dumps({'reply':False})
     if acc['enabled']['all'] == True:
         return json.dumps({'reply':True, 'app':app})
-        
+    else:
+        if acc['enabled'][data['symbol']]['all']:
+            return json.dumps({'reply':True, 'app':app})
+        else:
+            app['menu'] = [item for item in app['menu'] if item['url'] in acc['enabled'][data['symbol']]['mainMenu']]
+
+
     return json.dumps({'reply':True, 'app':app})
