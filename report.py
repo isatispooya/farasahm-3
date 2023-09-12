@@ -1113,9 +1113,12 @@ def desk_broker_gettraders(data):
         {'dateInt':date,'TradeSymbolAbs':symbol},
         {'_id':0,'AddedValueTax':0,'BondDividend':0,'BranchID':0,'Discount':0,'InstrumentCategory':0,'MarketInstrumentISIN':0,'page':0,'Update':0,'dateInt':0,
          'صندوق':0,'DateYrInt':0,'DateMnInt':0,'DateDyInt':0,'TradeSymbolAbs':0,'TradeItemBroker':0,'TradeItemRayanBourse':0,'TradeNumber':0,'TradeSymbol':0,'نام':0}))
-    
-    df = df.groupby(by=['TradeCode']).apply(function.Apply_Trade_Symbol,symbol = symbol)
-    dic = {'Volume_Buy':int(df['Volume_Buy'].max()),'Volume_Sell':int(df['Volume_Buy'].max())}
+    df = df[pd.to_numeric(df['NetPrice'], errors='coerce').notnull()]
+    df = df.groupby(by=['TradeCode']).apply(function.Apply_Trade_Symbol,symbol = symbol,date=date)
+    dic = {'Volume_Buy':int(df['Volume_Buy'].max()),'Volume_Sell':int(df['Volume_Buy'].max()),'Price_Buy':int(df['Price_Buy'].max()),'Price_Sell':int(df['Price_Sell'].max()),'balance':int(df['balance'].max())}
     df = df.to_dict('records')
 
     return json.dumps({'replay':True,'df':df,'dic':dic})
+
+
+

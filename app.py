@@ -386,6 +386,11 @@ def getprioritytransaction():
     data = request.get_json()
     return report.getprioritytransaction(data)
 
+@app.route('/delprioritytransaction',methods = ['POST', 'GET'])
+def delprioritytransaction():
+    data = request.get_json()
+    return dataManagment.delprioritytransaction(data)
+
 @app.route('/preemptioncard',methods = ['POST', 'GET'])
 def preemptioncard():
     data = request.get_json()

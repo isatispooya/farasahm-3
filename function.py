@@ -5,6 +5,8 @@ import requests
 from persiantools.jdatetime import JalaliDate
 from persiantools import characters, digits
 import pymongo
+from pymongo import ASCENDING,DESCENDING
+
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
 
@@ -165,7 +167,7 @@ def toBillionRial(x):
 
     
 
-def Apply_Trade_Symbol(group,symbol):
+def Apply_Trade_Symbol(group,symbol,date):
     group['NetPrice_Buy'] = group[group['TradeType']=='Buy']['NetPrice'].sum()
     group['Volume_Buy'] = group[group['TradeType']=='Buy']['Volume'].sum()
     group['Price_Buy'] = group['NetPrice_Buy'] / group['Volume_Buy']
@@ -174,11 +176,53 @@ def Apply_Trade_Symbol(group,symbol):
     group['Volume_Sell'] = group[group['TradeType']=='Sell']['Volume'].sum()
     group['Price_Sell'] = group['NetPrice_Sell'] / group['Volume_Sell']
     group['TotalCommission_Sell'] = group[group['TradeType']=='Sell']['TotalCommission'].sum()
+    tree = group[['Price','Volume','TradeDate','BranchTitle','TradeType','NetPrice','TotalCommission']]
+    tree['NetPrice_Buy'] = tree[tree['TradeType']=='Buy']['NetPrice']
+    tree['Volume_Buy'] = tree[tree['TradeType']=='Buy']['Volume']
+    tree['Price_Buy'] = tree[tree['TradeType']=='Buy']['Price']
+    tree['TotalCommission_Buy'] = tree[tree['TradeType']=='Buy']['TotalCommission']
+    tree['NetPrice_Sell'] = tree[tree['TradeType']=='Sell']['NetPrice']
+    tree['Volume_Sell'] = tree[tree['TradeType']=='Sell']['Volume']
+    tree['Price_Sell'] = tree[tree['TradeType']=='Sell']['Price']
+    tree['TotalCommission_Sell'] = tree[tree['TradeType']=='Sell']['TotalCommission']
+    tree = tree.drop(columns=['Price','Volume','TradeType','NetPrice','TotalCommission']).fillna(0)
+    tree['TradeDate'] = [str(x).split('T')[1] for x in tree['TradeDate']]
+    tree['balance'] = ' '
+    tree = tree.to_dict('records')
     group = group.drop(columns=['NetPrice','Price','TotalCommission','TradeDate','TradeStationType','TradeType','TransferTax','Volume'])
+    group['_children'] = tree
     group = group[group.index==group.index.max()]
     group = group.fillna(0)
-    print(group)
-    #df = farasahmDb['assetsCoustomerBroker'].find()
+    group['Price_Buy'] = group['Price_Buy'].apply(int)
+    group['Price_Sell'] = group['Price_Sell'].apply(int)
+    TradeCode = group['TradeCode'][group.index.max()]
+    df = pd.DataFrame(farasahmDb['assetsCoustomerBroker'].find({'TradeCode':TradeCode,'dateInt':date}))
+    nc = str(TradeCode)[4:]
+    balanceRegister = farasahmDb['register'].find({'کد ملی':int(nc),'نماد کدال':symbol}).sort("تاریخ گزارش", DESCENDING).limit(1)
+    balanceRegister = [x for x in balanceRegister]
+    if len(balanceRegister)>0:
+        group['balanceRegister'] = balanceRegister[0]['سهام کل']
+    else:
+        group['balanceRegister'] = 0
+
+    name = farasahmDb['assetsCoustomerBroker'].find_one({'TradeCode':TradeCode},{'_id':0,'CustomerTitle':1})
+    if len(df) == 0:
+        group['balance'] = 0
+    else:
+        df['Symbol'] = df['Symbol'].apply(remove_non_alphanumeric)
+        df = df[df['Symbol']==symbol]
+    if len(df) == 0:
+        group['balance'] = 0
+    else:
+        group['balance'] = int(df['Volume'][df.index.max()])
+    
+    if name !=None:
+        group['CustomerTitle'] = name['CustomerTitle']
+    elif len(balanceRegister)>0:
+        group['CustomerTitle'] = balanceRegister[0]['نام خانوادگی ']
+    else:
+        group['CustomerTitle'] = 'نامشخص'
+
     return group
 
 def convert_TradeCode_To_name(code):
@@ -193,3 +237,4 @@ def drop_duplicet_TradeListBroker():
     df = df.drop_duplicates(subset=['BranchID','MarketInstrumentISIN','NetPrice','Price','TotalCommission','TradeCode','TradeDate','TradeItemBroker','TradeNumber','TradeSymbol','TradeType','Volume'])
     farasahmDb['TradeListBroker'].delete_many({"dateInt":jalaliInt})
     farasahmDb['TradeListBroker'].insert_many(df.to_dict('records'))
+    

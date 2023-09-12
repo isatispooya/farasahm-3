@@ -450,8 +450,9 @@ def addtradernobourse(data):
     symbol = data['access'][1]
     data['dataTrader']['نام و نام خانوادگی'] = data['dataTrader']['نام و نام خانوادگی'].replace('  ',' ').strip()
     if '_id' in data['dataTrader']:
+        id_ = data['dataTrader']['_id']
         del data['dataTrader']['_id']
-        farasahmDb['registerNoBours'].update_many({'symbol':symbol,'نام و نام خانوادگی':data['dataTrader']['نام و نام خانوادگی']},{'$set':data['dataTrader']})
+        farasahmDb['registerNoBours'].update_many({'_id':ObjectId(id_)},{'$set':data['dataTrader']})
     else:
         check = farasahmDb['registerNoBours'].find_one({'symbol':symbol,'نام و نام خانوادگی':data['dataTrader']['نام و نام خانوادگی']})!=None
         if check:return json.dumps({'replay':False,'msg':'سهامداری با همین نام موجود است امکان ثبت وجود ندارد'})
@@ -660,3 +661,6 @@ def delprioritypay(data):
     farasahmDb['Priority'].update_one({'_id':CheackBase['_id']},{'$set':{'حق تقدم استفاده شده':int(CheackBase['حق تقدم استفاده شده'])-int(cheack['count']),'حق تقدم':int(CheackBase['حق تقدم'])+int(cheack['count'])}})
     return json.dumps({'replay':True})
 
+def delprioritytransaction(data):
+    farasahmDb['TradeListBroker'].delete_one({'_id':ObjectId(data['id'])})
+    return json.dumps({'replay':True})

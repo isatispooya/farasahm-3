@@ -347,9 +347,6 @@ def get_asset_customer():
                     assets['TradeCode'] = TradeCode
                     assets['dateInt'] = today
                     assets['update'] = datetime.datetime.now()
-                    print(TradeCode)
-                    print(today)
-                    print(assets)
                     assets = assets.to_dict('records')
                     farasahmDb['assetsCoustomerBroker'].delete_many({"TradeCode":TradeCode,"dateInt":today})
                     farasahmDb['assetsCoustomerBroker'].insert_many(assets)
