@@ -6,15 +6,18 @@ from persiantools.jdatetime import JalaliDate
 from persiantools import characters, digits
 import pymongo
 from pymongo import ASCENDING,DESCENDING
-
+import time
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
 
 def gorgianIntToJalaliInt(date):
+    date = str(date).replace('-','')
+    print(date)
     y = str(date)[:4]
     m = str(date)[4:6]
     d = str(date)[6:8]
-    Jalali = (JalaliDate.to_jalali(int(y),int(m),int(d)))
+
+    Jalali = JalaliDate.to_jalali(int(y),int(m),int(d))
     return int(str(Jalali).replace('-',''))
 
 def todayIntJalali():
@@ -70,8 +73,7 @@ def is_time_between(start,end):
         return False
     
 
-def toDayJalaliListYMD():
-    Today = datetime.datetime.now()
+def toDayJalaliListYMD(Today = datetime.datetime.now()):
     Today = JalaliDate.to_jalali(Today)
     Today = str(Today).split('-')
     Today = [int(x) for x in Today]
@@ -120,28 +122,38 @@ def isOragh(name):
     else:
         return False
     
-def getTseToday():
-    today = datetime.datetime.now()
-    dt = datetime.datetime(today.year,today.month,today.day,15,0,0)
-    jalali = JalaliDate.to_jalali(today)
+def getTseDate(date=datetime.datetime.now()):
+    dt = datetime.datetime(date.year,date.month,date.day,15,0,0)
+    jalali = JalaliDate.to_jalali(date)
     jalaliStr = str(jalali).replace('-','/')
     jalaliInt =int(str(jalali).replace('-',''))
-    #res = requests.get(url=f'http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d={jalali}')
-    res = requests.get(url='http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d=0')
-    if res.status_code == 200:
-        df = pd.read_excel(res.content,header=2, engine='openpyxl')
-        if len(df)>10:
-            df['نماد'] = df['نماد'].apply(characters.ar_to_fa)
-            df['نام'] = df['نام'].apply(characters.ar_to_fa)
-            df['صندوق'] = df['نام'].apply(isFund)
-            df['InstrumentCategory'] = df['نام'].apply(isOragh)
-            df['data'] = jalaliStr
-            df['dataInt'] = jalaliInt
-            df['timestump'] = dt.timestamp()
-            df['time'] = str(dt.hour) +':'+str(dt.minute)+':'+str(dt.second)
-            df = df.to_dict('records')
-            farasahmDb['tse'].delete_many({'dataInt':jalaliInt})
-            farasahmDb['tse'].insert_many(df)
+    avalibale = farasahmDb['tse'].find_one({'dataInt':jalaliInt})
+    print('start get tse in', jalaliInt)
+    if (date != datetime.datetime.now() and avalibale!=None) == False:
+        if date != datetime.datetime.now():
+            res = requests.get(url=f'http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d={jalali}')
+        else:
+            res = requests.get(url='http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d=0')
+        if res.status_code == 200:
+            df = pd.read_excel(res.content,header=2, engine='openpyxl')
+            if len(df)>10:
+                df['نماد'] = df['نماد'].apply(characters.ar_to_fa)
+                df['نام'] = df['نام'].apply(characters.ar_to_fa)
+                df['صندوق'] = df['نام'].apply(isFund)
+                df['InstrumentCategory'] = df['نام'].apply(isOragh)
+                df['data'] = jalaliStr
+                df['dataInt'] = jalaliInt
+                df['timestump'] = dt.timestamp()
+                df['time'] = str(dt.hour) +':'+str(dt.minute)+':'+str(dt.second)
+                df = df.to_dict('records')
+                farasahmDb['tse'].delete_many({'dataInt':jalaliInt})
+                farasahmDb['tse'].insert_many(df)
+
+def getTse30LastDay():
+    for d in range(1,30):
+        day = datetime.datetime.now() - datetime.timedelta(days=d)
+        getTseDate(day)
+        
 
 def remove_non_alphanumeric(input_string):
     result = ''.join(character for character in input_string if character.isalpha())
@@ -190,8 +202,9 @@ def Apply_Trade_Symbol(group,symbol,date):
     tree['balance'] = ' '
     tree = tree.to_dict('records')
     group = group.drop(columns=['NetPrice','Price','TotalCommission','TradeDate','TradeStationType','TradeType','TransferTax','Volume'])
-    group['_children'] = tree
     group = group[group.index==group.index.max()]
+    group['_children'] = ''
+    group['_children'][group.index.max()] = tree
     group = group.fillna(0)
     group['Price_Buy'] = group['Price_Buy'].apply(int)
     group['Price_Sell'] = group['Price_Sell'].apply(int)
@@ -229,12 +242,10 @@ def convert_TradeCode_To_name(code):
     pass
 
 
-def drop_duplicet_TradeListBroker():
-    today = datetime.datetime.now()
-    jalali = JalaliDate.to_jalali(today)
-    jalaliInt =int(str(jalali).replace('-',''))
+def drop_duplicet_TradeListBroker(jalaliInt = todayIntJalali()):
     df = pd.DataFrame(farasahmDb['TradeListBroker'].find({"dateInt":jalaliInt},{'_id':0}))
     df = df.drop_duplicates(subset=['BranchID','MarketInstrumentISIN','NetPrice','Price','TotalCommission','TradeCode','TradeDate','TradeItemBroker','TradeNumber','TradeSymbol','TradeType','Volume'])
     farasahmDb['TradeListBroker'].delete_many({"dateInt":jalaliInt})
     farasahmDb['TradeListBroker'].insert_many(df.to_dict('records'))
+    print('drop duplicets')
     

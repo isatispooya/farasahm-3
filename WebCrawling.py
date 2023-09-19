@@ -4,10 +4,9 @@ import pymongo
 from selenium import webdriver
 import warnings
 import time
-import schedule
 from selenium.webdriver.common.by import By
 import os
-import function
+import Fnc
 
 warnings.filterwarnings("ignore")
 client = pymongo.MongoClient()
@@ -64,7 +63,7 @@ def WC():
 
             df.columns = ['<TICKER>', 'date', 'first_price', 'highest_price', 'lowest_price', 'close_price','trade_value', 'trade_volume', 'trade_number', '<PER>', 'first_price', 'final_price']
             df = df[['highest_price','lowest_price','final_price','close_price','first_price','trade_value','trade_volume','trade_number','date']]
-            df['dateInt'] = [function.gorgianIntToJalaliInt(x) for x in df['date']]
+            df['dateInt'] = [Fnc.gorgianIntToJalaliInt(x) for x in df['date']]
             df['date'] = df['dateInt']
             df = df[df['dateInt']>int(lastUpdate)]
             if len(df)>0:

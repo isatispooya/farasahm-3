@@ -1,6 +1,6 @@
 import pymongo
 import pandas as pd
-import function
+import Fnc
 import time
 import datetime
 import requests

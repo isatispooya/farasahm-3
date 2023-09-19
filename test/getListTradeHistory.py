@@ -1,4 +1,4 @@
-import function
+import Fnc
 import ApiMethods
 import pandas as pd
 import encryption

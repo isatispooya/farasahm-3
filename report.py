@@ -18,7 +18,7 @@ from persiantools import characters, digits
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from bson import ObjectId
-import function
+import Fnc
 
 farasahmDb = client['farasahm2']
 
@@ -1028,7 +1028,6 @@ def desk_broker_volumeTrade(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'replay':False})
-    df = farasahmDb['TradeListBroker']
     dateTo = data['date'][1]
     dateFrom = data['date'][0]
     pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
@@ -1059,25 +1058,25 @@ def desk_broker_volumeTrade(data):
     df['نسبت سهام'] = df['سهام'] / df['کل سهام']
     tse_mean = {'نسبت اوراق':df['نسبت اوراق'].mean(), 'نسبت صندوق':df['نسبت صندوق'].mean(), 'نسبت سهام':df['نسبت سهام'].mean(), 'نسبت کل':df['نسبت کل'].mean()}
     if dateFrom != None and dateTo != None:
-        dateFrom = function.timestumpToJalalInt(dateFrom)
-        dateTo = function.timestumpToJalalInt(dateTo)
+        dateFrom = Fnc.timestumpToJalalInt(dateFrom)
+        dateTo = Fnc.timestumpToJalalInt(dateTo)
         df = df[df.index<=dateTo]
         df = df[df.index>=dateFrom]
     elif dateFrom != None:
-        dateFrom = function.timestumpToJalalInt(dateFrom)
+        dateFrom = Fnc.timestumpToJalalInt(dateFrom)
         df = df[df.index>=dateFrom]
     elif dateTo != None:
-        dateTo = function.timestumpToJalalInt(dateTo)
+        dateTo = Fnc.timestumpToJalalInt(dateTo)
         df = df[df.index<=dateTo]
     dic = {}
     df = df.fillna(0)
     for c in df.columns:
         if c in ['نسبت کل','نسبت اوراق','نسبت صندوق','نسبت سهام']:
-            df[c] = df[c].apply(function.floatTo2decimal)
-            df[f'{c} انحراف'] = df[c] - float(function.floatTo2decimal(tse_mean[c]))
-            df[f'{c} انحراف'] = df[f'{c} انحراف'].apply(function.floatTo2decimalNormal)
+            df[c] = df[c].apply(Fnc.floatTo2decimal)
+            df[f'{c} انحراف'] = df[c] - float(Fnc.floatTo2decimal(tse_mean[c]))
+            df[f'{c} انحراف'] = df[f'{c} انحراف'].apply(Fnc.floatTo2decimalNormal)
         else:
-            df[c] = df[c].apply(function.toBillionRial)
+            df[c] = df[c].apply(Fnc.toBillionRial)
     for c in df.columns:
         dic[c] = float(df[c].max())
     df = df.reset_index()
@@ -1108,13 +1107,13 @@ def desk_broker_gettraders(data):
     if acc == None:
         return json.dumps({'replay':False})
     symbol = farasahmDb['menu'].find_one({'name':data['access'][1]})['symbol']
-    date = function.timestumpToJalalInt(data['date'])
+    date = Fnc.timestumpToJalalInt(data['date'])
     df = pd.DataFrame(farasahmDb['TradeListBroker'].find(
         {'dateInt':date,'TradeSymbolAbs':symbol},
         {'_id':0,'AddedValueTax':0,'BondDividend':0,'BranchID':0,'Discount':0,'InstrumentCategory':0,'MarketInstrumentISIN':0,'page':0,'Update':0,'dateInt':0,
          'صندوق':0,'DateYrInt':0,'DateMnInt':0,'DateDyInt':0,'TradeSymbolAbs':0,'TradeItemBroker':0,'TradeItemRayanBourse':0,'TradeNumber':0,'TradeSymbol':0,'نام':0}))
     df = df[pd.to_numeric(df['NetPrice'], errors='coerce').notnull()]
-    df = df.groupby(by=['TradeCode']).apply(function.Apply_Trade_Symbol,symbol = symbol,date=date)
+    df = df.groupby(by=['TradeCode']).apply(Fnc.Apply_Trade_Symbol,symbol = symbol,date=date)
     dic = {'Volume_Buy':int(df['Volume_Buy'].max()),'Volume_Sell':int(df['Volume_Buy'].max()),'Price_Buy':int(df['Price_Buy'].max()),'Price_Sell':int(df['Price_Sell'].max()),'balance':int(df['balance'].max())}
     df = df.to_dict('records')
 
@@ -1122,3 +1121,71 @@ def desk_broker_gettraders(data):
 
 
 
+def desk_broker_turnover(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'replay':False})
+    dateTo = data['date'][1]
+    dateFrom = data['date'][0]
+    pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
+    df = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
+    df = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in df]
+    df = pd.DataFrame(df).sort_values(by=['date'])
+    if len(df)==0:
+        return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
+    df_oragh = df[df['type']=='true'][['date','value']].rename(columns={'value':'اوراق'}).set_index('date')
+    df = df[df['type']=='false']
+    df_fund = df[df['fund']==True][['date','value']].rename(columns={'value':'صندوق'}).set_index('date')
+    df_stock = df[df['fund']==False][['date','value']].rename(columns={'value':'سهام'}).set_index('date')
+    df = df_stock.join(df_fund,how='outer').join(df_oragh,how='outer').fillna(0)
+    sabadCode =['61580281855','61580155499','61580186248','61580209324','6156185287','6156293799','6156185291','6156274220','6156227513','6156233785','6156292015','6156259476']
+    pipeline = [{"$match": {"TradeCode": {"$in": sabadCode}}},{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
+    sabad = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
+    sabad = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in sabad]
+    sabad = pd.DataFrame(sabad).sort_values(by=['date'])
+    if len(sabad)==0:
+        return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
+    sabad_oragh = sabad[sabad['type']=='true'][['date','value']].rename(columns={'value':'اوراق سبد'}).set_index('date')
+    sabad_fund = sabad[sabad['fund']==True][['date','value']].rename(columns={'value':'صندوق سبد'}).set_index('date')
+    sabad = sabad[sabad['type']=='false']
+    sabad_stock = sabad[sabad['fund']==False][['date','value']].rename(columns={'value':'سهام سبد'}).set_index('date')
+    sabad = sabad_stock.join(sabad_fund,how='outer').join(sabad_oragh,how='outer').fillna(0)
+    df = df.join(sabad_oragh).join(sabad_fund).join(sabad_stock)
+
+    df['کل'] = df['سهام'] + df['اوراق'] + df['صندوق']
+    df['سبد'] = df['اوراق سبد'] + df['صندوق سبد'] + df['سهام سبد']
+    df['نسبت کل'] = df['سبد'] / df['کل']
+    df['نسبت اوراق'] = df['اوراق سبد'] / df['اوراق']
+    df['نسبت صندوق'] = df['صندوق سبد'] / df['صندوق']
+    df['نسبت سهام'] = df['سهام سبد'] / df['سهام']
+    mean = {'نسبت اوراق':df['نسبت اوراق'].mean(), 'نسبت صندوق':df['نسبت صندوق'].mean(), 'نسبت سهام':df['نسبت سهام'].mean(), 'نسبت کل':df['نسبت کل'].mean()}
+    if dateFrom != None and dateTo != None:
+        dateFrom = Fnc.timestumpToJalalInt(dateFrom)
+        dateTo = Fnc.timestumpToJalalInt(dateTo)
+        df = df[df.index<=dateTo]
+        df = df[df.index>=dateFrom]
+    elif dateFrom != None:
+        dateFrom = Fnc.timestumpToJalalInt(dateFrom)
+        df = df[df.index>=dateFrom]
+    elif dateTo != None:
+        dateTo = Fnc.timestumpToJalalInt(dateTo)
+        df = df[df.index<=dateTo]
+    dic = {}
+    df = df.fillna(0)
+    for c in df.columns:
+        if c in ['نسبت کل','نسبت اوراق','نسبت صندوق','نسبت سهام']:
+            df[c] = df[c].apply(Fnc.floatTo2decimal)
+            df[f'{c} انحراف'] = df[c] - float(Fnc.floatTo2decimal(mean[c]))
+            df[f'{c} انحراف'] = df[f'{c} انحراف'].apply(Fnc.floatTo2decimalNormal)
+        else:
+            df[c] = df[c].apply(Fnc.toBillionRial)
+    for c in df.columns:
+        dic[c] = float(df[c].max())
+
+    df = df.reset_index()
+    df = df.sort_values(by='date',ascending=False)
+    print(df)
+    df = df.to_dict('records')
+    return json.dumps({'replay':True,'df':df,'dic':dic})

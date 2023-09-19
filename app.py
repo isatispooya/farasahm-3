@@ -498,6 +498,11 @@ def desk_broker_gettraders():
     data = request.get_json()
     return report.desk_broker_gettraders(data)
 
+@app.route('/desk/broker/turnover',methods = ['POST', 'GET'])
+def desk_broker_turnover():
+    data = request.get_json()
+    return report.desk_broker_turnover(data)
+
 
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)

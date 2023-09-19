@@ -148,7 +148,21 @@ def getApp(data):
         if acc['enabled'][data['symbol']]['all']:
             return json.dumps({'reply':True, 'app':app})
         else:
-            app['menu'] = [item for item in app['menu'] if item['url'] in acc['enabled'][data['symbol']]['mainMenu']]
+            appMenu = []
+            for item in app['menu']:
+                if item['url'] in acc['enabled'][data['symbol']]['mainMenu']:
+                    if len(item['sub'])==0:
+                        appMenu.append(item)
+                    else:
+                        appSubMenu = []
+                        for j in item['sub']:
+                            if j['url'] in acc['enabled'][data['symbol']]['mainMenu']:
+                                appSubMenu.append(j)
+                        if len(appSubMenu)>0:
+                            item['sub'] = appSubMenu
+                            appMenu.append(item)
+            app['menu'] = appMenu
+
 
 
     return json.dumps({'reply':True, 'app':app})

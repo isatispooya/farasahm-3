@@ -1,7 +1,7 @@
 import requests
 import pandas as pd
 import xml.etree.ElementTree as ET
-import function
+import Fnc
 import xml.etree.ElementTree as ET
 import encryption
 import pymongo
@@ -22,7 +22,7 @@ def GetBranchList():
     response = response.content
     response = response.decode("utf-8")
     root = ET.fromstring(response)
-    xml_dict = function.element_to_dict(root)
+    xml_dict = Fnc.element_to_dict(root)
     Body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetBranchListResponse']['{http://tempuri.org/}GetBranchListResult']['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}BranchDto']
     lst = []
     for i in Body:
@@ -48,7 +48,7 @@ def GetTradeTimeTrades(fromTime, toTime,page):
     response = response.content
     response = response.decode("utf-8")
     root = ET.fromstring(response)
-    xml_dict = function.element_to_dict(root)
+    xml_dict = Fnc.element_to_dict(root)
     body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetTradeTimeTradesResponse']['{http://tempuri.org/}GetTradeTimeTradesResult']['{http://schemas.datacontract.org/2004/07/TadbirPardaz.Infrastructure.DataAccess}Result']['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}TradeDto']
     lst = []
     for i in body:
@@ -88,7 +88,7 @@ def GetCustomerPortfolio(nationalIdentification):
     response = response.content
     response = response.decode("utf-8")
     root = ET.fromstring(response)
-    xml_dict = function.element_to_dict(root)
+    xml_dict = Fnc.element_to_dict(root)
     body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetCustomerPortfolioResponse']['{http://tempuri.org/}GetCustomerPortfolioResult']['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}PortfolioDto']
     lst = []
     for i in body:
@@ -111,7 +111,7 @@ def GetCustomerByNationalCode(nationalIdentification):
     response = response.content
     response = response.decode("utf-8")
     root = ET.fromstring(response)
-    xml_dict = function.element_to_dict(root)
+    xml_dict = Fnc.element_to_dict(root)
     body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetCustomerByNationalCodeResponse']['{http://tempuri.org/}GetCustomerByNationalCodeResult']
     dic = {}
     for i in body:
@@ -137,7 +137,7 @@ def GetCustomerMomentaryAssets(tradeCode):
     response = response.content
     response = response.decode("utf-8")
     root = ET.fromstring(response)
-    xml_dict = function.element_to_dict(root)
+    xml_dict = Fnc.element_to_dict(root)
     body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetCustomerMomentaryAssetsResponse']['{http://tempuri.org/}GetCustomerMomentaryAssetsResult']
     if len(body) == 0:
         return []
@@ -186,7 +186,7 @@ def GetFirmByNationalIdentification(nationalIdentification):
     response = response.content
     response = response.decode("utf-8")
     root = ET.fromstring(response)
-    xml_dict = function.element_to_dict(root)
+    xml_dict = Fnc.element_to_dict(root)
     body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetFirmByNationalIdentificationResponse']['{http://tempuri.org/}GetFirmByNationalIdentificationResult']
     dic = {}
     for i in body:
@@ -203,8 +203,8 @@ def GetTradeList(Firm,nationalIdentification,yr,mn,dy):
         tradeCode = GetFirmByNationalIdentification(nationalIdentification)['PAMCode']
     else:
         tradeCode = GetCustomerByNationalCode(nationalIdentification)['PAMCode']
-    toDate = function.GenerateDate(yr,mn,dy)
-    fromDate = function.nDayLastDate(toDate,7)
+    toDate = Fnc.GenerateDate(yr,mn,dy)
+    fromDate = Fnc.nDayLastDate(toDate,7)
     payload = f"<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n   <soapenv:Header>\n <CustomHeaderMessage xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"TadbirPardaz.TBS/PrincipalHeader\">\n  <AuthenticationType xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <Delegate xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IpAddress xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IsAuthenticated xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">false</IsAuthenticated>\n  <Name xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomHeaderMessage</Name>\n  <NameSpace xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">TadbirPardaz.TBS/PrincipalHeader</NameSpace>\n  <Password xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">123456aA$</Password>\n  <Roles xmlns:d2p1=\"http://schemas.microsoft.com/2003/10/Serialization/Arrays\" xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserId xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserName xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomerClub</UserName>\n </CustomHeaderMessage>\n   </soapenv:Header>\n   <soapenv:Body>\n   <tem:GetTradeList>\n    <tem:tradeCode>{tradeCode}</tem:tradeCode>\n    <tem:fromDate>{fromDate}</tem:fromDate>\n    <tem:toDate>{toDate}</tem:toDate>\n   </tem:GetTradeList>\n   </soapenv:Body>\n</soapenv:Envelope>"
     headers = {
     'Content-Type': 'text/xml; charset=utf-8',
@@ -214,7 +214,7 @@ def GetTradeList(Firm,nationalIdentification,yr,mn,dy):
     response = response.content
     response = response.decode("utf-8")
     root = ET.fromstring(response)
-    xml_dict = function.element_to_dict(root)
+    xml_dict = Fnc.element_to_dict(root)
     body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetTradeListResponse']['{http://tempuri.org/}GetTradeListResult']['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}TradeDto']
     lst = []
     for i in body:
@@ -243,7 +243,7 @@ def GetCustomerRemain(nationalIdentification, market):
     response = response.content
     response = response.decode("utf-8")
     root = ET.fromstring(response)
-    xml_dict = function.element_to_dict(root)
+    xml_dict = Fnc.element_to_dict(root)
     body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetCustomerRemainResponse']['{http://tempuri.org/}GetCustomerRemainResult']
     dic = {}
     for i in body.keys():
@@ -259,7 +259,7 @@ def GetCustomerRemain(nationalIdentification, market):
     return dic
 
 def GetDailyTradeList(yr,mn,dy,page,pageSize):
-    tradeDate = function.GenerateDate(yr,mn,dy)
+    tradeDate = Fnc.GenerateDate(yr,mn,dy)
     payload = f"<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n   <soapenv:Header>\n <CustomHeaderMessage xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"TadbirPardaz.TBS/PrincipalHeader\">\n  <AuthenticationType xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <Delegate xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IpAddress xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IsAuthenticated xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">false</IsAuthenticated>\n  <Name xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomHeaderMessage</Name>\n  <NameSpace xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">TadbirPardaz.TBS/PrincipalHeader</NameSpace>\n  <Password xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">123456aA$</Password>\n  <Roles xmlns:d2p1=\"http://schemas.microsoft.com/2003/10/Serialization/Arrays\" xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserId xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserName xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomerClub</UserName>\n </CustomHeaderMessage>\n   </soapenv:Header>\n   <soapenv:Body>\n   <tem:GetDailyTradeList>\n    <tem:tradeDate>{tradeDate}</tem:tradeDate>\n    <tem:page>{page}</tem:page>\n   <tem:pageSize>{pageSize}</tem:pageSize>\n   </tem:GetDailyTradeList>\n   </soapenv:Body>\n</soapenv:Envelope>"
     headers = {
     'Content-Type': 'text/xml; charset=utf-8',
@@ -269,7 +269,7 @@ def GetDailyTradeList(yr,mn,dy,page,pageSize):
     response = response.content
     response = response.decode("utf-8")
     root = ET.fromstring(response)
-    xml_dict = function.element_to_dict(root)
+    xml_dict = Fnc.element_to_dict(root)
     body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetDailyTradeListResponse']['{http://tempuri.org/}GetDailyTradeListResult']['{http://schemas.datacontract.org/2004/07/TadbirPardaz.Infrastructure.DataAccess}Result']
     if len(body)==0:
         return []
@@ -289,7 +289,7 @@ def GetDailyTradeList(yr,mn,dy,page,pageSize):
 
 
 def GetTSESymbolList(yr,mn,dy):
-    tradeDate = function.GenerateDate(yr,mn,dy)
+    tradeDate = Fnc.GenerateDate(yr,mn,dy)
     payload = f"<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n   <soapenv:Header>\n <CustomHeaderMessage xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"TadbirPardaz.TBS/PrincipalHeader\">\n  <AuthenticationType xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <Delegate xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IpAddress xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IsAuthenticated xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">false</IsAuthenticated>\n  <Name xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomHeaderMessage</Name>\n  <NameSpace xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">TadbirPardaz.TBS/PrincipalHeader</NameSpace>\n  <Password xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">123456aA$</Password>\n  <Roles xmlns:d2p1=\"http://schemas.microsoft.com/2003/10/Serialization/Arrays\" xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserId xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserName xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomerClub</UserName>\n </CustomHeaderMessage>\n   </soapenv:Header>\n   <soapenv:Body>\n   <tem:GetTSESymbolList>\n    <tem:symbolDate>{tradeDate}</tem:symbolDate>\n    </tem:GetTSESymbolList>\n   </soapenv:Body>\n</soapenv:Envelope>"
     headers = {
     'Content-Type': 'text/xml; charset=utf-8',
@@ -299,7 +299,7 @@ def GetTSESymbolList(yr,mn,dy):
     response = response.content
     response = response.decode("utf-8")
     root = ET.fromstring(response)
-    xml_dict = function.element_to_dict(root)
+    xml_dict = Fnc.element_to_dict(root)
     body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetTSESymbolListResponse']['{http://tempuri.org/}GetTSESymbolListResult']['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}SymbolDto']
     if len(body)==0:
         return []
@@ -327,14 +327,13 @@ def GetMarketInstrumentMomentaryPrice(isin):
     response = response.content
     response = response.decode("utf-8")
     root = ET.fromstring(response)
-    xml_dict = function.element_to_dict(root)
+    xml_dict = Fnc.element_to_dict(root)
     body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetMarketInstrumentMomentaryPriceResponse']['{http://tempuri.org/}GetMarketInstrumentMomentaryPriceResult']
     return body['text']
 
 
-def get_asset_customer():
+def get_asset_customer(today = Fnc.todayIntJalali()):
     symbols = ['ویسا','بازرگام']
-    today = function.todayIntJalali()
     for symbol in symbols:
         df = farasahmDb['TradeListBroker'].find({"dateInt":today,"TradeSymbolAbs":symbol})
         df = pd.DataFrame(df)
@@ -352,16 +351,15 @@ def get_asset_customer():
                     farasahmDb['assetsCoustomerBroker'].insert_many(assets)
 
 
-def GetTodayAllTrade():
+def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJalali()):
     page = 1
-    doDay = function.toDayJalaliListYMD()
     farasahmDb['TradeListBroker'].delete_many({'DateYrInt':doDay[0],'DateMnInt':doDay[1],'DateDyInt':doDay[2]})
     while True:
         try:
             symbolList = farasahmDb['tse'].find({},{'نام':1,'نماد':1,'_id':0,'صندوق':1})
             symbolList = pd.DataFrame(symbolList)
             symbolList = symbolList.drop_duplicates()
-            symbolList['نماد'] = symbolList['نماد'].apply(function.remove_non_alphanumeric)
+            symbolList['نماد'] = symbolList['نماد'].apply(Fnc.remove_non_alphanumeric)
             df = GetDailyTradeList(doDay[0],doDay[1],doDay[2],page,1000)
             if len(df) == 0:
                 break
@@ -369,12 +367,12 @@ def GetTodayAllTrade():
             df['DateYrInt'] = doDay[0]
             df['DateMnInt'] = doDay[1]
             df['DateDyInt'] = doDay[2]
-            df['dateInt'] = df['TradeDate'].apply(function.dateStrToIntJalali)
+            df['dateInt'] = df['TradeDate'].apply(Fnc.dateStrToIntJalali)
             df['page'] = page
             for i in ['NetPrice','Price','TotalCommission','Volume']:
                 df[i] = df[i].apply(int)
             df['Update'] = datetime.datetime.now()
-            df['TradeSymbolAbs'] = df['TradeSymbol'].apply(function.remove_non_alphanumeric)
+            df['TradeSymbolAbs'] = df['TradeSymbol'].apply(Fnc.remove_non_alphanumeric)
             df = df.set_index('TradeSymbolAbs').join(symbolList.set_index('نماد'))
             df = df.reset_index()
             df = df.to_dict('records')
@@ -383,9 +381,17 @@ def GetTodayAllTrade():
             page = page + 1
         except:
             pass
-    function.drop_duplicet_TradeListBroker()
-    get_asset_customer()
+    Fnc.drop_duplicet_TradeListBroker(DateInt)
+    get_asset_customer(DateInt)
 
 
 
 
+def GetAllTradeLastDate():
+    today = datetime.datetime.now()
+    for d in range(1,30):
+        date = today - datetime.timedelta(days=d)
+        dateInt = Fnc.gorgianIntToJalaliInt(date)
+        avalibale = farasahmDb['TradeListBroker'].find_one({'dateInt':dateInt})
+        if avalibale == None:
+            GetAllTradeInDate(doDay=Fnc.toDayJalaliListYMD(date), DateInt=dateInt)

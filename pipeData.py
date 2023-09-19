@@ -1,12 +1,12 @@
-import function
+import Fnc
 import WebCrawling
 import time
 import ApiMethods
 while True:
     # این بخش حلقه برای خزش وب است
-    if function.is_time_between(17,19):
+    if Fnc.is_time_between(17,19):
         webCrawlingCheak = False
-        while webCrawlingCheak == False and function.is_time_between(20,22):
+        while webCrawlingCheak == False and Fnc.is_time_between(20,22):
             try:
                 WebCrawling.WC()
                 webCrawling = True
@@ -15,12 +15,16 @@ while True:
                 print('Web Crawling Break')
                 time.sleep(60)
 
-    if function.is_time_between(8,17) and function.is_time_divisible(15):
+    if Fnc.is_time_between(8,17) and Fnc.is_time_divisible(15):
     # این بخش حلقه برای دریافت اطلاعات از کار گزاری است
-        function.getTseToday()
+        Fnc.getTseDate()
     # این بخش حلقه برای دریافت اطلاعات از کار گزاری است
-        ApiMethods.GetTodayAllTrade()
+        ApiMethods.GetAllTradeInDate()
         time.sleep(60)
+    
+    if Fnc.is_time_between(17,23):
+        Fnc.getTse30LastDay()
+        ApiMethods.GetAllTradeLastDate()
 
 
 
