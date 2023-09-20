@@ -1030,46 +1030,25 @@ def desk_broker_volumeTrade(data):
         return json.dumps({'replay':False})
     dateTo = data['date'][1]
     dateFrom = data['date'][0]
-    pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
-    pipelineTse = [{"$match": {"dataInt": {"$gte": 14020101}}},{"$group":{ "_id": {"fund": "$صندوق","date": "$dataInt","InstrumentCategory":"$InstrumentCategory"},"totalNetPrice": {"$sum": "$ارزش"}}}]
-    df = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
-    df = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in df]
-    df = pd.DataFrame(df).sort_values(by=['date'])
-    if len(df)==0:
-        return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
-    df_oragh = df[df['type']=='true'][['date','value']].rename(columns={'value':'اوراق'}).set_index('date')
-    df = df[df['type']=='false']
-    df_fund = df[df['fund']==True][['date','value']].rename(columns={'value':'صندوق'}).set_index('date')
-    df_stock = df[df['fund']==False][['date','value']].rename(columns={'value':'سهام'}).set_index('date')
-    df = df_stock.join(df_fund,how='outer').join(df_oragh,how='outer').fillna(0)
-    tse = list(farasahmDb['tse'].aggregate(pipelineTse))
-    tse = [{ 'date':x['_id']['date'] , 'type':x['_id']['InstrumentCategory'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in tse]
-    tse = pd.DataFrame(tse)
-    tse_oragh = tse[tse['type']==True][['date','value']].rename(columns={'value':'کل اوراق'}).set_index('date')
-    tse = tse[tse['type']==False]
-    tse_fund = tse[tse['fund']==True][['date','value']].rename(columns={'value':'کل صندوق ها'}).set_index('date')
-    tse_stoke = tse[tse['fund']==False][['date','value']].rename(columns={'value':'کل سهام'}).set_index('date')
-    df = df.join(tse_oragh).join(tse_fund).join(tse_stoke)
-    df['کل'] = df['سهام'] + df['اوراق'] + df['صندوق']
-    df['کل بازار'] = df['کل سهام'] + df['کل صندوق ها'] + df['کل اوراق']
-    df['نسبت کل'] = df['کل'] / df['کل بازار']
-    df['نسبت اوراق'] = df['اوراق'] / df['کل اوراق']
-    df['نسبت صندوق'] = df['صندوق'] / df['کل صندوق ها']
-    df['نسبت سهام'] = df['سهام'] / df['کل سهام']
+    df = pd.DataFrame(farasahmDb['deskBrokerVolumeTrade'].find({},{'_id':0}))
+    df = df.replace(np.inf,0)
+    df = df.replace(-np.inf,0)
+    df = df.fillna(0)
     tse_mean = {'نسبت اوراق':df['نسبت اوراق'].mean(), 'نسبت صندوق':df['نسبت صندوق'].mean(), 'نسبت سهام':df['نسبت سهام'].mean(), 'نسبت کل':df['نسبت کل'].mean()}
     if dateFrom != None and dateTo != None:
         dateFrom = Fnc.timestumpToJalalInt(dateFrom)
         dateTo = Fnc.timestumpToJalalInt(dateTo)
-        df = df[df.index<=dateTo]
-        df = df[df.index>=dateFrom]
+        df = df[df['date']<=dateTo]
+        df = df[df['date']>=dateFrom]
     elif dateFrom != None:
         dateFrom = Fnc.timestumpToJalalInt(dateFrom)
-        df = df[df.index>=dateFrom]
+        df = df[df['date']>=dateFrom]
     elif dateTo != None:
         dateTo = Fnc.timestumpToJalalInt(dateTo)
-        df = df[df.index<=dateTo]
+        df = df[df['date']<=dateTo]
     dic = {}
     df = df.fillna(0)
+    df = df.set_index('date')
     for c in df.columns:
         if c in ['نسبت کل','نسبت اوراق','نسبت صندوق','نسبت سهام']:
             df[c] = df[c].apply(Fnc.floatTo2decimal)
@@ -1080,9 +1059,12 @@ def desk_broker_volumeTrade(data):
     for c in df.columns:
         dic[c] = float(df[c].max())
     df = df.reset_index()
+    print(df)
     df = df.sort_values(by='date',ascending=False)
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df,'dic':dic})
+
+
 
 
 def desk_broker_dateavalibale(data):
@@ -1091,7 +1073,7 @@ def desk_broker_dateavalibale(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'replay':False})
-    dataList = farasahmDb['TradeListBroker'].distinct('dateInt')
+    dataList = farasahmDb['deskBrokerVolumeTrade'].distinct('date')
     dataList = [str(x) for x in dataList]
     lastDate = str(max(dataList))
     lastDate = JalaliDate(int(lastDate[:4]), int(lastDate[4:6]), int(lastDate[6:8])).to_gregorian()
@@ -1129,51 +1111,24 @@ def desk_broker_turnover(data):
         return json.dumps({'replay':False})
     dateTo = data['date'][1]
     dateFrom = data['date'][0]
-    pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
-    df = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
-    df = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in df]
-    df = pd.DataFrame(df).sort_values(by=['date'])
-    if len(df)==0:
-        return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
-    df_oragh = df[df['type']=='true'][['date','value']].rename(columns={'value':'اوراق'}).set_index('date')
-    df = df[df['type']=='false']
-    df_fund = df[df['fund']==True][['date','value']].rename(columns={'value':'صندوق'}).set_index('date')
-    df_stock = df[df['fund']==False][['date','value']].rename(columns={'value':'سهام'}).set_index('date')
-    df = df_stock.join(df_fund,how='outer').join(df_oragh,how='outer').fillna(0)
-    sabadCode =['61580281855','61580155499','61580186248','61580209324','6156185287','6156293799','6156185291','6156274220','6156227513','6156233785','6156292015','6156259476']
-    pipeline = [{"$match": {"TradeCode": {"$in": sabadCode}}},{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
-    sabad = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
-    sabad = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in sabad]
-    sabad = pd.DataFrame(sabad).sort_values(by=['date'])
-    if len(sabad)==0:
-        return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
-    sabad_oragh = sabad[sabad['type']=='true'][['date','value']].rename(columns={'value':'اوراق سبد'}).set_index('date')
-    sabad_fund = sabad[sabad['fund']==True][['date','value']].rename(columns={'value':'صندوق سبد'}).set_index('date')
-    sabad = sabad[sabad['type']=='false']
-    sabad_stock = sabad[sabad['fund']==False][['date','value']].rename(columns={'value':'سهام سبد'}).set_index('date')
-    sabad = sabad_stock.join(sabad_fund,how='outer').join(sabad_oragh,how='outer').fillna(0)
-    df = df.join(sabad_oragh).join(sabad_fund).join(sabad_stock)
-
-    df['کل'] = df['سهام'] + df['اوراق'] + df['صندوق']
-    df['سبد'] = df['اوراق سبد'] + df['صندوق سبد'] + df['سهام سبد']
-    df['نسبت کل'] = df['سبد'] / df['کل']
-    df['نسبت اوراق'] = df['اوراق سبد'] / df['اوراق']
-    df['نسبت صندوق'] = df['صندوق سبد'] / df['صندوق']
-    df['نسبت سهام'] = df['سهام سبد'] / df['سهام']
+    df = pd.DataFrame(farasahmDb['deskSabadTurnover'].find({},{'_id':0}))
+    df = df.replace(np.inf,0)
+    df = df.replace(-np.inf,0)
+    df = df.fillna(0)
     mean = {'نسبت اوراق':df['نسبت اوراق'].mean(), 'نسبت صندوق':df['نسبت صندوق'].mean(), 'نسبت سهام':df['نسبت سهام'].mean(), 'نسبت کل':df['نسبت کل'].mean()}
     if dateFrom != None and dateTo != None:
         dateFrom = Fnc.timestumpToJalalInt(dateFrom)
         dateTo = Fnc.timestumpToJalalInt(dateTo)
-        df = df[df.index<=dateTo]
-        df = df[df.index>=dateFrom]
+        df = df[df['date']<=dateTo]
+        df = df[df['date']>=dateFrom]
     elif dateFrom != None:
         dateFrom = Fnc.timestumpToJalalInt(dateFrom)
-        df = df[df.index>=dateFrom]
+        df = df[df['date']>=dateFrom]
     elif dateTo != None:
         dateTo = Fnc.timestumpToJalalInt(dateTo)
-        df = df[df.index<=dateTo]
+        df = df[df['date']<=dateTo]
+    df = df.set_index('date')
     dic = {}
-    df = df.fillna(0)
     for c in df.columns:
         if c in ['نسبت کل','نسبت اوراق','نسبت صندوق','نسبت سهام']:
             df[c] = df[c].apply(Fnc.floatTo2decimal)
@@ -1186,6 +1141,7 @@ def desk_broker_turnover(data):
 
     df = df.reset_index()
     df = df.sort_values(by='date',ascending=False)
-    print(df)
+    
+
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df,'dic':dic})

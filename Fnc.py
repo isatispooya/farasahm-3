@@ -245,7 +245,8 @@ def convert_TradeCode_To_name(code):
 def drop_duplicet_TradeListBroker(jalaliInt = todayIntJalali()):
     df = pd.DataFrame(farasahmDb['TradeListBroker'].find({"dateInt":jalaliInt},{'_id':0}))
     df = df.drop_duplicates(subset=['BranchID','MarketInstrumentISIN','NetPrice','Price','TotalCommission','TradeCode','TradeDate','TradeItemBroker','TradeNumber','TradeSymbol','TradeType','Volume'])
-    farasahmDb['TradeListBroker'].delete_many({"dateInt":jalaliInt})
-    farasahmDb['TradeListBroker'].insert_many(df.to_dict('records'))
-    print('drop duplicets')
-    
+    if len(df)>0:
+        farasahmDb['TradeListBroker'].delete_many({"dateInt":jalaliInt})
+        farasahmDb['TradeListBroker'].insert_many(df.to_dict('records'))
+        print('drop duplicets')
+        

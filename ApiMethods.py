@@ -335,6 +335,7 @@ def GetMarketInstrumentMomentaryPrice(isin):
 def get_asset_customer(today = Fnc.todayIntJalali()):
     symbols = ['ویسا','بازرگام']
     for symbol in symbols:
+        print('get assets customer', symbol)
         df = farasahmDb['TradeListBroker'].find({"dateInt":today,"TradeSymbolAbs":symbol})
         df = pd.DataFrame(df)
         if len(df)>0:
