@@ -19,6 +19,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from bson import ObjectId
 import Fnc
+from ApiMethods import GetCustomerMomentaryAssets
 
 farasahmDb = client['farasahm2']
 
@@ -887,6 +888,11 @@ def getcapitalincrease(data):
 def getpriority(data):
     symbol = data['access'][1]
     df = pd.DataFrame(farasahmDb['Priority'].find({'symbol':symbol}))
+    dfPay = pd.DataFrame(farasahmDb['PriorityPay'].find({"symbol":symbol}))
+    dfPay = dfPay.groupby(by=['frm']).sum(numeric_only=True)
+    df = df.set_index('نام و نام خانوادگی').join(dfPay).fillna(0)
+    df = df.rename(columns={"popUp":"تعداد واریز","value":"ارزش واریز"})
+    df = df.reset_index()
     df['_id'] = df['_id'].astype(str)
     df = df.fillna(0)
     df = df.to_dict('records')
@@ -899,6 +905,8 @@ def getprioritytransaction(data):
     df = pd.DataFrame(farasahmDb['PriorityTransaction'].find({'symbol':symbol},{'popUp':0,'symbol':0}))
     if len(df)==0:
         return json.dumps({'replay':False,'msg':'تراکنشی یافت نشد'})
+    
+    
     df['_id'] = df['_id'].apply(str)
     df['date'] = df['date'].apply(JalaliDate.to_jalali)
     df['date'] = df['date'].apply(str)
@@ -1059,7 +1067,6 @@ def desk_broker_volumeTrade(data):
     for c in df.columns:
         dic[c] = float(df[c].max())
     df = df.reset_index()
-    print(df)
     df = df.sort_values(by='date',ascending=False)
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df,'dic':dic})
@@ -1094,11 +1101,12 @@ def desk_broker_gettraders(data):
         {'dateInt':date,'TradeSymbolAbs':symbol},
         {'_id':0,'AddedValueTax':0,'BondDividend':0,'BranchID':0,'Discount':0,'InstrumentCategory':0,'MarketInstrumentISIN':0,'page':0,'Update':0,'dateInt':0,
          'صندوق':0,'DateYrInt':0,'DateMnInt':0,'DateDyInt':0,'TradeSymbolAbs':0,'TradeItemBroker':0,'TradeItemRayanBourse':0,'TradeNumber':0,'TradeSymbol':0,'نام':0}))
+    if len(df) == 0:
+        return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
     df = df[pd.to_numeric(df['NetPrice'], errors='coerce').notnull()]
     df = df.groupby(by=['TradeCode']).apply(Fnc.Apply_Trade_Symbol,symbol = symbol,date=date)
     dic = {'Volume_Buy':int(df['Volume_Buy'].max()),'Volume_Sell':int(df['Volume_Buy'].max()),'Price_Buy':int(df['Price_Buy'].max()),'Price_Sell':int(df['Price_Sell'].max()),'balance':int(df['balance'].max())}
     df = df.to_dict('records')
-
     return json.dumps({'replay':True,'df':df,'dic':dic})
 
 
@@ -1145,3 +1153,130 @@ def desk_broker_turnover(data):
 
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df,'dic':dic})
+
+
+def getinfocode(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False})
+    code = data['code']
+    dic = farasahmDb['assetsCoustomerBroker'].find_one({'TradeCode':code},{'CustomerTitle':1,'_id':0})
+    if dic == None:
+        dic = farasahmDb['TradeListBroker'].find_one({'TradeCode':code})
+        if dic == None:
+            return json.dumps({'reply':False,'msg':'کد معاملاتی یافت نشد'})
+        else:
+            assets = pd.DataFrame(GetCustomerMomentaryAssets(code))
+            if len(assets)>0:
+                assets['TradeCode'] = code
+                assets['dateInt'] = Fnc.todayIntJalali()
+                assets['update'] = datetime.datetime.now()
+                assets = assets.to_dict('records')
+                farasahmDb['assetsCoustomerBroker'].delete_many({"TradeCode":code,"dateInt":Fnc.todayIntJalali()})
+                farasahmDb['assetsCoustomerBroker'].insert_many(assets)
+                dic = farasahmDb['assetsCoustomerBroker'].find_one({'TradeCode':code},{'CustomerTitle':1,'_id':0})
+                if dic == None:
+                    return json.dumps({'reply':False,'msg':'کد معاملاتی یافت نشد'})
+            else:
+                return json.dumps({'reply':False,'msg':'کد معاملاتی یافت نشد'})
+    return json.dumps({'reply':True,'dic':dic['CustomerTitle']})
+
+def codeToInfo(code):
+    dic = farasahmDb['assetsCoustomerBroker'].find_one({'TradeCode':code},{'CustomerTitle':1,'_id':0})
+    if dic == None:
+        dic = farasahmDb['TradeListBroker'].find_one({'TradeCode':code})
+        if dic == None:
+            return 'نامشخص'
+        else:
+            assets = pd.DataFrame(GetCustomerMomentaryAssets(code))
+            if len(assets)>0:
+                assets['TradeCode'] = code
+                assets['dateInt'] = Fnc.todayIntJalali()
+                assets['update'] = datetime.datetime.now()
+                assets = assets.to_dict('records')
+                farasahmDb['assetsCoustomerBroker'].delete_many({"TradeCode":code,"dateInt":Fnc.todayIntJalali()})
+                farasahmDb['assetsCoustomerBroker'].insert_many(assets)
+                dic = farasahmDb['assetsCoustomerBroker'].find_one({'TradeCode':code},{'CustomerTitle':1,'_id':0})
+                if dic == None:
+                    return 'نامشخص'
+            else:
+                return 'نامشخص'
+    return dic['CustomerTitle']
+
+def desk_sabad_addcodetrader(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False})
+    cheack = getinfocode(data)
+    if json.loads(cheack)['reply'] == False:
+        return cheack
+    code = {'name':json.loads(cheack)['dic'],'code':data['code']}
+    avalibel = farasahmDb['codeTraderInSabad'].find_one(code)
+    if avalibel !=None:
+        return json.dumps({'reply':False,'msg':'این کد قبلا موجود بوده است'}) 
+    farasahmDb['codeTraderInSabad'].insert_one(code)
+    return json.dumps({'reply':True}) 
+
+
+
+def codetrader(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['codeTraderInSabad'].find({},{'_id':0}))
+    df = df.to_dict("records")
+    return json.dumps({'reply':True,'df':df}) 
+
+
+def delcodetrade(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    code = data['row']['code']
+    farasahmDb['codeTraderInSabad'].delete_many({'code':code})
+    return json.dumps({'reply':True})
+
+
+def turnoverpercode(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    date = data['row']['date']
+    sabadCode = farasahmDb['codeTraderInSabad'].distinct('code')
+
+    df = pd.DataFrame(farasahmDb['TradeListBroker'].find({"TradeCode": {"$in": sabadCode},"dateInt":date},{'_id':0,'NetPrice':1,'TradeCode':1,'InstrumentCategory':1,'صندوق':1}))
+    if len(df)==0:
+        return json.dumps({'reply':False,'msg':'داده ای در این تاریخ یافت نشد'})
+
+    df = df.groupby(by=['InstrumentCategory','TradeCode','صندوق']).sum().reset_index()
+    df['name'] = [codeToInfo(x) for x in df['TradeCode']]
+
+    labels = list(set(df['name']))
+    orag = []
+    fund = []
+    sahm = []
+    for i in labels:
+        orghsum = df[df['InstrumentCategory']=='true']
+        orghsum = orghsum[orghsum['name']==i]['NetPrice'].sum()
+        orag.append(int(orghsum))
+        fundsum = df[df['صندوق']==True]
+        fundsum = fundsum[fundsum['name']==i]['NetPrice'].sum()
+        fund.append(int(fundsum))
+        sahamsum = df[df['صندوق']!=True]
+        sahamsum = sahamsum[sahamsum['InstrumentCategory']!='true']
+        sahamsum = sahamsum[sahamsum['name']==i]['NetPrice'].sum()
+        sahm.append(int(sahamsum))
+
+    df = {'labels':labels,'orag':orag,'fund':fund,'sahm':sahm}
+    print(df)
+    return json.dumps({'reply':True,'df':df})

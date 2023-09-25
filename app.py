@@ -503,6 +503,33 @@ def desk_broker_turnover():
     data = request.get_json()
     return report.desk_broker_turnover(data)
 
+@app.route('/desk/getinfocode',methods = ['POST', 'GET'])
+def desk_getinfocode():
+    data = request.get_json()
+    return report.getinfocode(data)
+
+@app.route('/desk/sabad/addcodetrader',methods = ['POST', 'GET'])
+def desk_sabad_addcodetrader():
+    data = request.get_json()
+    return report.desk_sabad_addcodetrader(data)
+
+@app.route('/desk/sabad/codetrader',methods = ['POST', 'GET'])
+def desk_sabad_codetrader():
+    data = request.get_json()
+    return report.codetrader(data)
+
+
+@app.route('/desk/sabad/delcodetrade',methods = ['POST', 'GET'])
+def desk_sabad_delcodetrade():
+    data = request.get_json()
+    return report.delcodetrade(data)
+
+
+@app.route('/desk/sabad/turnoverpercode',methods = ['POST', 'GET'])
+def desk_sabad_turnoverpercode():
+    data = request.get_json()
+    return report.turnoverpercode(data)
+
 
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)

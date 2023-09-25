@@ -452,13 +452,20 @@ def addtradernobourse(data):
     if '_id' in data['dataTrader']:
         id_ = data['dataTrader']['_id']
         del data['dataTrader']['_id']
+        befor = farasahmDb['registerNoBours'].find_one({'_id':ObjectId(id_)})
+        if befor == None: return json.dumps({'replay':False,'msg':'سهامدار یافت نشد'})
+        newAfter = data['dataTrader']
+        farasahmDb['Priority'].update_many({"کد ملی": befor['کد ملی'], 'symbol': symbol}, {'$set': {'نام و نام خانوادگی': newAfter['نام و نام خانوادگی'], 'کد ملی': newAfter['کد ملی'], 'نام پدر': newAfter['نام پدر'], 'شماره تماس': newAfter['شماره تماس']}})
+        farasahmDb['PriorityPay'].update_many({'frm':befor['نام و نام خانوادگی']},{'$set':{'frm':newAfter['نام و نام خانوادگی']}})
+        farasahmDb['PriorityTransaction'].update_many({'frm':befor['نام و نام خانوادگی']},{'$set':{'frm':newAfter['نام و نام خانوادگی']}})
+        farasahmDb['PriorityTransaction'].update_many({'to':befor['نام و نام خانوادگی']},{'$set':{'to':newAfter['نام و نام خانوادگی']}})
         farasahmDb['registerNoBours'].update_many({'_id':ObjectId(id_)},{'$set':data['dataTrader']})
     else:
         check = farasahmDb['registerNoBours'].find_one({'symbol':symbol,'نام و نام خانوادگی':data['dataTrader']['نام و نام خانوادگی']})!=None
         if check:return json.dumps({'replay':False,'msg':'سهامداری با همین نام موجود است امکان ثبت وجود ندارد'})
         check = farasahmDb['registerNoBours'].find_one({'symbol':symbol,'کد ملی':data['dataTrader']['کد ملی']})!=None
         if check:
-            farasahmDb['registerNoBours'].delete_many({'symbol':symbol,'کد ملی':data['dataTrader']['کد ملی']})
+            return json.dumps({'replay':False,'msg':'سهامداری با همین کد ملی موجود است امکان ثبت وجود ندارد'})
         lastDate = farasahmDb['registerNoBours'].find_one({'symbol':symbol},sort=[("date", pymongo.DESCENDING)])['date']
         dic = data['dataTrader']
         dic['symbol'] = symbol
@@ -466,7 +473,6 @@ def addtradernobourse(data):
         dic['تعداد سهام'] = 0
         farasahmDb['registerNoBours'].insert_one(dic)
     return json.dumps({'replay':True})
-
 
 
 def delshareholders(data):
@@ -662,7 +668,19 @@ def delprioritypay(data):
     return json.dumps({'replay':True})
 
 def delprioritytransaction(data):
-    farasahmDb['TradeListBroker'].delete_one({'_id':ObjectId(data['id'])})
+    doc = farasahmDb['PriorityTransaction'].find_one({'_id':ObjectId(data['id'])})
+    if doc == None:
+         return json.dumps({'replay':False,'msg':'یافت نشد'})
+    newTo = farasahmDb['Priority'].find_one({"نام و نام خانوادگی":doc['to']})
+    newTo['حق تقدم'] = int(newTo['حق تقدم']) - int(doc['count'])
+    if newTo['حق تقدم'] < 0 and doc['to'] != 'حق تقدم استفاده نشده':
+         return json.dumps({'replay':False,'msg':f'حذف انجام نشد، مانده دریافت کننده منفی میشود'})
+    farasahmDb['PriorityTransaction'].delete_one({'_id':ObjectId(data['id'])})
+    newFrm = farasahmDb['Priority'].find_one({"نام و نام خانوادگی":doc['frm']})
+    newFrm['حق تقدم'] = int(newFrm['حق تقدم']) + int(doc['count'])
+    farasahmDb['Priority'].update_one({"_id":newFrm['_id']},{"$set":{'حق تقدم':newFrm['حق تقدم']}})
+
+    farasahmDb['Priority'].update_one({"_id":newTo['_id']},{"$set":{'حق تقدم':newTo['حق تقدم']}})
     return json.dumps({'replay':True})
 
 
@@ -717,7 +735,8 @@ def desk_broker_turnover_cal():
     df_fund = df[df['fund']==True][['date','value']].rename(columns={'value':'صندوق'}).set_index('date')
     df_stock = df[df['fund']==False][['date','value']].rename(columns={'value':'سهام'}).set_index('date')
     df = df_stock.join(df_fund,how='outer').join(df_oragh,how='outer').fillna(0)
-    sabadCode =['61580281855','61580155499','61580186248','61580209324','6156185287','6156293799','6156185291','6156274220','6156227513','6156233785','6156292015','6156259476']
+    sabadCode = farasahmDb['codeTraderInSabad'].distinct('code')
+    #sabadCode = ['61580281855','61580155499','61580186248','61580209324','6156185287','6156293799','6156185291','6156274220','6156227513','6156233785','6156292015','6156259476']
     pipeline = [{"$match": {"TradeCode": {"$in": sabadCode}}},{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
     sabad = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
     sabad = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in sabad]
@@ -741,3 +760,5 @@ def desk_broker_turnover_cal():
     df = df.to_dict('records')
     farasahmDb['deskSabadTurnover'].delete_many({})
     farasahmDb['deskSabadTurnover'].insert_many(df)
+
+
