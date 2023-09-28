@@ -473,6 +473,12 @@ def dara_getcompany():
     data = request.get_json()
     return dara.getcompany(data)
 
+@app.route('/dara/getSheetpng',methods = ['POST', 'GET'])
+def dara_getSheetpng():
+    data = request.get_json()
+    return dara.getSheetpng(data)
+
+
 @app.route('/dara/getassembly',methods = ['POST', 'GET'])
 def getassembly():
     data = request.get_json()

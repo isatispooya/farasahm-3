@@ -895,6 +895,7 @@ def getpriority(data):
     df = df.reset_index()
     df['_id'] = df['_id'].astype(str)
     df = df.fillna(0)
+    df['countForward'] = df['حق تقدم استفاده شده'] + df['تعداد سهام']
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df})
 

@@ -117,13 +117,28 @@ def GetCustomerByNationalCode(nationalIdentification):
     for i in body:
         key = i.split('}')[1]
         value = body[i]
+        print(key)
+        print(value)
         if key == 'BankBranchName':
-            dic[key] = value['{http://www.w3.org/2001/XMLSchema-instance}nil']
+            try:
+                dic[key] = value['{http://www.w3.org/2001/XMLSchema-instance}nil']
+            except:
+                if len(value)>0:
+                    dic[key] = value['text']
+                else:
+                    dic[key] = ''
+
         else:
-            if len(value)>0:
-                dic[key] = value['text']
-            else:
-                dic[key] = 0
+            try:
+                dic[key] = value['{http://www.w3.org/2001/XMLSchema-instance}nil']
+            except:
+                if len(value)>0:
+                    if value != 'true':
+                        dic[key] = value['text']
+                    else:
+                        dic[key] = True
+                else:
+                    dic[key] = 0
     return dic
 
 def GetCustomerMomentaryAssets(tradeCode):
