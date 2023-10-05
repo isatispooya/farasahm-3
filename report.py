@@ -887,8 +887,8 @@ def getcapitalincrease(data):
 
 def getpriority(data):
     symbol = data['access'][1]
-    df = pd.DataFrame(farasahmDb['Priority'].find({'symbol':symbol}))
-    dfPay = pd.DataFrame(farasahmDb['PriorityPay'].find({"symbol":symbol}))
+    df = pd.DataFrame(farasahmDb['Priority'].find({'symbol':symbol},{'enable':0}))
+    dfPay = pd.DataFrame(farasahmDb['PriorityPay'].find({"symbol":symbol},{'enable':0}))
     dfPay = dfPay.groupby(by=['frm']).sum(numeric_only=True)
     df = df.set_index('نام و نام خانوادگی').join(dfPay).fillna(0)
     df = df.rename(columns={"popUp":"تعداد واریز","value":"ارزش واریز"})
@@ -1279,5 +1279,54 @@ def turnoverpercode(data):
         sahm.append(int(sahamsum))
 
     df = {'labels':labels,'orag':orag,'fund':fund,'sahm':sahm}
-    print(df)
     return json.dumps({'reply':True,'df':df})
+
+def perNameMaxdate(group):
+    return group[group['date']==group['date'].max()]
+
+def endpriority(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    
+    capitalIns = farasahmDb['capitalIns'].find_one({'_id':ObjectId(data['id'])})
+    symbol = capitalIns['symbol']
+    dateStr = capitalIns['date']
+    dateInt = int(str(dateStr).replace('/',''))
+    dfPri = pd.DataFrame(farasahmDb['Priority'].find({'symbol':symbol,'تاریخ':dateStr},{'_id':0,'کد ملی':1,'حق تقدم استفاده شده':1,'date':1})).set_index('کد ملی')
+    dfStc = pd.DataFrame(farasahmDb['registerNoBours'].find({"symbol":symbol},{'_id':0}))
+    dfStc = dfStc.groupby(by='کد ملی').apply(perNameMaxdate)
+    df = dfPri.join(dfStc,how="outer")
+    if df[['حق تقدم استفاده شده','نام و نام خانوادگی','کد ملی','تعداد سهام']].isnull().sum().sum() != 0:
+        return json.dumps({'reply':False,'msg':'خطا موارد نا مشخص'})
+    df['تعداد سهام'] = df['حق تقدم استفاده شده'] + df['تعداد سهام']
+    df['date'] = Fnc.todayIntJalali()
+    df['rate'] = [int((x / df['تعداد سهام'].sum())*10000)/100 for x in df['تعداد سهام']]
+    df['rate'] = [int((x / df['تعداد سهام'].sum())*10000)/100 for x in df['تعداد سهام']]
+    df = df.drop(columns=['حق تقدم استفاده شده'])
+    df = df.to_dict('records')
+    farasahmDb['capitalIns'].update_one({'_id':ObjectId(data['id'])},{'$set':{'enable':False}})
+    farasahmDb['Priority'].update_many({'symbol':symbol,'تاریخ':dateStr},{'$set':{'enable':False}})
+    farasahmDb['PriorityPay'].update_many({'symbol':symbol},{'$set':{'enable':False}})
+    farasahmDb['PriorityTransaction'].update_many({'symbol':symbol},{'$set':{'enable':False}})
+    farasahmDb['registerNoBours'].insert_many(df)
+    return json.dumps({'reply':True})
+
+
+
+def getestelamstocksheet(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['registerNoBours'].find({'symbol':symbol}))
+    df = df.groupby(by=['کد ملی']).apply(perNameMaxdate)
+    df = df[['نام و نام خانوادگی','کد ملی']]
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
+
+

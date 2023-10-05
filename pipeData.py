@@ -18,9 +18,13 @@ while True:
     try:
         if Fnc.is_time_between(8,17) and Fnc.is_time_divisible(15):
         # این بخش حلقه برای دریافت اطلاعات از کار گزاری است
-            Fnc.getTseDate()
+            try:
+                Fnc.getTseDate()
+            except:
+                print('crash getTseDate')
         # این بخش حلقه برای دریافت اطلاعات از کار گزاری است
             ApiMethods.GetAllTradeInDate()
+            print('ended GetAllTradeInDate')
             desk_broker_volumeTrade_cal()
             desk_broker_turnover_cal()
         

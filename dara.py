@@ -19,6 +19,8 @@ from PIL import Image, ImageDraw, ImageFont
 import arabic_reshaper
 from bidi.algorithm import get_display
 import Fnc
+from bson import ObjectId
+
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
 
@@ -172,11 +174,11 @@ def checkcookie(data):
         registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':nationalCode})
         if registerNoBours != None:
             if registerNoBours['شماره تماس'] == phone:
-                return json.dumps({'replay':True})
+                return json.dumps({'replay':True,'name':registerNoBours['نام و نام خانوادگی']})
         else:
             daraRegister = farasahmDb['daraRegister'].find_one({'nationalCode':nationalCode})
             if daraRegister['phone'] == phone:
-                return json.dumps({'replay':True})
+                return json.dumps({'replay':True,'name':''})
         return json.dumps({'replay':False})
     except:
         return json.dumps({'replay':False})
@@ -214,7 +216,8 @@ def getcompany(data):
                 ]
 
     stockBourse = pd.DataFrame(farasahmDb['register'].aggregate(pipeline)).drop_duplicates(subset=['symbol'])
-    stockBourse = stockBourse[stockBourse['symbol']!='bazargam']
+    if len(stockBourse)>0:
+        stockBourse = stockBourse[stockBourse['symbol']!='bazargam']
 
     stockBourse = stockBourse.rename(columns={'سهام کل':'تعداد سهام','تاریخ گزارش':'date'})
     listStock = stockBourse.to_dict('records')
@@ -288,21 +291,13 @@ def getsheet(data):
         lastTrade = farasahmDb['trade'].find({'symbol':symbol['symbol']},{"تاریخ معامله":1})
         lastTrade =[x['تاریخ معامله'] for x in lastTrade]
         lastTrade = max(lastTrade)
-
-
-        BourseUser = farasahmDb['register'].find_one(
-                                {'کد ملی': int(user['nationalCode']), 'symbol': symbol['symbol'],'تاریخ گزارش': lastTrade},
-                                {'_id':0, 'fullName':1, 'نام پدر':1, 'کد ملی':1,'سهام کل':1})
+        BourseUser = farasahmDb['register'].find_one({'کد ملی': int(user['nationalCode']), 'symbol': symbol['symbol'],'تاریخ گزارش': lastTrade},{'_id':0, 'fullName':1, 'نام پدر':1, 'کد ملی':1,'سهام کل':1})
         if BourseUser == None:
             return json.dumps({'replay': False, 'msg':'سهامی ندارید'})
-        
-
         BourseUser['stockword'] = digits.to_word(BourseUser['سهام کل'])
         BourseUser['company'] = company['fullname']
         return json.dumps({'replay': True, 'sheet': BourseUser})
-    
-    userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': user['nationalCode'], 'symbol':symbol['symbol']},
-                                                          sort=[('date',-1)])
+    userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': user['nationalCode'], 'symbol':symbol['symbol']},sort=[('date',-1)])
     userNoBourse['stockword'] = digits.to_word(userNoBourse['تعداد سهام']) 
     userNoBourse['company'] = company['fullname']
     userNoBourse['fullName'] = userNoBourse['نام و نام خانوادگی']
@@ -328,17 +323,12 @@ def getassembly(data):
     return json.dumps({'replay':True, 'assembly': assembly})
 
 
-
-
 def getSheetpng(data):
-
     resulte = json.loads(getsheet(data))
     if resulte['replay'] == False:
         return getsheet(data)
     resulte = resulte['sheet']
-
     companyInfo = farasahmDb['companyBasicInformation'].find_one({'symbol':resulte['symbol']})
-
     image = Image.open('public/sheet1.png')
     image_width, image_height = image.size
     draw = ImageDraw.Draw(image)
@@ -346,8 +336,6 @@ def getSheetpng(data):
     font60 = ImageFont.truetype('public/Peyda-Medium.ttf', 60)
     font40 = ImageFont.truetype('public/Peyda-Medium.ttf', 40)
     font50 = ImageFont.truetype('public/Peyda-Medium.ttf', 50)
-
-
 
     # اسم شرکت
     text = arabic_reshaper.reshape('شرکت ' + resulte['company'])
@@ -406,7 +394,7 @@ def getSheetpng(data):
     draw.text((x, y), text, fill=(0,0,0), font=font50)
 
     #فیلد ها تعداد سهام
-    text = arabic_reshaper.reshape('مالک تعداد' + '      ' + Fnc.comma_separate(digits.en_to_fa(resulte['تعداد سهام'])) + '      (' + digits.to_word(int(resulte['تعداد سهام']))+')' + '       سهم ' + digits.to_word(int((int(companyInfo['سرمایه ثبتی']) / int(companyInfo['تعداد سهام'])))) + '    ريالی با نام از شرکت    ' + resulte['company'] + ' میباشد.')
+    text = arabic_reshaper.reshape('مالک تعداد' + '      ' + Fnc.comma_separate(digits.en_to_fa(str(resulte['تعداد سهام']))) + '      (' + digits.to_word(int(resulte['تعداد سهام']))+')' + '       سهم ' + digits.to_word(int((int(companyInfo['سرمایه ثبتی']) / int(companyInfo['تعداد سهام'])))) + '    ريالی با نام از شرکت    ' + resulte['company'] + ' میباشد.')
     text_width, text_height = draw.textsize(text, font=font50)
     x = image_width - text_width - 280 
     y = 1200
@@ -458,6 +446,145 @@ def getSheetpng(data):
     y = 1800
     text = get_display(text)
     draw.text((x, y), text, fill=(0,0,0), font=font40)
-
     image.save('public/sheet1_download.png')
     return send_file("public/sheet1_download.png", as_attachment=True, mimetype="image/png")
+
+
+def getSheetpngAdmin(data):
+    print(data)
+
+    access = data['access'][0]
+    symbol = data['access'][1]
+    company = farasahmDb['companyList'].find_one({'symbol':symbol})
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    resulte = farasahmDb['registerNoBours'].find_one({'کد ملی': data['inp'], 'symbol':symbol},sort=[('date',-1)])
+    print(company)
+    print(resulte)
+    companyInfo = farasahmDb['companyBasicInformation'].find_one({'symbol':symbol})
+    image = Image.open('public/sheet1.png')
+    image_width, image_height = image.size
+    draw = ImageDraw.Draw(image)
+    font120 = ImageFont.truetype('public/Peyda-Medium.ttf', 120)
+    font60 = ImageFont.truetype('public/Peyda-Medium.ttf', 60)
+    font40 = ImageFont.truetype('public/Peyda-Medium.ttf', 40)
+    font50 = ImageFont.truetype('public/Peyda-Medium.ttf', 50)
+
+    # اسم شرکت
+    text = arabic_reshaper.reshape('شرکت ' + company['fullname'])
+    text_width, text_height = draw.textsize(text, font=font120)
+    x = (image_width - text_width) // 2
+    y = 350
+    text = get_display(text)
+    draw.text((x, y), text, fill=(100,50,25), font=font120)
+    # سهامی خاص
+
+    text = arabic_reshaper.reshape('('+companyInfo['نوع شرکت']+')')
+    text_width, text_height = draw.textsize(text, font=font60)
+    x = (image_width - text_width) // 2
+    y = 500
+    text = get_display(text)
+    draw.text((x, y), text, fill=(115,105,95), font=font60)
+
+    # شماره و تاریخ ثبت
+    text = arabic_reshaper.reshape('شماره ثبت:'+digits.en_to_fa(companyInfo['شماره ثبت'])+ '       ' +'تاریخ تاسیس:' + digits.en_to_fa(companyInfo['تاریخ تاسیس']))
+    text_width, text_height = draw.textsize(text, font=font40)
+    x = (image_width - text_width) // 2
+    y = 650
+    text = get_display(text)
+    draw.text((x, y), text, fill=(10,10,35), font=font40)
+    #سرمایه ثبتی
+
+    text = arabic_reshaper.reshape('سرمایه ثبت شده '+Fnc.comma_separate(digits.en_to_fa(companyInfo['سرمایه ثبتی']))+ ' ريال منقسم به '+ Fnc.comma_separate(digits.en_to_fa(companyInfo['تعداد سهام'])) + ' سهم ' + digits.to_word(int((int(companyInfo['سرمایه ثبتی']) / int(companyInfo['تعداد سهام'])))) + ' ريالی  که صد در دصد آن پرداخت شده میباشد')
+    text_width, text_height = draw.textsize(text, font=font40)
+    x = (image_width - text_width) // 2
+    y = 740
+    text = get_display(text)
+    draw.text((x, y), text, fill=(10,10,35), font=font40)
+
+    #فیلد ها دارنده این ورقه
+    text = arabic_reshaper.reshape('دارنده این ورقه' + '      ' + resulte['نام و نام خانوادگی'])
+    text_width, text_height = draw.textsize(text, font=font50)
+    x = image_width - text_width - 280 
+    y = 1100
+    text = get_display(text)
+    draw.text((x, y), text, fill=(0,0,0), font=font50)
+
+    #فیلد ها فرزند
+    text = arabic_reshaper.reshape('فرزند' + '      ' + resulte['نام پدر'])
+    text_width, text_height = draw.textsize(text, font=font50)
+    x = image_width - text_width - 1400 
+    y = 1100
+    text = get_display(text)
+    draw.text((x, y), text, fill=(0,0,0), font=font50)
+
+    #فیلد ها کد ملی
+    text = arabic_reshaper.reshape('شماره/شناسه ملی' + '      ' + digits.en_to_fa(resulte['کد ملی']))
+    text_width, text_height = draw.textsize(text, font=font50)
+    x = image_width - text_width - 2100 
+    y = 1100
+    text = get_display(text)
+    draw.text((x, y), text, fill=(0,0,0), font=font50)
+
+    #فیلد ها تعداد سهام
+    text = 'مالک تعداد' + '      ' + Fnc.comma_separate(digits.en_to_fa(str(resulte['تعداد سهام'])))
+    text = text + '      (' + digits.to_word(int(resulte['تعداد سهام'])) +')' + '       سهم '
+    text = text + digits.to_word(int((int(companyInfo['سرمایه ثبتی']) / int(companyInfo['تعداد سهام'])))) + '    ريالی با نام از شرکت    '
+    text = text + company['fullname'] + ' میباشد.'
+    text = arabic_reshaper.reshape(text)
+    text_width, text_height = draw.textsize(text, font=font50)
+    x = image_width - text_width - 280 
+    y = 1200
+    text = get_display(text)
+    draw.text((x, y), text, fill=(0,0,0), font=font50)
+
+    #حقوق مشخصه
+    text = arabic_reshaper.reshape('مالک سهام دارای حقوق مشخصه در اساسنامه شرکت میباشد.')
+    text_width, text_height = draw.textsize(text, font=font40)
+    x = (image_width - text_width) // 2
+    y = 1400
+    text = get_display(text)
+    draw.text((x, y), text, fill=(0,0,0), font=font40)
+
+    #مدیرعامل
+    text = arabic_reshaper.reshape('مدیرعامل')
+    text_width, text_height = draw.textsize(text, font=font40)
+    x = ((image_width - text_width) // 4)*3
+    y = 1800
+    text = get_display(text)
+    draw.text((x, y), text, fill=(0,0,0), font=font40)
+    #اسم مدیرعامل
+    text = arabic_reshaper.reshape(companyInfo['مدیر عامل'])
+    text_width, text_height = draw.textsize(text, font=font40)
+    x = ((image_width - text_width) // 4)*3
+    y = 1900
+    text = get_display(text)
+    draw.text((x, y), text, fill=(0,0,0), font=font40)
+
+    #هیئت مدیره
+    text = arabic_reshaper.reshape('رئیس هیئت مدیره')
+    text_width, text_height = draw.textsize(text, font=font40)
+    x = ((image_width - text_width) // 4)*1
+    y = 1800
+    text = get_display(text)
+    draw.text((x, y), text, fill=(0,0,0), font=font40)
+    #اسم هیئت مدیره
+    text = arabic_reshaper.reshape(companyInfo['رئیس هیئت مدیره'])
+    text_width, text_height = draw.textsize(text, font=font40)
+    x = ((image_width - text_width) // 4)*1
+    y = 1900
+    text = get_display(text)
+    draw.text((x, y), text, fill=(0,0,0), font=font40)
+
+    #مهر شرکت
+    text = arabic_reshaper.reshape('مهر شرکت')
+    text_width, text_height = draw.textsize(text, font=font40)
+    x = ((image_width - text_width) // 4)*2
+    y = 1800
+    text = get_display(text)
+    draw.text((x, y), text, fill=(0,0,0), font=font40)
+    image.save('public/sheet1_download.png')
+    return send_file("public/sheet1_download.png", as_attachment=True, mimetype="image/png")
+

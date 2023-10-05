@@ -193,6 +193,11 @@ def delrowgrouping():
     return dataManagment.delrowgrouping(data)
 
 
+@app.route('/getdatepriority',methods = ['POST', 'GET'])
+def getdatepriority():
+    data = request.get_json()
+    return dataManagment.getdatepriority(data)
+
 @app.route('/getprofiletrader',methods = ['POST', 'GET'])
 def getprofiletrader():
     data = request.get_json()
@@ -202,6 +207,16 @@ def getprofiletrader():
 def getbalancetrader():
     data = request.get_json()
     return report.getbalancetrader(data)
+
+@app.route('/getestelamstocksheet',methods = ['POST', 'GET'])
+def getestelamstocksheet():
+    data = request.get_json()
+    return report.getestelamstocksheet(data)
+
+@app.route('/checkstocksheet',methods = ['POST', 'GET'])
+def checkstocksheet():
+    data = request.get_json()
+    return dara.getSheetpngAdmin(data)
 
 @app.route('/getpersonalnobourse',methods = ['POST', 'GET'])
 def getpersonalnobourse():
@@ -359,6 +374,11 @@ def getpriority():
     data = request.get_json()
     return report.getpriority(data)
 
+@app.route('/endpriority',methods = ['POST', 'GET'])
+def endpriority():
+    data = request.get_json()
+    return report.endpriority(data)
+
 @app.route('/settransactionpriority',methods = ['POST', 'GET'])
 def settransactionpriority():
     data = request.get_json()
@@ -374,12 +394,10 @@ def getprioritypay():
     data = request.get_json()
     return dataManagment.getprioritypay(data)
 
-
 @app.route('/delprioritypay',methods = ['POST', 'GET'])
 def delprioritypay():
     data = request.get_json()
     return dataManagment.delprioritypay(data)
-
 
 @app.route('/getprioritytransaction',methods = ['POST', 'GET'])
 def getprioritytransaction():
@@ -411,7 +429,6 @@ def getxlsxpriority():
     data = request.get_json()
     return report.getxlsxpriority(data)
 
-
 @app.route('/dara/applynationalcode',methods = ['POST', 'GET'])
 def dara_applynationalcode():
     data = request.get_json()
@@ -436,7 +453,6 @@ def dara_register():
 def dara_gettrade():
     data = request.get_json()
     return dara.gettrade(data)
-
 
 @app.route('/dara/coderegister',methods = ['POST', 'GET'])
 def dara_coderegister():
@@ -477,7 +493,6 @@ def dara_getcompany():
 def dara_getSheetpng():
     data = request.get_json()
     return dara.getSheetpng(data)
-
 
 @app.route('/dara/getassembly',methods = ['POST', 'GET'])
 def getassembly():
@@ -524,18 +539,15 @@ def desk_sabad_codetrader():
     data = request.get_json()
     return report.codetrader(data)
 
-
 @app.route('/desk/sabad/delcodetrade',methods = ['POST', 'GET'])
 def desk_sabad_delcodetrade():
     data = request.get_json()
     return report.delcodetrade(data)
 
-
 @app.route('/desk/sabad/turnoverpercode',methods = ['POST', 'GET'])
 def desk_sabad_turnoverpercode():
     data = request.get_json()
     return report.turnoverpercode(data)
-
 
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)

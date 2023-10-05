@@ -723,7 +723,6 @@ def desk_broker_volumeTrade_cal():
 
 
 def desk_broker_turnover_cal():
-    print('start cal turnover')
     pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
     df = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
     df = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in df]
@@ -762,3 +761,15 @@ def desk_broker_turnover_cal():
     farasahmDb['deskSabadTurnover'].insert_many(df)
 
 
+def getdatepriority(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['capitalIns'].find({'symbol':symbol},{'_id':0}))
+    if len(df) == 0:
+        return json.dumps({'reply':False,'msg':'رویدداد افزایش سرمایه یافت نشد'})
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'lst':df})
