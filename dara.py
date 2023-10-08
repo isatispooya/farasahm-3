@@ -31,15 +31,19 @@ def applynationalcode(data):
     registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['UserInput']['nationalCode']})
     if registerNoBours != None:
         VerificationPhone(registerNoBours['شماره تماس'])
-        return json.dumps({'replay':True,'status':'Registered'})
+        phonPrivet = registerNoBours['شماره تماس']
+        phonPrivet = phonPrivet[:3]+'xxxxx'+phonPrivet[-3:]
+        return json.dumps({'replay':True,'status':'Registered','phonPrivet':phonPrivet})
     register = farasahmDb['register'].find_one({'کد ملی':int(data['UserInput']['nationalCode']),'symbol':'visa'})
     if register != None:
         daraRegister = farasahmDb['daraRegister'].find_one({'nationalCode':data['UserInput']['nationalCode']})
         if daraRegister == None:
             return json.dumps({'replay':True,'status':'RegisterDara'})
         else:
+            phonPrivet = registerNoBours['شماره تماس']
+            phonPrivet = phonPrivet[:3]+'xxxxx'+phonPrivet[-3:]
             VerificationPhone(daraRegister['phone'])
-            return json.dumps({'replay':True,'status':'Registered'})
+            return json.dumps({'replay':True,'status':'Registered','phonPrivet':phonPrivet})
     return json.dumps({'replay':True,'status':'NotFund'})
 
 def questionauth(data):
@@ -394,10 +398,18 @@ def getSheetpng(data):
     draw.text((x, y), text, fill=(0,0,0), font=font50)
 
     #فیلد ها تعداد سهام
-    text = arabic_reshaper.reshape('مالک تعداد' + '      ' + Fnc.comma_separate(digits.en_to_fa(str(resulte['تعداد سهام']))) + '      (' + digits.to_word(int(resulte['تعداد سهام']))+')' + '       سهم ' + digits.to_word(int((int(companyInfo['سرمایه ثبتی']) / int(companyInfo['تعداد سهام'])))) + '    ريالی با نام از شرکت    ' + resulte['company'] + ' میباشد.')
+    text = arabic_reshaper.reshape('مالک تعداد' + '      ' + Fnc.comma_separate(digits.en_to_fa(str(resulte['تعداد سهام']))) + '      (' + digits.to_word(int(resulte['تعداد سهام']))+')' + '       سهم ' + digits.to_word(int((int(companyInfo['سرمایه ثبتی']) / int(companyInfo['تعداد سهام'])))) + '    ريالی با نام')
     text_width, text_height = draw.textsize(text, font=font50)
     x = image_width - text_width - 280 
     y = 1200
+    text = get_display(text)
+    draw.text((x, y), text, fill=(0,0,0), font=font50)
+
+    #فیلد ها تعداد سهام
+    text = arabic_reshaper.reshape('از شرکت    ' + resulte['company'] + ' میباشد.')
+    text_width, text_height = draw.textsize(text, font=font50)
+    x = image_width - text_width - 280 
+    y = 1300
     text = get_display(text)
     draw.text((x, y), text, fill=(0,0,0), font=font50)
 
@@ -405,7 +417,7 @@ def getSheetpng(data):
     text = arabic_reshaper.reshape('مالک سهام دارای حقوق مشخصه در اساسنامه شرکت میباشد.')
     text_width, text_height = draw.textsize(text, font=font40)
     x = (image_width - text_width) // 2
-    y = 1400
+    y = 1450
     text = get_display(text)
     draw.text((x, y), text, fill=(0,0,0), font=font40)
 

@@ -117,8 +117,6 @@ def GetCustomerByNationalCode(nationalIdentification):
     for i in body:
         key = i.split('}')[1]
         value = body[i]
-        print(key)
-        print(value)
         if key == 'BankBranchName':
             try:
                 dic[key] = value['{http://www.w3.org/2001/XMLSchema-instance}nil']

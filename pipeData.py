@@ -10,7 +10,7 @@ while True:
         while webCrawlingCheak == False and Fnc.is_time_between(20,22):
             try:
                 WebCrawling.WC()
-                webCrawling = True
+                webCrawlingCheak = True
                 print('Web Crawling successful')
             except:
                 print('Web Crawling Break')
