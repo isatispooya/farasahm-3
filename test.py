@@ -6,7 +6,7 @@ import ApiMethods
 client = pymongo.MongoClient()
 db = client['farasahm2']
 
-d = ApiMethods.GetCustomerByNationalCode('4420278862')
-print(d)
+protfo = ApiMethods.GetCustomerMomentaryAssets('61580209324')
 
 
+print(protfo)

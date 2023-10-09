@@ -28,7 +28,7 @@ def applynationalcode(data):
     textCaptcha = decrypt(data['captchaCode'][2:-1].encode())
     if textCaptcha!=data['UserInput']['captcha']:
         return json.dumps({'replay':False,'msg':'کد تصویر صحیح نیست'})
-    registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['UserInput']['nationalCode']})
+    registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['UserInput']['nationalCode']},sort=[('date', -1)])
     if registerNoBours != None:
         VerificationPhone(registerNoBours['شماره تماس'])
         phonPrivet = registerNoBours['شماره تماس']
