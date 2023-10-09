@@ -271,6 +271,56 @@ def GetCustomerRemain(nationalIdentification, market):
                 dic[key] = 0
     return dic
 
+def GetCustomerRemainInDate(tradeCode, yr,mn,dy, market):
+    '''
+    market => TSE = 1, IME = 2, IEE = 3, EFP = 4 
+    resulte => AdjustedRemain:مانده تعدیلی(قابل دریافت) ,BlockedRemain:مسدود شده ,Credit:اعتبار ,CurrentRemain: قدرت خرید
+    '''
+    dateOfRemain =Fnc.GenerateDate(yr,mn,dy)
+    payload = f"<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n   <soapenv:Header>\n <CustomHeaderMessage xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"TadbirPardaz.TBS/PrincipalHeader\">\n  <AuthenticationType xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <Delegate xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IpAddress xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IsAuthenticated xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">false</IsAuthenticated>\n  <Name xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomHeaderMessage</Name>\n  <NameSpace xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">TadbirPardaz.TBS/PrincipalHeader</NameSpace>\n  <Password xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">123456aA$</Password>\n  <Roles xmlns:d2p1=\"http://schemas.microsoft.com/2003/10/Serialization/Arrays\" xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserId xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserName xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomerClub</UserName>\n </CustomHeaderMessage>\n   </soapenv:Header>\n   <soapenv:Body>\n   <tem:GetCustomerRemainInDate>\n    <tem:tradeCode>{tradeCode}</tem:tradeCode>\n    <tem:dateOfRemain>{dateOfRemain}</tem:dateOfRemain>\n    <tem:market>{market}</tem:market>\n   </tem:GetCustomerRemainInDate>\n   </soapenv:Body>\n</soapenv:Envelope>"
+    headers = {
+    'Content-Type': 'text/xml; charset=utf-8',
+    'SOAPAction': 'http://tempuri.org/ICustomerClubExternalService/GetCustomerRemainInDate',
+    }
+    response = requests.request("POST", url, headers=headers, data=payload)
+    response = response.content
+    response = response.decode("utf-8")
+    root = ET.fromstring(response)
+    xml_dict = Fnc.element_to_dict(root)
+    body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetCustomerRemainInDateResponse']['{http://tempuri.org/}GetCustomerRemainInDateResult']
+    AdjustedRemain = body['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}AdjustedRemain']['text']
+    BlockedRemain = body['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}BlockedRemain']['text']
+    Credit = body['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}Credit']['text']
+    CurrentRemain = body['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}CurrentRemain']['text']
+    dic = {'AdjustedRemain':AdjustedRemain,'BlockedRemain':BlockedRemain,'Credit':Credit,'CurrentRemain':CurrentRemain}
+    return dic
+
+
+
+def GetCustomerRemainWithTradeCode(tradeCode, market):
+    '''
+    market => TSE = 1, IME = 2, IEE = 3, EFP = 4 
+    resulte => AdjustedRemain:مانده تعدیلی(قابل دریافت) ,BlockedRemain:مسدود شده ,Credit:اعتبار ,CurrentRemain: قدرت خرید
+    '''
+    payload = f"<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n   <soapenv:Header>\n <CustomHeaderMessage xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"TadbirPardaz.TBS/PrincipalHeader\">\n  <AuthenticationType xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <Delegate xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IpAddress xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IsAuthenticated xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">false</IsAuthenticated>\n  <Name xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomHeaderMessage</Name>\n  <NameSpace xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">TadbirPardaz.TBS/PrincipalHeader</NameSpace>\n  <Password xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">123456aA$</Password>\n  <Roles xmlns:d2p1=\"http://schemas.microsoft.com/2003/10/Serialization/Arrays\" xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserId xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserName xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomerClub</UserName>\n </CustomHeaderMessage>\n   </soapenv:Header>\n   <soapenv:Body>\n   <tem:GetCustomerRemainWithTradeCode>\n    <tem:tradeCode>{tradeCode}</tem:tradeCode>\n    <tem:market>{market}</tem:market>\n   </tem:GetCustomerRemainWithTradeCode>\n   </soapenv:Body>\n</soapenv:Envelope>"
+    headers = {
+    'Content-Type': 'text/xml; charset=utf-8',
+    'SOAPAction': 'http://tempuri.org/ICustomerClubExternalService/GetCustomerRemainWithTradeCode',
+    }
+    response = requests.request("POST", url, headers=headers, data=payload)
+    response = response.content
+    response = response.decode("utf-8")
+    root = ET.fromstring(response)
+    xml_dict = Fnc.element_to_dict(root)
+    body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetCustomerRemainWithTradeCodeResponse']['{http://tempuri.org/}GetCustomerRemainWithTradeCodeResult']
+    AdjustedRemain = body['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}AdjustedRemain']['text']
+    BlockedRemain = body['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}BlockedRemain']['text']
+    Credit = body['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}Credit']['text']
+    CurrentRemain = body['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}CurrentRemain']['text']
+    dic = {'AdjustedRemain':AdjustedRemain,'BlockedRemain':BlockedRemain,'Credit':Credit,'CurrentRemain':CurrentRemain}
+    return dic
+
+
 def GetDailyTradeList(yr,mn,dy,page,pageSize):
     tradeDate = Fnc.GenerateDate(yr,mn,dy)
     payload = f"<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n   <soapenv:Header>\n <CustomHeaderMessage xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"TadbirPardaz.TBS/PrincipalHeader\">\n  <AuthenticationType xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <Delegate xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IpAddress xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IsAuthenticated xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">false</IsAuthenticated>\n  <Name xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomHeaderMessage</Name>\n  <NameSpace xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">TadbirPardaz.TBS/PrincipalHeader</NameSpace>\n  <Password xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">123456aA$</Password>\n  <Roles xmlns:d2p1=\"http://schemas.microsoft.com/2003/10/Serialization/Arrays\" xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserId xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserName xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomerClub</UserName>\n </CustomHeaderMessage>\n   </soapenv:Header>\n   <soapenv:Body>\n   <tem:GetDailyTradeList>\n    <tem:tradeDate>{tradeDate}</tem:tradeDate>\n    <tem:page>{page}</tem:page>\n   <tem:pageSize>{pageSize}</tem:pageSize>\n   </tem:GetDailyTradeList>\n   </soapenv:Body>\n</soapenv:Envelope>"
