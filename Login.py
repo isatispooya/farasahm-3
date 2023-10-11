@@ -2,15 +2,12 @@ import pymongo
 from cryptography.fernet import Fernet
 import json
 from bson import ObjectId
-import cv2
-import base64
 import random
-import numpy as np
-import string
 import json
 import requests
 import random
-import GuardPyCaptcha
+from GuardPyCaptcha.Captch import GuardPyCaptcha
+
 key = 'KPms1b_Kibq5XR6M0d88rJTsjjgdlBFzbFN4irIxiHo='
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
@@ -35,30 +32,6 @@ def VerificationPhone(phone):
 
 
 
-def captchaGenerate():
-    font = cv2.FONT_HERSHEY_COMPLEX
-    captcha = np.zeros((50,250,3), np.uint8)
-    captcha[:] = (234, 228, 228)
-    font= cv2.FONT_HERSHEY_SIMPLEX
-    texcode = ''
-    listCharector =  string.digits+string.ascii_lowercase+string.digits
-    for i in range(1,5):
-        bottomLeftCornerOfText = (random.randint(35,45)*i,35+(random.randint(-8,8)))
-        fontScale= random.randint(8,16)/10
-        fontColor= (random.randint(0,180),random.randint(0,180),random.randint(0,180))
-        thickness= random.randint(1,2)
-        lineType= 1
-        text = str(listCharector[random.randint(0,len(listCharector)-1)])
-        texcode = texcode+(text)
-        cv2.putText(captcha,text,bottomLeftCornerOfText,font,fontScale,fontColor,thickness,lineType)
-        if random.randint(0,2)>0:
-            pt1 = (random.randint(0,250),random.randint(0,50))
-            pt2 = (random.randint(0,250),random.randint(0,50))
-            lineColor = (random.randint(0,150),random.randint(0,150),random.randint(0,150))
-            cv2.line(captcha,pt1,pt2,lineColor,1)
-    stringImg = base64.b64encode(cv2.imencode('.jpg', captcha)[1]).decode()
-    return [texcode,stringImg]
-
 
 
 f = Fernet(key)
@@ -76,12 +49,14 @@ def decrypt(msg):
     
 
 def captcha():
-    cg = captchaGenerate()
-    return json.dumps({'captcha':str(encrypt(cg[0])),'img':cg[1]})
+    captchas = GuardPyCaptcha()
+    captchas = captchas.Captcha_generation()
+    return json.dumps(captchas)
 
 def applyPhone(data):
-    textCaptcha = decrypt(data['captchaCode'][2:-1].encode())
-    if textCaptcha!=data['inputPhone']['captcha']:
+    captchas = GuardPyCaptcha()
+    captchas = captchas.check_response(data['captchaCode'],data['inputPhone']['captcha'])
+    if captchas == False:
         return json.dumps({'replay':False,'msg':'کد تصویر صحیح نیست'})
     if farasahmDb['user'].find_one({'phone':data['inputPhone']['phone']})==None:
         return json.dumps({'replay':False,'msg':'شماره همراه صحیح نیست'})
