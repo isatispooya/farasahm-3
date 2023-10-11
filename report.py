@@ -1090,6 +1090,19 @@ def desk_broker_dateavalibale(data):
     weekDate = str(JalaliDate.to_jalali(weekDate.year, weekDate.month, weekDate.day))
     return json.dumps({'dataList':dataList,'lastDate':lastDate,'weekDate':weekDate})
 
+def datenow(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'replay':False})
+    fromDate = datetime.datetime.now()
+    toDate = fromDate + datetime.timedelta(days=5)
+    lastDate = str(JalaliDate.to_jalali(toDate.year, toDate.month, toDate.day))
+    weekDate = str(JalaliDate.to_jalali(fromDate.year, fromDate.month, fromDate.day))
+    return json.dumps({'lastDate':lastDate,'weekDate':weekDate})
+    
+
 def desk_broker_gettraders(data):
     access = data['access'][0]
     _id= ObjectId(access)
@@ -1330,3 +1343,13 @@ def getestelamstocksheet(data):
     return json.dumps({'reply':True,'df':df})
 
 
+def desk_todo_addtask(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    
+    print(data)
+    return json.dumps({'reply':True})

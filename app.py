@@ -514,6 +514,17 @@ def desk_broker_dateavalibale():
     data = request.get_json()
     return report.desk_broker_dateavalibale(data)
 
+@app.route('/desk/broker/datenow',methods = ['POST', 'GET'])
+def desk_broker_datenow():
+    data = request.get_json()
+    return report.datenow(data)
+
+@app.route('/desk/todo/addtask',methods = ['POST', 'GET'])
+def desk_todo_addtask():
+    data = request.get_json()
+    return report.desk_todo_addtask(data)
+
+
 @app.route('/desk/broker/gettraders',methods = ['POST', 'GET'])
 def desk_broker_gettraders():
     data = request.get_json()
