@@ -6,7 +6,7 @@ import pandas as pd
 from io import StringIO
 import pymongo
 from persiantools.jdatetime import JalaliDate
-
+import jdatetime
 import datetime
 from dataManagment import lastupdate
 import numpy as np
@@ -21,6 +21,7 @@ from reportlab.pdfgen import canvas
 from bson import ObjectId
 import Fnc
 from ApiMethods import GetCustomerMomentaryAssets
+import calendar
 
 farasahmDb = client['farasahm2']
 
@@ -1368,38 +1369,90 @@ def desk_todo_addtask(data):
     return json.dumps({'reply':True})
 
 
+
+def is_valid_day_in_jalali_month(jalali_year, jalali_month, day):
+
+    try:
+        return jdatetime.date(jalali_year, jalali_month, day)
+
+    except ValueError:
+        nearest_valid_date = None
+        current_day = day
+        while nearest_valid_date is None:
+            current_day -= 1
+            try:
+                nearest_valid_date = jdatetime.date(jalali_year, jalali_month, current_day)
+            except ValueError:
+                continue
+        return nearest_valid_date
+
 def repetition_Task_Generator(group,toDate):
     
     
     repetition = group['repetition'][group.index.min()]
     date = group['date'][group.index.min()]
-    dayOfDate = date.day
+    jalali_date = jdatetime.date.fromgregorian(date=date)
+    print(jalali_date)
 
-    toDate= datetime.datetime.fromtimestamp(toDate)
-
+    toDate= jdatetime.date.fromgregorian(date= datetime.datetime.fromtimestamp(toDate).date() )
 
     if repetition == 'NoRepetition':
         return group
     elif repetition == 'daily':
         step  = datetime.timedelta(days=1)
+        dateList = []
+        currentDate = jalali_date
+        while currentDate<=toDate:
+            dateList.append(currentDate)
+            currentDate = currentDate + step
+        if len(dateList) == 0:
+            return group
+        
     elif repetition == 'weekly':
         step  = datetime.timedelta(weeks=1)
+        dateList = []
+        currentDate = jalali_date
+        while currentDate<=toDate:
+            dateList.append(currentDate)
+            currentDate = currentDate + step
+        if len(dateList) == 0:
+            return group
     elif repetition == 'monthly':
-        step  = datetime.timedelta(days=30)
+
+        dateList = []
+        currentDate = jalali_date
+        year1= currentDate.year
+        month1= currentDate.month
+        day1= currentDate.day
+
+        while currentDate<=toDate:
+            dateList.append(currentDate)
+            month1 +=1
+            if month1 > 12 :
+                month1 = 1
+                year1 +=1
+
+            currentDate= is_valid_day_in_jalali_month(year1, month1, day1)
+        if len(dateList) == 0:
+            return group
+
     elif repetition == 'yearly':
-        step  = datetime.timedelta(days=365)
+        dateList = []
+        currentDate = jalali_date
+        year1= currentDate.year
+        month1= currentDate.month
+        day1= currentDate.day
+
+        while currentDate<=toDate:
+            dateList.append(currentDate)
+            year1 +=1
+
+            currentDate= is_valid_day_in_jalali_month(year1, month1, day1)
+        if len(dateList) == 0:
+            return group
     else:
         return group
 
-
-    dateList = []
-    currentDate = date
-    while currentDate<=toDate:
-        dateList.append(currentDate)
-        currentDate = currentDate + step
-    if len(dateList) == 0:
-        return group
-    
 
     dfs = [
         group.assign(date=new_date, datejalali=np.nan, timestamp= np.nan)
@@ -1426,7 +1479,9 @@ def desk_todo_gettask(data):
         return json.dumps({'reply':False})
     df = df.drop(columns='timestamp')
     df['datejalali'] = df['date'].apply(Fnc.gorgianIntToJalaliInt)
-
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', None)
     print(df)
 
     return json.dumps({'reply':True})
