@@ -1360,9 +1360,50 @@ def desk_todo_addtask(data):
     gregorian_dt = datetime.datetime.fromtimestamp( int(data['popup']['date']/1000) ) 
     jalali_date = JalaliDate(gregorian_dt.year, gregorian_dt.month, gregorian_dt.day)
     jalali_date = jalali_date.strftime('%Y%m%d')
-    dic= {"symbol": symbol, "title": data['popup']['title'], "discription": data['popup']['discription'], "force": data['popup']['force'], "importent": data['popup']['importent'], "date": int( data['popup']['date'] /1000 ), "date": gregorian_dt, "datejalali": int( jalali_date )}
+    dic= {"symbol": symbol, "title": data['popup']['title'], "discription": data['popup']['discription'], "force": data['popup']['force'], "importent": data['popup']['importent'], "date": int( data['popup']['date'] /1000 ), "date": gregorian_dt, "datejalali": int( jalali_date ),'repetition':data['popup']['repetition']}
     dic["timestamp"]= int( data['popup']['date'] /1000 )
     dic["date"]= gregorian_dt
     dic["datejalali"]= int( jalali_date )
     farasahmDb["Todo"].insert_one(dic)
+    return json.dumps({'reply':True})
+
+
+def repetition_Task_Generator(group,toDate):
+    repetition = group['repetition'][group.index.min()]
+    date = group['date'][group.index.min()]
+    
+    if repetition == 'NoRepetition':
+        return group
+    elif repetition == 'daily':
+        dateList = pd.date_range(start=date,end=toDate,freq='D')
+    elif repetition == 'weekly':
+        dateList = pd.date_range(start=date,end=toDate,freq='W')
+    elif repetition == 'monthly':
+        dateList = pd.date_range(start=date,end=toDate,freq='MS')
+    elif repetition == 'yearly':
+        dateList = pd.date_range(start=date,end=toDate,freq='AS')
+    else:
+        pass
+    print(dateList)
+    print(date - toDate)
+
+    print(group)
+    return group
+
+def desk_todo_gettask(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    
+    toDate = max(data['DateSelection'])/1000
+    now = datetime.datetime.now()
+    df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol},{'_id':0}))
+    df = df[df['timestamp']<=toDate]
+    df = df.groupby(['datejalali','repetition']).apply(repetition_Task_Generator,toDate=toDate)
+
+
+
     return json.dumps({'reply':True})

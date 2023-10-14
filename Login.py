@@ -72,7 +72,6 @@ def applyCode(data):
 
 
 def access(data):
-    print(data)
     _id= ObjectId(data['id'])
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc==None:
