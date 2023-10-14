@@ -1389,13 +1389,12 @@ def repetition_Task_Generator(group,toDate):
         dateList = pd.date_range(start=date,end=toDate,freq='AS')
     else:
         pass
-    print(2222222, dateList)
+    print(2222222, dateList, list(dateList))
 
-    df = group
-    # List of new dates
+
     new_dates =dateList
     dfs = [
-        df.assign(date=new_date, datejalali=int(new_date.replace("-", "")))
+        group.assign(date=new_date, datejalali=int(111), timestamp= 1111)
         for new_date in new_dates
     ]
 
