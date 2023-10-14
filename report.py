@@ -6,7 +6,6 @@ import pandas as pd
 from io import StringIO
 import pymongo
 from persiantools.jdatetime import JalaliDate
-from jdatetime import datetime as jdatetime
 
 import datetime
 from dataManagment import lastupdate
@@ -1352,7 +1351,6 @@ def desk_todo_addtask(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-
     if data['popup']['title'] == "":
         return json.dumps({'reply':False,'msg': "عنوان خالی هست"})
     if data['popup']['discription'] == "":
@@ -1360,16 +1358,11 @@ def desk_todo_addtask(data):
     if data['popup']['date'] == "":
         return json.dumps({'reply':False,'msg': "تاریخ خالی هست"})
     gregorian_dt = datetime.datetime.fromtimestamp( int(data['popup']['date']/1000) ) 
-    jalali_date = jdatetime.fromgregorian(datetime=gregorian_dt)
+    jalali_date = JalaliDate(gregorian_dt.year, gregorian_dt.month, gregorian_dt.day)
     jalali_date = jalali_date.strftime('%Y%m%d')
-
     dic= {"symbol": symbol, "title": data['popup']['title'], "discription": data['popup']['discription'], "force": data['popup']['force'], "importent": data['popup']['importent'], "date": int( data['popup']['date'] /1000 ), "date": gregorian_dt, "datejalali": int( jalali_date )}
-
     dic["timestamp"]= int( data['popup']['date'] /1000 )
     dic["date"]= gregorian_dt
     dic["datejalali"]= int( jalali_date )
-
-    resinsert= farasahmDb["Todo"].insert_one(dic)
-    print(resinsert)
-
+    farasahmDb["Todo"].insert_one(dic)
     return json.dumps({'reply':True})

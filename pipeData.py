@@ -3,6 +3,7 @@ import WebCrawling
 import time
 import ApiMethods
 from dataManagment import desk_broker_volumeTrade_cal, desk_broker_turnover_cal
+
 while True:
     # این بخش حلقه برای خزش وب است
     if Fnc.is_time_between(20,22):
