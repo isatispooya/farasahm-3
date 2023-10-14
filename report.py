@@ -1369,9 +1369,14 @@ def desk_todo_addtask(data):
 
 
 def repetition_Task_Generator(group,toDate):
+    
+    
     repetition = group['repetition'][group.index.min()]
     date = group['date'][group.index.min()]
-    
+    toDate= datetime.datetime.fromtimestamp(toDate)
+
+    print(1111, group)
+    print( "start:", date, " end:", toDate )
     if repetition == 'NoRepetition':
         return group
     elif repetition == 'daily':
@@ -1384,10 +1389,20 @@ def repetition_Task_Generator(group,toDate):
         dateList = pd.date_range(start=date,end=toDate,freq='AS')
     else:
         pass
-    print(dateList)
-    print(date - toDate)
+    print(2222222, dateList)
 
-    print(group)
+    df = group
+    # List of new dates
+    new_dates =dateList
+    dfs = [
+        df.assign(date=new_date, datejalali=int(new_date.replace("-", "")))
+        for new_date in new_dates
+    ]
+
+    new_df = pd.concat(dfs, ignore_index=True)
+
+    print(new_df)
+
     return group
 
 def desk_todo_gettask(data):
@@ -1398,12 +1413,10 @@ def desk_todo_gettask(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     
-    toDate = max(data['DateSelection'])/1000
+    toDate = int( max(data['DateSelection'])/1000 )
     now = datetime.datetime.now()
     df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol},{'_id':0}))
     df = df[df['timestamp']<=toDate]
     df = df.groupby(['datejalali','repetition']).apply(repetition_Task_Generator,toDate=toDate)
-
-
 
     return json.dumps({'reply':True})
