@@ -1373,35 +1373,40 @@ def repetition_Task_Generator(group,toDate):
     
     repetition = group['repetition'][group.index.min()]
     date = group['date'][group.index.min()]
+    dayOfDate = date.day
+
     toDate= datetime.datetime.fromtimestamp(toDate)
 
-    print(1111, group)
-    print( "start:", date, " end:", toDate )
+
     if repetition == 'NoRepetition':
         return group
     elif repetition == 'daily':
-        dateList = pd.date_range(start=date,end=toDate,freq='D')
+        step  = datetime.timedelta(days=1)
     elif repetition == 'weekly':
-        dateList = pd.date_range(start=date,end=toDate,freq='W')
+        step  = datetime.timedelta(weeks=1)
     elif repetition == 'monthly':
-        dateList = pd.date_range(start=date,end=toDate,freq='MS')
+        step  = datetime.timedelta(days=30)
     elif repetition == 'yearly':
-        dateList = pd.date_range(start=date,end=toDate,freq='AS')
+        step  = datetime.timedelta(days=365)
     else:
-        pass
-    print(2222222, dateList, list(dateList))
+        return group
 
 
-    new_dates =dateList
+    dateList = []
+    currentDate = date
+    while currentDate<=toDate:
+        dateList.append(currentDate)
+        currentDate = currentDate + step
+    if len(dateList) == 0:
+        return group
+    
+
     dfs = [
-        group.assign(date=new_date, datejalali=int(111), timestamp= 1111)
-        for new_date in new_dates
+        group.assign(date=new_date, datejalali=np.nan, timestamp= np.nan)
+        for new_date in dateList
     ]
-
-    new_df = pd.concat(dfs, ignore_index=True)
-
-    print(new_df)
-
+    group = pd.concat([group,pd.concat(dfs, ignore_index=True)]).fillna(method='ffill')
+    group = group.drop_duplicates()
     return group
 
 def desk_todo_gettask(data):
@@ -1417,5 +1422,11 @@ def desk_todo_gettask(data):
     df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol},{'_id':0}))
     df = df[df['timestamp']<=toDate]
     df = df.groupby(['datejalali','repetition']).apply(repetition_Task_Generator,toDate=toDate)
+    if len(df) == 0:
+        return json.dumps({'reply':False})
+    df = df.drop(columns='timestamp')
+    df['datejalali'] = df['date'].apply(Fnc.gorgianIntToJalaliInt)
+
+    print(df)
 
     return json.dumps({'reply':True})
