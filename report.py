@@ -1511,10 +1511,14 @@ def desk_todo_gettask(data):
     df = df.reset_index().drop(columns=['level_0','level_1'])
 
     df = df.sort_values(by='reminderDate',ascending=True)
-    df['jalali_deadlineDate'] = df['deadlineDate'].apply(Fnc.dateStrToIntJalali)
+    df['jalali_reminderDate'] = df['reminderDate'].apply(Fnc.gorgianIntToJalali)
+    df['jalali_deadlineDate'] = df['deadlineDate'].apply(Fnc.gorgianIntToJalali)
+    df['expier'] = df['reminderDate']<datetime.datetime.now().date()
+    
+    for i in ['deadlineDate','reminderDate','jalali_reminderDate','jalali_deadlineDate','_id']:
+        df[i] = df[i].apply(str)
+
     print(df)
-
-
     df = df.to_dict('records')
     now = str(Fnc.JalaliDate.to_jalali(datetime.datetime.now()))
 
@@ -1525,14 +1529,13 @@ def desk_todo_gettask(data):
         JdateCuroser = str(JdateCuroser).replace('-','/')
         dic[JdateCuroser] = []
         dateCuroser = dateCuroser + datetime.timedelta(days=1)
+    
     for i in df:
-        deadline = int(str(i['date']).replace('-','')) < int(now.replace('-',''))
-        if deadline:
+        if i['expier']:
             dateList = str(now).replace('-','/')
-            i['deadline'] = deadline
         else:
-            dateList = str(i['date']).replace('-','/')
-            i['deadline'] = deadline
+            dateList = str(i['jalali_reminderDate']).replace('-','/')
+
         if dateList in dic.keys():
             dic[dateList] = dic[dateList] + [i]
         else:

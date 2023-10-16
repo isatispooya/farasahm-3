@@ -19,6 +19,17 @@ def gorgianIntToJalaliInt(date):
     Jalali = JalaliDate.to_jalali(int(y),int(m),int(d))
     return int(str(Jalali).replace('-',''))
 
+
+def gorgianIntToJalali(date):
+    date = str(date).replace('-','')
+    y = str(date)[:4]
+    m = str(date)[4:6]
+    d = str(date)[6:8]
+
+    Jalali = JalaliDate.to_jalali(int(y),int(m),int(d))
+    return str(Jalali)
+
+
 def todayIntJalali():
     today = datetime.datetime.now()
     jalali = JalaliDate.to_jalali(today)
