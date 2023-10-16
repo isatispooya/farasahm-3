@@ -264,3 +264,11 @@ def  replace_values(row):
         return row['date_act']
     else:
         return row['date']
+    
+
+
+def Jdatetime_to_datetime(jdatetime):
+    jdatetime = str(jdatetime).split('-')
+    jdatetime = [int(x) for x in jdatetime]
+    date = JalaliDate(jdatetime[0],jdatetime[1],jdatetime[2]).to_gregorian()
+    return date

@@ -20,13 +20,15 @@ import arabic_reshaper
 from bidi.algorithm import get_display
 import Fnc
 from bson import ObjectId
+from GuardPyCaptcha.Captch import GuardPyCaptcha
 
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
 
 def applynationalcode(data):
-    textCaptcha = decrypt(data['captchaCode'][2:-1].encode())
-    if textCaptcha!=data['UserInput']['captcha']:
+    captchas = GuardPyCaptcha()
+    captchas = captchas.check_response(data['captchaCode'],data['UserInput']['captcha'])
+    if captchas == False:
         return json.dumps({'replay':False,'msg':'کد تصویر صحیح نیست'})
     registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['UserInput']['nationalCode']},sort=[('date', -1)])
     if registerNoBours != None:
@@ -213,13 +215,12 @@ def getcompany(data):
     user = CookieToUser(data['cookie'])
     if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
     user = user['user']
-    pipeline = [{"$match": {"کد ملی": int(user['nationalCode'])}},{"$group": {"_id": "$symbol","max_date": {"$max": "$تاریخ گزارش"}}},
-                {"$lookup": {"from": "register","localField": "_id","foreignField": "symbol","as": "symbol_data"}},
-                {"$unwind": "$symbol_data"},{"$match": {"$expr": {"$eq": ["$max_date", "$symbol_data.تاریخ گزارش"]}}},
-                {"$project": {"_id": 0,"symbol": "$_id","سهام کل": "$symbol_data.سهام کل","تاریخ گزارش": "$max_date",}}
-                ]
 
-    stockBourse = pd.DataFrame(farasahmDb['register'].aggregate(pipeline)).drop_duplicates(subset=['symbol'])
+    stockBourse = pd.DataFrame(farasahmDb['register'].find({"کد ملی": int(user['nationalCode']),'symbol':'visa'},{'_id':0,'symbol':1,'سهام کل':1,'تاریخ گزارش':1}))
+    stockBourse = stockBourse[stockBourse['تاریخ گزارش'] == stockBourse['تاریخ گزارش'].max()]
+
+    stockBourse = stockBourse.drop_duplicates(subset=['symbol'])
+
     if len(stockBourse)>0:
         stockBourse = stockBourse[stockBourse['symbol']!='bazargam']
 
@@ -238,6 +239,7 @@ def getcompany(data):
     allStockCompany = allStockCompany[allStockCompany['symbol']!='bazargam']
     allStockCompany = allStockCompany.set_index('symbol')
     allStockCompany = allStockCompany.rename(columns={'تعداد سهام':'allStockCompany'})
+
     allCompany = allCompany.set_index('symbol')
     allCompany = allCompany.join(allStockCompany)
     allCompany = allCompany[allCompany.index != 'hevisa']

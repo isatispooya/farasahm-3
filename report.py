@@ -1388,94 +1388,101 @@ def is_valid_day_in_jalali_month(jalali_year, jalali_month, day):
         return nearest_valid_date
 
 def repetition_Task_Generator(group,toDate):
-    
-    
     repetition = group['repetition'][group.index.min()]
-    date = group['date'][group.index.min()]
-    jalali_date = jdatetime.date.fromgregorian(date=date)
+    reminderDate = group['reminderDate'][group.index.min()]
+    deadlineDate = group['deadlineDate'][group.index.min()]
+    reminder_jalali_date = jdatetime.date.fromgregorian(date=reminderDate.date())
+    deadline_jalali_date = jdatetime.date.fromgregorian(date=deadlineDate.date())
     toDate= jdatetime.date.fromgregorian(date= datetime.datetime.fromtimestamp(toDate).date() )
-
-    if repetition == 'NoRepetition':
-        return group
-    elif repetition == 'daily':
+    dateList = []
+    if repetition == 'daily':
         step  = datetime.timedelta(days=1)
-        dateList = []
-        currentDate = jalali_date
-        while currentDate<=toDate:
-            dateList.append(currentDate)
-            currentDate = currentDate + step
-        if len(dateList) == 0:
-            return group
-        
+        while reminder_jalali_date<=toDate:
+            lst = [reminder_jalali_date,deadline_jalali_date]
+            dateList.append(lst)
+            reminder_jalali_date = reminder_jalali_date + step
+            deadline_jalali_date = deadline_jalali_date + step
     elif repetition == 'weekly':
         step  = datetime.timedelta(weeks=1)
-        dateList = []
-        currentDate = jalali_date
-        while currentDate<=toDate:
-            dateList.append(currentDate)
-            currentDate = currentDate + step
-        if len(dateList) == 0:
-            return group
+        while reminder_jalali_date<=toDate:
+            lst = [reminder_jalali_date,deadline_jalali_date]
+            dateList.append(lst)
+            reminder_jalali_date = reminder_jalali_date + step
+            deadline_jalali_date = deadline_jalali_date + step
+
     elif repetition == 'monthly':
+        r_year1= reminder_jalali_date.year
+        r_month1= reminder_jalali_date.month
+        r_day1= reminder_jalali_date.day
+        d_year1= deadline_jalali_date.year
+        d_month1= deadline_jalali_date.month
+        d_day1= deadline_jalali_date.day
+        while reminder_jalali_date<=toDate:
+            lst = [reminder_jalali_date,deadline_jalali_date]
+            dateList.append(lst)
+            r_month1 +=1
+            if r_month1 > 12 :
+                r_month1 = 1
+                r_year1 +=1
+            d_month1 +=1
+            if d_month1 > 12 :
+                d_month1 = 1
+                d_year1 +=1
+            reminder_jalali_date= is_valid_day_in_jalali_month(r_year1, r_month1, r_day1)
+            deadline_jalali_date= is_valid_day_in_jalali_month(d_year1, d_month1, d_day1)
 
-        dateList = []
-        currentDate = jalali_date
-        year1= currentDate.year
-        month1= currentDate.month
-        day1= currentDate.day
-
-        while currentDate<=toDate:
-            dateList.append(currentDate)
-            month1 +=1
-            if month1 > 12 :
-                month1 = 1
-                year1 +=1
-
-            currentDate= is_valid_day_in_jalali_month(year1, month1, day1)
-        if len(dateList) == 0:
-            return group
     elif repetition == 'quarterly':
+        r_year1= reminder_jalali_date.year
+        r_month1= reminder_jalali_date.month
+        r_day1= reminder_jalali_date.day
+        d_year1= deadline_jalali_date.year
+        d_month1= deadline_jalali_date.month
+        d_day1= deadline_jalali_date.day
+        while reminder_jalali_date<=toDate:
+            lst = [reminder_jalali_date,deadline_jalali_date]
+            dateList.append(lst)
+            r_month1 +=3
+            if r_month1 > 12 :
+                r_month1 = r_month1 -12
+                r_year1 +=1
+            d_month1 +=3
+            if d_month1 > 12 :
+                d_month1 = d_month1 -12
+                d_year1 +=1
+            reminder_jalali_date= is_valid_day_in_jalali_month(r_year1, r_month1, r_day1)
+            deadline_jalali_date= is_valid_day_in_jalali_month(d_year1, d_month1, d_day1)
 
-        dateList = []
-        currentDate = jalali_date
-        year1= currentDate.year
-        month1= currentDate.month
-        day1= currentDate.day
 
-        while currentDate<=toDate:
-            dateList.append(currentDate)
-            month1 +=3
-            if month1 > 12 :
-                month1 = month1-12
-                year1 +=1
-
-            currentDate= is_valid_day_in_jalali_month(year1, month1, day1)
-        if len(dateList) == 0:
-            return group
     elif repetition == 'yearly':
-        dateList = []
-        currentDate = jalali_date
-        year1= currentDate.year
-        month1= currentDate.month
-        day1= currentDate.day
+        r_year1= reminder_jalali_date.year
+        r_month1= reminder_jalali_date.month
+        r_day1= reminder_jalali_date.day
+        d_year1= deadline_jalali_date.year
+        d_month1= deadline_jalali_date.month
+        d_day1= deadline_jalali_date.day
+        while reminder_jalali_date<=toDate:
+            lst = [reminder_jalali_date,deadline_jalali_date]
+            dateList.append(lst)
+            r_year1 +=1
+            d_year1 +=1
 
-        while currentDate<=toDate:
-            dateList.append(currentDate)
-            year1 +=1
+            reminder_jalali_date= is_valid_day_in_jalali_month(r_year1, r_month1, r_day1)
+            deadline_jalali_date= is_valid_day_in_jalali_month(d_year1, d_month1, d_day1)
 
-            currentDate= is_valid_day_in_jalali_month(year1, month1, day1)
-        if len(dateList) == 0:
-            return group
-    else:
+
+    if len(dateList) == 0:
         return group
+
 
 
     dfs = [
-        group.assign(date=new_date, datejalali=np.nan, timestamp= np.nan)
+        group.assign(reminderDate=new_date[0],deadlineDate=new_date[1])
         for new_date in dateList
     ]
     group = pd.concat(dfs, ignore_index=True).fillna(method='ffill')
     group = group.drop_duplicates()
+    group['deadlineDate'] = group['deadlineDate'].apply(Fnc.Jdatetime_to_datetime)
+    group['reminderDate'] = group['reminderDate'].apply(Fnc.Jdatetime_to_datetime)
     return group
 
 
@@ -1493,43 +1500,20 @@ def desk_todo_gettask(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    
     toDate = int( max(data['DateSelection'])/1000 )
-    actDf = pd.DataFrame(farasahmDb['TodoAct'].find({'symbol':symbol},{'_id':0,'symbol':0}))
-    if len(actDf) > 0:
-        actDf = actDf.groupby(by=['task_id','date_task']).apply(filter_last_date)
-        actDf = actDf.reset_index().drop(columns=['level_2'])
-        actDf = actDf.rename(columns={'task_id':'_id','date_task':'date'})
-        actDf = actDf.set_index(['_id','date'])
-
-
-    df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol},))
-    df = df[df['timestamp']<=toDate]
-    df = df.groupby(['datejalali','repetition']).apply(repetition_Task_Generator,toDate=toDate)
+    df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol}))
+    df = df[df['reminderDate']<=toDate]
+    df['reminderDate'] = df['reminderDate'].apply(datetime.datetime.fromtimestamp)
+    df['deadlineDate'] = df['deadlineDate'].apply(datetime.datetime.fromtimestamp)
+    df = df.groupby(['reminderDate','repetition'],as_index=False).apply(repetition_Task_Generator,toDate=toDate)
     if len(df) == 0:
         return json.dumps({'reply':False})
-    df = df.drop(columns=['timestamp','datejalali','repetition'])
-    df['_id'] = df['_id'].apply(str)
-    df['date'] = df['date'].apply(str)
+    df = df.reset_index().drop(columns=['level_0','level_1'])
 
-    df = df.reset_index()
-    df = df.drop(columns=['datejalali','level_2'])
-    if len(actDf)>0:
-        df = df.set_index(['_id','date'])
-        df = df.join(actDf).reset_index()
-        df = df[df['act']!='done']
-        df['act'] = df['act'].fillna('noting')
-        df['date_act'] = df['date_act'].fillna(method='ffill').fillna(method='bfill')
-        df['chngDate'] = df['act']!='noting'
-        df = df.drop(columns=['dateJalali'])
-        df['date_act'] = df['date_act'] + datetime.timedelta(days=1)
-        if df['chngDate'].sum() > 0:
-            df['date_act'] = df['date_act'].apply(Fnc.JalaliDate.to_jalali)
-            df['date_act'] = df['date_act'].apply(str)
-            df['date'] = df.apply(Fnc.replace_values,axis=1)
-        df = df.drop(columns=['date_act','chngDate'])
-        df = df.reset_index()
-    df = df.sort_values(by='date',ascending=True)
+    df = df.sort_values(by='reminderDate',ascending=True)
+    df['jalali_deadlineDate'] = df['deadlineDate'].apply(Fnc.dateStrToIntJalali)
+    print(df)
+
 
     df = df.to_dict('records')
     now = str(Fnc.JalaliDate.to_jalali(datetime.datetime.now()))
@@ -1567,3 +1551,4 @@ def desk_todo_setact(data):
     dateJalali = str(Fnc.JalaliDate.to_jalali(date))
     farasahmDb['TodoAct'].insert_one({'symbol':symbol,'task_id':data['task']['_id'], 'act':data['act'], 'date_task':data['task']['date'], 'date':date, 'dateJalali':dateJalali})
     return json.dumps({'reply':True})
+
