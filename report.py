@@ -1434,7 +1434,24 @@ def repetition_Task_Generator(group,toDate):
             currentDate= is_valid_day_in_jalali_month(year1, month1, day1)
         if len(dateList) == 0:
             return group
+    elif repetition == 'quarterly':
 
+        dateList = []
+        currentDate = jalali_date
+        year1= currentDate.year
+        month1= currentDate.month
+        day1= currentDate.day
+
+        while currentDate<=toDate:
+            dateList.append(currentDate)
+            month1 +=3
+            if month1 > 12 :
+                month1 = month1-12
+                year1 +=1
+
+            currentDate= is_valid_day_in_jalali_month(year1, month1, day1)
+        if len(dateList) == 0:
+            return group
     elif repetition == 'yearly':
         dateList = []
         currentDate = jalali_date
