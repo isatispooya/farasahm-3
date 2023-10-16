@@ -530,6 +530,11 @@ def desk_todo_gettask():
     data = request.get_json()
     return report.desk_todo_gettask(data)
 
+@app.route('/desk/todo/setact',methods = ['POST', 'GET'])
+def desk_todo_setact():
+    data = request.get_json()
+    return report.desk_todo_setact(data)
+
 
 @app.route('/desk/broker/gettraders',methods = ['POST', 'GET'])
 def desk_broker_gettraders():

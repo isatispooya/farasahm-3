@@ -1392,8 +1392,6 @@ def repetition_Task_Generator(group,toDate):
     repetition = group['repetition'][group.index.min()]
     date = group['date'][group.index.min()]
     jalali_date = jdatetime.date.fromgregorian(date=date)
-    print(jalali_date)
-
     toDate= jdatetime.date.fromgregorian(date= datetime.datetime.fromtimestamp(toDate).date() )
 
     if repetition == 'NoRepetition':
@@ -1458,9 +1456,17 @@ def repetition_Task_Generator(group,toDate):
         group.assign(date=new_date, datejalali=np.nan, timestamp= np.nan)
         for new_date in dateList
     ]
-    group = pd.concat([group,pd.concat(dfs, ignore_index=True)]).fillna(method='ffill')
+    group = pd.concat(dfs, ignore_index=True).fillna(method='ffill')
     group = group.drop_duplicates()
     return group
+
+
+def filter_last_date(group):
+    group =  group[group['date']==group['date'].max()][['act','dateJalali','date']]
+    group = group.rename(columns={'date':'date_act'})
+    return group
+
+
 
 def desk_todo_gettask(data):
     access = data['access'][0]
@@ -1471,17 +1477,71 @@ def desk_todo_gettask(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     
     toDate = int( max(data['DateSelection'])/1000 )
-    now = datetime.datetime.now()
-    df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol},{'_id':0}))
+    fromDate = int( min(data['DateSelection'])/1000 )
+    actDf = pd.DataFrame(farasahmDb['TodoAct'].find({'symbol':symbol},{'_id':0,'symbol':0}))
+    if len(actDf) > 0:
+        actDf = actDf.groupby(by=['task_id','date_task']).apply(filter_last_date)
+        actDf = actDf.reset_index().drop(columns=['level_2'])
+        actDf = actDf.rename(columns={'task_id':'_id','date_task':'date'})
+        actDf = actDf.set_index(['_id','date'])
+
+
+
+
+
+
+
+    df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol},))
     df = df[df['timestamp']<=toDate]
     df = df.groupby(['datejalali','repetition']).apply(repetition_Task_Generator,toDate=toDate)
     if len(df) == 0:
         return json.dumps({'reply':False})
-    df = df.drop(columns='timestamp')
-    df['datejalali'] = df['date'].apply(Fnc.gorgianIntToJalaliInt)
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.width', None)
-    print(df)
+    df = df.drop(columns=['timestamp','datejalali','repetition'])
+    df['_id'] = df['_id'].apply(str)
+    df['date'] = df['date'].apply(str)
 
+    df = df.reset_index()
+    df = df.drop(columns=['datejalali','level_2'])
+    df = df.set_index(['_id','date'])
+    df = df.join(actDf).reset_index()
+    df = df[df['act']!='done']
+    df['act'] = df['act'].fillna('noting')
+    df['date_act'] = df['date_act'].fillna(method='ffill').fillna(method='bfill')
+
+    df['chngDate'] = df['act']!='noting'
+    df = df.drop(columns=['dateJalali'])
+    df = df.reset_index()
+
+    #print(actDf)
+    df = df.sort_values(by='date',ascending=True)
+
+    df = df.to_dict('records')
+    now = str(Fnc.JalaliDate.to_jalali(datetime.datetime.now()))
+    afterDay = str(Fnc.JalaliDate.to_jalali(datetime.datetime.now() + datetime.timedelta(days=1)))
+    dic = {}
+    for i in df:
+        deadline = int(str(i['date']).replace('-','')) < int(now.replace('-',''))
+        if deadline:
+            dateList = str(now).replace('-','/')
+            i['deadline'] = deadline
+        else:
+            dateList = str(i['date']).replace('-','/')
+            i['deadline'] = deadline
+        if dateList in dic.keys():
+            dic[dateList] = dic[dateList] + [i]
+        else:
+            dic[dateList] = [i]
+    return json.dumps({'reply':True,'df':dic})
+
+
+def desk_todo_setact(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    date = datetime.datetime.now()
+    dateJalali = str(Fnc.JalaliDate.to_jalali(date))
+    farasahmDb['TodoAct'].insert_one({'symbol':symbol,'task_id':data['task']['_id'], 'act':data['act'], 'date_task':data['task']['date'], 'date':date, 'dateJalali':dateJalali})
     return json.dumps({'reply':True})

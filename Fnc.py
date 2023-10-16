@@ -12,7 +12,6 @@ farasahmDb = client['farasahm2']
 
 def gorgianIntToJalaliInt(date):
     date = str(date).replace('-','')
-    print(date)
     y = str(date)[:4]
     m = str(date)[4:6]
     d = str(date)[6:8]
