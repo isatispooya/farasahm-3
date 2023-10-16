@@ -1350,21 +1350,22 @@ def desk_todo_addtask(data):
     symbol = data['access'][1]
     _id= ObjectId(access)
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    dic = data['popup']
+    dic['symbol'] = symbol
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    if data['popup']['title'] == "":
+    if dic['title'] == "":
         return json.dumps({'reply':False,'msg': "عنوان خالی هست"})
-    if data['popup']['discription'] == "":
+    if dic['discription'] == "":
         return json.dumps({'reply':False,'msg': "توضیحات خالی هست"})
-    if data['popup']['date'] == "":
-        return json.dumps({'reply':False,'msg': "تاریخ خالی هست"})
-    gregorian_dt = datetime.datetime.fromtimestamp( int(data['popup']['date']/1000) ) 
-    jalali_date = JalaliDate(gregorian_dt.year, gregorian_dt.month, gregorian_dt.day)
-    jalali_date = jalali_date.strftime('%Y%m%d')
-    dic= {"symbol": symbol, "title": data['popup']['title'], "discription": data['popup']['discription'], "force": data['popup']['force'], "importent": data['popup']['importent'], "date": int( data['popup']['date'] /1000 ), "date": gregorian_dt, "datejalali": int( jalali_date ),'repetition':data['popup']['repetition']}
-    dic["timestamp"]= int( data['popup']['date'] /1000 )
-    dic["date"]= gregorian_dt
-    dic["datejalali"]= int( jalali_date )
+    if dic['deadlineDate'] == "":
+        return json.dumps({'reply':False,'msg': "تاریخ سررسید خالی هست"})
+    if dic['reminderDate'] == "":
+        return json.dumps({'reply':False,'msg': "تاریخ یاداور خالی هست"})
+    if dic['reminderDate'] > dic['deadlineDate']:
+        return json.dumps({'reply':False,'msg': "تاریخ یادآور باید قبل از سررسید باشد"})
+    dic['deadlineDate'] = int(dic['deadlineDate']/1000)
+    dic['reminderDate'] = int(dic['reminderDate']/1000)
     farasahmDb["Todo"].insert_one(dic)
     return json.dumps({'reply':True})
 
@@ -1477,18 +1478,12 @@ def desk_todo_gettask(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     
     toDate = int( max(data['DateSelection'])/1000 )
-    fromDate = int( min(data['DateSelection'])/1000 )
     actDf = pd.DataFrame(farasahmDb['TodoAct'].find({'symbol':symbol},{'_id':0,'symbol':0}))
     if len(actDf) > 0:
         actDf = actDf.groupby(by=['task_id','date_task']).apply(filter_last_date)
         actDf = actDf.reset_index().drop(columns=['level_2'])
         actDf = actDf.rename(columns={'task_id':'_id','date_task':'date'})
         actDf = actDf.set_index(['_id','date'])
-
-
-
-
-
 
 
     df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol},))
@@ -1502,23 +1497,33 @@ def desk_todo_gettask(data):
 
     df = df.reset_index()
     df = df.drop(columns=['datejalali','level_2'])
-    df = df.set_index(['_id','date'])
-    df = df.join(actDf).reset_index()
-    df = df[df['act']!='done']
-    df['act'] = df['act'].fillna('noting')
-    df['date_act'] = df['date_act'].fillna(method='ffill').fillna(method='bfill')
-
-    df['chngDate'] = df['act']!='noting'
-    df = df.drop(columns=['dateJalali'])
-    df = df.reset_index()
-
-    #print(actDf)
+    if len(actDf)>0:
+        df = df.set_index(['_id','date'])
+        df = df.join(actDf).reset_index()
+        df = df[df['act']!='done']
+        df['act'] = df['act'].fillna('noting')
+        df['date_act'] = df['date_act'].fillna(method='ffill').fillna(method='bfill')
+        df['chngDate'] = df['act']!='noting'
+        df = df.drop(columns=['dateJalali'])
+        df['date_act'] = df['date_act'] + datetime.timedelta(days=1)
+        if df['chngDate'].sum() > 0:
+            df['date_act'] = df['date_act'].apply(Fnc.JalaliDate.to_jalali)
+            df['date_act'] = df['date_act'].apply(str)
+            df['date'] = df.apply(Fnc.replace_values,axis=1)
+        df = df.drop(columns=['date_act','chngDate'])
+        df = df.reset_index()
     df = df.sort_values(by='date',ascending=True)
 
     df = df.to_dict('records')
     now = str(Fnc.JalaliDate.to_jalali(datetime.datetime.now()))
-    afterDay = str(Fnc.JalaliDate.to_jalali(datetime.datetime.now() + datetime.timedelta(days=1)))
+
     dic = {}
+    dateCuroser = datetime.datetime.now()
+    while dateCuroser < datetime.datetime.fromtimestamp(toDate):
+        JdateCuroser = Fnc.JalaliDate.to_jalali(dateCuroser)
+        JdateCuroser = str(JdateCuroser).replace('-','/')
+        dic[JdateCuroser] = []
+        dateCuroser = dateCuroser + datetime.timedelta(days=1)
     for i in df:
         deadline = int(str(i['date']).replace('-','')) < int(now.replace('-',''))
         if deadline:

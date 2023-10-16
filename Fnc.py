@@ -256,3 +256,11 @@ def comma_separate(input_str):
     else:
         result_str = ','.join(input_str[-i-1:-i-4:-1] for i in range(0, len(input_str), 3))
         return result_str[::-1]
+    
+
+
+def  replace_values(row):
+    if row['chngDate']:
+        return row['date_act']
+    else:
+        return row['date']
