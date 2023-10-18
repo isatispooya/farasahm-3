@@ -1513,33 +1513,41 @@ def desk_todo_gettask(data):
     df = df.sort_values(by='reminderDate',ascending=True)
     df['jalali_reminderDate'] = df['reminderDate'].apply(Fnc.gorgianIntToJalali)
     df['jalali_deadlineDate'] = df['deadlineDate'].apply(Fnc.gorgianIntToJalali)
-    df['expier'] = df['reminderDate']<datetime.datetime.now().date()
+    df['expier_reminderDate'] = df['reminderDate']<datetime.datetime.now().date()
+    df['expier_deadlineDate'] = df['deadlineDate']<datetime.datetime.now().date()
+    df['in_list_jalali_reminderDate'] = df.apply(Fnc.replace_values, axis=1)
     
-    for i in ['deadlineDate','reminderDate','jalali_reminderDate','jalali_deadlineDate','_id']:
+    for i in ['deadlineDate','reminderDate','jalali_reminderDate','jalali_deadlineDate','_id','in_list_jalali_reminderDate']:
         df[i] = df[i].apply(str)
 
-    print(df)
+    actDf = pd.DataFrame(farasahmDb['TodoAct'].find({'symbol':symbol},{'_id':0,'symbol':0}))
+    actDf = actDf.rename(columns={'task_id':'_id','task_deadlineDate':'deadlineDate'})
+    actDf = actDf.set_index(['_id','deadlineDate'])
+    df = df.set_index(['_id','deadlineDate'])
+    df = df.join(actDf,how='left')
+    df = df[df['act']!='done']
+    df['to_in_list_jalali_reminderDate'] = df['to_in_list_jalali_reminderDate'].fillna(df['in_list_jalali_reminderDate'])
+    df['in_list_jalali_reminderDate'] = df['to_in_list_jalali_reminderDate']
+
+    df = df.drop(columns=['act','to_in_list_jalali_reminderDate','act_date'])
+    df = df.reset_index()
     df = df.to_dict('records')
-    now = str(Fnc.JalaliDate.to_jalali(datetime.datetime.now()))
 
     dic = {}
     dateCuroser = datetime.datetime.now()
-    while dateCuroser < datetime.datetime.fromtimestamp(toDate):
+    while dateCuroser <= datetime.datetime.fromtimestamp(toDate) + datetime.timedelta(days=1):
         JdateCuroser = Fnc.JalaliDate.to_jalali(dateCuroser)
+        print(JdateCuroser)
         JdateCuroser = str(JdateCuroser).replace('-','/')
         dic[JdateCuroser] = []
         dateCuroser = dateCuroser + datetime.timedelta(days=1)
     
-    for i in df:
-        if i['expier']:
-            dateList = str(now).replace('-','/')
-        else:
-            dateList = str(i['jalali_reminderDate']).replace('-','/')
 
+    for i in df:
+        dateList = str(i['in_list_jalali_reminderDate']).replace('-','/')
         if dateList in dic.keys():
             dic[dateList] = dic[dateList] + [i]
-        else:
-            dic[dateList] = [i]
+
     return json.dumps({'reply':True,'df':dic})
 
 
@@ -1551,7 +1559,18 @@ def desk_todo_setact(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     date = datetime.datetime.now()
-    dateJalali = str(Fnc.JalaliDate.to_jalali(date))
-    farasahmDb['TodoAct'].insert_one({'symbol':symbol,'task_id':data['task']['_id'], 'act':data['act'], 'date_task':data['task']['date'], 'date':date, 'dateJalali':dateJalali})
-    return json.dumps({'reply':True})
+    task = data['task']
+    chack = farasahmDb['TodoAct'].find_one({'symbol':symbol,'task_id':task['_id'],'task_deadlineDate':task['deadlineDate']})
+    if chack == None:
+        to_in_list = Fnc.JalalistrToGorgia(task['in_list_jalali_reminderDate']) + datetime.timedelta(days=1)
+        to_in_list = str(Fnc.JalaliDate.to_jalali(to_in_list))
+        farasahmDb['TodoAct'].insert_one({'symbol':symbol,'task_id':task['_id'], 'act':data['act'], 'task_deadlineDate':task['deadlineDate'],'to_in_list_jalali_reminderDate':to_in_list, 'act_date':date})
+        return json.dumps({'reply':True})
+    else:
+        to_in_list = Fnc.JalalistrToGorgia(task['in_list_jalali_reminderDate']) + datetime.timedelta(days=1)
+        to_in_list = str(Fnc.JalaliDate.to_jalali(to_in_list))
+        farasahmDb['TodoAct'].update_one({'symbol':symbol,'task_id':task['_id'],'task_deadlineDate':task['deadlineDate']},{'$set':{'act':data['act'],'to_in_list_jalali_reminderDate':to_in_list,'act_date':date}})
+        return json.dumps({'reply':True})
+
+
 

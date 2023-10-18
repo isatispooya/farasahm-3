@@ -19,6 +19,12 @@ def gorgianIntToJalaliInt(date):
     Jalali = JalaliDate.to_jalali(int(y),int(m),int(d))
     return int(str(Jalali).replace('-',''))
 
+def JalalistrToGorgia(date):
+    date = str(date).replace('-','')
+    y = int(str(date)[:4])
+    m = int(str(date)[4:6])
+    d = int(str(date)[6:8])
+    return JalaliDate(y,m,d).to_gregorian()
 
 def gorgianIntToJalali(date):
     date = str(date).replace('-','')
@@ -271,10 +277,11 @@ def comma_separate(input_str):
 
 
 def  replace_values(row):
-    if row['chngDate']:
-        return row['date_act']
+    now = str(JalaliDate.to_jalali(datetime.datetime.now()))
+    if row['expier_reminderDate']:
+        return now
     else:
-        return row['date']
+        return row['jalali_reminderDate']
     
 
 

@@ -217,15 +217,15 @@ def getcompany(data):
     user = user['user']
 
     stockBourse = pd.DataFrame(farasahmDb['register'].find({"کد ملی": int(user['nationalCode']),'symbol':'visa'},{'_id':0,'symbol':1,'سهام کل':1,'تاریخ گزارش':1}))
-    stockBourse = stockBourse[stockBourse['تاریخ گزارش'] == stockBourse['تاریخ گزارش'].max()]
-
-    stockBourse = stockBourse.drop_duplicates(subset=['symbol'])
-
     if len(stockBourse)>0:
-        stockBourse = stockBourse[stockBourse['symbol']!='bazargam']
-
-    stockBourse = stockBourse.rename(columns={'سهام کل':'تعداد سهام','تاریخ گزارش':'date'})
-    listStock = stockBourse.to_dict('records')
+        stockBourse = stockBourse[stockBourse['تاریخ گزارش'] == stockBourse['تاریخ گزارش'].max()]
+        stockBourse = stockBourse.drop_duplicates(subset=['symbol'])
+        if len(stockBourse)>0:
+            stockBourse = stockBourse[stockBourse['symbol']!='bazargam']
+        stockBourse = stockBourse.rename(columns={'سهام کل':'تعداد سهام','تاریخ گزارش':'date'})
+        listStock = stockBourse.to_dict('records')
+    else:
+        listStock = []
 
     stockNoBourse = pd.DataFrame(farasahmDb['registerNoBours'].find({"کد ملی": str(user['nationalCode'])},{'تعداد سهام':1,'_id':0,'date':1,'symbol':1}))
     stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='hevisa']
