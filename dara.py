@@ -215,8 +215,11 @@ def getcompany(data):
     user = CookieToUser(data['cookie'])
     if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
     user = user['user']
+    
+    lastupDate = farasahmDb['register'].distinct('تاریخ گزارش')
+    lastupDate = max(lastupDate)
+    stockBourse = pd.DataFrame(farasahmDb['register'].find({"کد ملی": int(user['nationalCode']),'symbol':'visa','تاریخ گزارش':lastupDate},{'_id':0,'symbol':1,'سهام کل':1,'تاریخ گزارش':1}))
 
-    stockBourse = pd.DataFrame(farasahmDb['register'].find({"کد ملی": int(user['nationalCode']),'symbol':'visa'},{'_id':0,'symbol':1,'سهام کل':1,'تاریخ گزارش':1}))
     if len(stockBourse)>0:
         stockBourse = stockBourse[stockBourse['تاریخ گزارش'] == stockBourse['تاریخ گزارش'].max()]
         stockBourse = stockBourse.drop_duplicates(subset=['symbol'])
@@ -228,11 +231,13 @@ def getcompany(data):
         listStock = []
 
     stockNoBourse = pd.DataFrame(farasahmDb['registerNoBours'].find({"کد ملی": str(user['nationalCode'])},{'تعداد سهام':1,'_id':0,'date':1,'symbol':1}))
-    stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='hevisa']
-    stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='yazdan']
-    stockNoBourse = stockNoBourse.groupby(by=['symbol']).apply(groupGetCompy)
-
-    stockNoBourse = stockNoBourse.to_dict('records')
+    if len(stockNoBourse)>0:
+        stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='hevisa']
+        stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='yazdan']
+        stockNoBourse = stockNoBourse.groupby(by=['symbol']).apply(groupGetCompy)
+        stockNoBourse = stockNoBourse.to_dict('records')
+    else:
+        stockNoBourse = []
     listStock = listStock + stockNoBourse
     allCompany = pd.DataFrame(farasahmDb['companyList'].find({},{'_id':0}))
     allStockCompany = pd.DataFrame(farasahmDb['companyBasicInformation'].find({},{'_id':0,'تعداد سهام':1,'symbol':1}))

@@ -21,7 +21,7 @@ from reportlab.pdfgen import canvas
 from bson import ObjectId
 import Fnc
 from ApiMethods import GetCustomerMomentaryAssets
-import calendar
+import time
 
 farasahmDb = client['farasahm2']
 
@@ -1471,6 +1471,8 @@ def repetition_Task_Generator(group,toDate):
 
 
     if len(dateList) == 0:
+        group['deadlineDate'] = [x.date() for x in group['deadlineDate']]
+        group['reminderDate'] = [x.date() for x in group['reminderDate']]
         return group
 
 
@@ -1502,6 +1504,8 @@ def desk_todo_gettask(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     toDate = int( max(data['DateSelection'])/1000 )
     df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol}))
+    if len(df) == 0:
+        return json.dumps({'reply':False, 'msg':'هیچ وظیفه ای تعریف نشده'})
     df = df[df['reminderDate']<=toDate]
     df['reminderDate'] = df['reminderDate'].apply(datetime.datetime.fromtimestamp)
     df['deadlineDate'] = df['deadlineDate'].apply(datetime.datetime.fromtimestamp)
@@ -1521,15 +1525,16 @@ def desk_todo_gettask(data):
         df[i] = df[i].apply(str)
 
     actDf = pd.DataFrame(farasahmDb['TodoAct'].find({'symbol':symbol},{'_id':0,'symbol':0}))
-    actDf = actDf.rename(columns={'task_id':'_id','task_deadlineDate':'deadlineDate'})
-    actDf = actDf.set_index(['_id','deadlineDate'])
-    df = df.set_index(['_id','deadlineDate'])
-    df = df.join(actDf,how='left')
-    df = df[df['act']!='done']
-    df['to_in_list_jalali_reminderDate'] = df['to_in_list_jalali_reminderDate'].fillna(df['in_list_jalali_reminderDate'])
-    df['in_list_jalali_reminderDate'] = df['to_in_list_jalali_reminderDate']
+    if len(actDf) >0:
+        actDf = actDf.rename(columns={'task_id':'_id','task_deadlineDate':'deadlineDate'})
+        actDf = actDf.set_index(['_id','deadlineDate'])
+        df = df.set_index(['_id','deadlineDate'])
+        df = df.join(actDf,how='left')
+        df = df[df['act']!='done']
+        df['to_in_list_jalali_reminderDate'] = df['to_in_list_jalali_reminderDate'].fillna(df['in_list_jalali_reminderDate'])
+        df['in_list_jalali_reminderDate'] = df['to_in_list_jalali_reminderDate']
 
-    df = df.drop(columns=['act','to_in_list_jalali_reminderDate','act_date'])
+        df = df.drop(columns=['act','to_in_list_jalali_reminderDate','act_date'])
     df = df.reset_index()
     df = df.to_dict('records')
 
@@ -1572,5 +1577,59 @@ def desk_todo_setact(data):
         farasahmDb['TodoAct'].update_one({'symbol':symbol,'task_id':task['_id'],'task_deadlineDate':task['deadlineDate']},{'$set':{'act':data['act'],'to_in_list_jalali_reminderDate':to_in_list,'act_date':date}})
         return json.dumps({'reply':True})
 
+def merg_df_todo_condrol(group):
+
+    group_parent = group[['_id','title','discription','force','importent','repetition','person','jalali_reminderDate','jalali_deadlineDate','expier_reminderDate','expier_deadlineDate','act']]
+    group_child = group[['_id','title','discription','force','importent','repetition','person','jalali_reminderDate','jalali_deadlineDate','expier_reminderDate','expier_deadlineDate','act']]
+    group_child = group_child.fillna('')
+    group_child = group_child.to_dict('records')
+    group_parent = group_parent.sort_values(by='jalali_reminderDate')
+    group_parent = group_parent.drop_duplicates(keep='last')
+    group_parent['_children'] = [group_child]
+    return group_parent
+
+def desk_todo_getcontrol(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol}))
+    toDate = time.time()
+
+    df['reminderDate'] = df['reminderDate'].apply(datetime.datetime.fromtimestamp)
+    df['deadlineDate'] = df['deadlineDate'].apply(datetime.datetime.fromtimestamp)
+    df = df.groupby(['reminderDate','repetition'],as_index=False).apply(repetition_Task_Generator,toDate=toDate)
+
+    
+    if len(df) == 0:
+        return json.dumps({'reply':False})
+    df = df.reset_index().drop(columns=['level_0','level_1'])
+    df['jalali_reminderDate'] = df['reminderDate'].apply(Fnc.gorgianIntToJalali)
+    df['jalali_deadlineDate'] = df['deadlineDate'].apply(Fnc.gorgianIntToJalali)
+    df['expier_reminderDate'] = df['reminderDate']<datetime.datetime.now().date()
+    df['expier_deadlineDate'] = df['deadlineDate']<datetime.datetime.now().date()
+    df['in_list_jalali_reminderDate'] = df.apply(Fnc.replace_values, axis=1)
+    for i in ['deadlineDate','reminderDate','jalali_reminderDate','jalali_deadlineDate','_id','in_list_jalali_reminderDate']:
+        df[i] = df[i].apply(str)
+    
+    actDf = pd.DataFrame(farasahmDb['TodoAct'].find({'symbol':symbol},{'_id':0,'symbol':0}))
+    if len(actDf)>0:
+        actDf = actDf.rename(columns={'task_id':'_id','task_deadlineDate':'deadlineDate'})
+        actDf = actDf.set_index(['_id','deadlineDate'])
+        df = df.set_index(['_id','deadlineDate'])
+        df = df.join(actDf,how='left')
+        df = df.drop(columns=['to_in_list_jalali_reminderDate','act_date'])
+        df = df.reset_index()
+    else:
+        df['act'] = ''
+    df = df.groupby(by='_id').apply(merg_df_todo_condrol)
+    print(df)
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
 
 
+
+def desk_todo_deltask(data):
+    return
