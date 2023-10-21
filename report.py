@@ -1596,6 +1596,11 @@ def desk_todo_getcontrol(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol}))
+
+    print( len( df ) )
+    if   len( df) == 0:
+        return json.dumps({'reply':True,'df':list()})
+    
     toDate = time.time()
 
     df['reminderDate'] = df['reminderDate'].apply(datetime.datetime.fromtimestamp)
@@ -1632,4 +1637,26 @@ def desk_todo_getcontrol(data):
 
 
 def desk_todo_deltask(data):
-    return
+    access = data['access'][0]
+    # symbol = data['access'][1]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    idd= ObjectId(data['idTask'])
+    del_todo= farasahmDb['Todo'].delete_many({'_id': idd})
+    del_todoact= farasahmDb['TodoAct'].delete_many({'task_id': data['idTask']})
+    # print(df)
+    
+    # if chack == None:
+    #     to_in_list = Fnc.JalalistrToGorgia(task['in_list_jalali_reminderDate']) + datetime.timedelta(days=1)
+    #     to_in_list = str(Fnc.JalaliDate.to_jalali(to_in_list))
+    #     farasahmDb['TodoAct'].insert_one({'symbol':symbol,'task_id':task['_id'], 'act':data['act'], 'task_deadlineDate':task['deadlineDate'],'to_in_list_jalali_reminderDate':to_in_list, 'act_date':date})
+    #     return json.dumps({'reply':True})
+    # else:
+    #     to_in_list = Fnc.JalalistrToGorgia(task['in_list_jalali_reminderDate']) + datetime.timedelta(days=1)
+    #     to_in_list = str(Fnc.JalaliDate.to_jalali(to_in_list))
+    #     farasahmDb['TodoAct'].update_one({'symbol':symbol,'task_id':task['_id'],'task_deadlineDate':task['deadlineDate']},{'$set':{'act':data['act'],'to_in_list_jalali_reminderDate':to_in_list,'act_date':date}})
+    #     return json.dumps({'reply':True})
+    # return
+    return json.dumps({'reply':True,'msg':"ok"})
