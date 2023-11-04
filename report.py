@@ -1113,6 +1113,7 @@ def desk_broker_gettraders(data):
         return json.dumps({'replay':False})
     symbol = farasahmDb['menu'].find_one({'name':data['access'][1]})['symbol']
     date = Fnc.timestumpToJalalInt(data['date'])
+    print({'dateInt':date,'TradeSymbolAbs':symbol})
     df = pd.DataFrame(farasahmDb['TradeListBroker'].find(
         {'dateInt':date,'TradeSymbolAbs':symbol},
         {'_id':0,'AddedValueTax':0,'BondDividend':0,'BranchID':0,'Discount':0,'InstrumentCategory':0,'MarketInstrumentISIN':0,'page':0,'Update':0,'dateInt':0,
@@ -1630,7 +1631,7 @@ def desk_todo_getcontrol(data):
     else:
         df['act'] = ''
     df = df.groupby(by='_id').apply(merg_df_todo_condrol)
-    print(df)
+    df = df.fillna('')
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
 
@@ -1638,7 +1639,6 @@ def desk_todo_getcontrol(data):
 
 def desk_todo_deltask(data):
     access = data['access'][0]
-    # symbol = data['access'][1]
     _id= ObjectId(access)
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
@@ -1646,17 +1646,4 @@ def desk_todo_deltask(data):
     idd= ObjectId(data['idTask'])
     del_todo= farasahmDb['Todo'].delete_many({'_id': idd})
     del_todoact= farasahmDb['TodoAct'].delete_many({'task_id': data['idTask']})
-    # print(df)
-    
-    # if chack == None:
-    #     to_in_list = Fnc.JalalistrToGorgia(task['in_list_jalali_reminderDate']) + datetime.timedelta(days=1)
-    #     to_in_list = str(Fnc.JalaliDate.to_jalali(to_in_list))
-    #     farasahmDb['TodoAct'].insert_one({'symbol':symbol,'task_id':task['_id'], 'act':data['act'], 'task_deadlineDate':task['deadlineDate'],'to_in_list_jalali_reminderDate':to_in_list, 'act_date':date})
-    #     return json.dumps({'reply':True})
-    # else:
-    #     to_in_list = Fnc.JalalistrToGorgia(task['in_list_jalali_reminderDate']) + datetime.timedelta(days=1)
-    #     to_in_list = str(Fnc.JalaliDate.to_jalali(to_in_list))
-    #     farasahmDb['TodoAct'].update_one({'symbol':symbol,'task_id':task['_id'],'task_deadlineDate':task['deadlineDate']},{'$set':{'act':data['act'],'to_in_list_jalali_reminderDate':to_in_list,'act_date':date}})
-    #     return json.dumps({'reply':True})
-    # return
     return json.dumps({'reply':True,'msg':"ok"})

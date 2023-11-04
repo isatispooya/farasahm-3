@@ -396,7 +396,7 @@ def GetMarketInstrumentMomentaryPrice(isin):
 
 
 def get_asset_customer(today = Fnc.todayIntJalali()):
-    symbols = ['ویسا','بازرگام']
+    symbols = ['ویسا','بازرگام','خاتم']
     for symbol in symbols:
         print('get assets customer', symbol)
         df = farasahmDb['TradeListBroker'].find({"dateInt":today,"TradeSymbolAbs":symbol})
@@ -439,6 +439,7 @@ def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJal
             df['TradeSymbolAbs'] = df['TradeSymbol'].apply(Fnc.remove_non_alphanumeric)
             df = df.set_index('TradeSymbolAbs').join(symbolList.set_index('نماد'))
             df = df.reset_index()
+            print(df)
             df = df.to_dict('records')
             farasahmDb['TradeListBroker'].insert_many(df)
             print(doDay[0],doDay[1],doDay[2],page,'broker')
@@ -459,3 +460,6 @@ def GetAllTradeLastDate():
         avalibale = farasahmDb['TradeListBroker'].find_one({'dateInt':dateInt})
         if avalibale == None:
             GetAllTradeInDate(doDay=Fnc.toDayJalaliListYMD(date), DateInt=dateInt)
+
+
+

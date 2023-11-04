@@ -290,3 +290,58 @@ def Jdatetime_to_datetime(jdatetime):
     jdatetime = [int(x) for x in jdatetime]
     date = JalaliDate(jdatetime[0],jdatetime[1],jdatetime[2]).to_gregorian()
     return date
+
+
+def has_number(input_str):
+    has_digit = any(char.isdigit() for char in input_str)
+    return has_digit
+
+def is_Fund(name):
+    fund_type_a = 'صندوق س.' in name
+    if fund_type_a:
+        return True
+    fund_type_b = 'ص.س.' in name
+    if fund_type_b:
+        return True
+    return False
+
+def type_fund(name):
+    if 'بخشي' in name:
+        return 'saham'
+    elif 'املاك' in name:
+        return 'amlak'
+    elif 'مستغلات' in name:
+        return 'amlak'
+    elif 'زمين و ساختمان' in name:
+        return 'amlak'
+    elif 'درسهام' in name:
+        return 'saham'
+    elif 'درآمد ثابت' in name:
+        return 'sabet'
+    elif name[-2:] == '-د':
+        return 'sabet'
+    elif name[-2:] == '-م':
+        return 'saham'
+    elif '-ثابت' in name:
+        return 'sabet'
+    elif name[-2:] == '-س':
+        return 'saham'
+    elif 'صندوق در صندوق' in name:
+        return 'sandoq'
+    elif 'طلاي سرخ' in name:
+        return 'kala'
+    elif 'طلا' in name:
+        return 'kala'
+    elif 'زعفران' in name:
+        return 'kala'
+    elif 'جسورانه' in name:
+        return 'jasor'
+    elif 'پارند پايدار سپهر' in name:
+        return 'sabet'
+    else:
+        return 'not fund'
+    
+
+    
+
+

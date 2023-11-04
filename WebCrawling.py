@@ -25,7 +25,6 @@ def WC():
         "safebrowsing.enabled": True
     }
     options.add_experimental_option('prefs', prefs)
-
     driver = webdriver.Edge(executable_path='msedgedriver.exe',options=options)
 
     for i in etfList.index:
