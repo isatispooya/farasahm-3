@@ -25,9 +25,3 @@ while True:
 
     print('End of circle')
     time.sleep(60)
-
-        
-
-
-
-    

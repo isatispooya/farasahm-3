@@ -227,9 +227,10 @@ def getdetailstrade(data):
 
 
 def getnav(data):
-    etf = farasahmDb['fixIncome'].find_one({'symbol':data['access'][1]})
-    name = etf['نماد']
-    history = pd.DataFrame(farasahmDb['fixIncomeHistori'].find({'name':name},{'_id':0,'date':1,'final_price':1,'nav':1,'trade_volume':1}))
+    etf = farasahmDb['menu'].find_one({'name':data['access'][1]})
+    symbol = etf['symbol']
+    history = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'date':1,'final_price':1,'nav':1,'trade_volume':1}))
+    print(history)
     history['diff'] = history['nav'] - history['final_price']
     history['rate'] = ((history['nav'] / history['final_price'])-1)*100
     history['rate'] = [round(x,2) for x in history['rate']]
@@ -243,177 +244,144 @@ def getnav(data):
 
 
 def getreturn(data):
-    etf = farasahmDb['fixIncome'].find_one({'symbol':data['access'][1]})
-    name = etf['نماد']
-    periodList = [1,7,14,30,60,90,180,365]
-    onDate = False
-    psPeriod = etf[' دوره تقسیم سود ']
-    if psPeriod=='ندارد':
-        df = pd.DataFrame(farasahmDb['fixIncomeHistori'].find({'name':name},{ 'dateInt':1, '_id':0,'final_price':1})).set_index('dateInt')
-        day_list = Day_list()
-        day_list =  filter(lambda x: x >= df.index.min(), day_list)
-        day_list =  filter(lambda x: x <= df.index.max(), day_list)
-        df = df.join(pd.DataFrame(index=day_list), how='right')
-        df = df.sort_index(ascending=True)
-        df['final_price'] = df['final_price'].fillna(method='ffill')
-        df = df.dropna()
-        df = df.reset_index()
-        df = df.reset_index()
-        for i in periodList:
-            df[f'{i}'] = (df['final_price']/df['final_price'].shift(int(i)))-1
-
-        if onDate==False:
-            df = df[df.index==df.index.max()]
-        else:
-            df = df[df['index']==int(onDate)]
-            if len(df)==0:
-                return json.dumps({'replay':False, 'msg':'اطلاعاتی موجود نیست'})
-        dic = df.to_dict(orient='records')[0]
-        del dic['index']
-        del dic["final_price"]
-        del dic["level_0"]
-
-        df = pd.DataFrame(dic.items(),columns=['period','ptp'])
-
-        df['periodint'] = [365/int(x) for x in periodList]
-        df['yearly'] = round(((((df['ptp']+1)**df['periodint'])-1)*100),2)
-        df['ptp'] = [round((x*100),2) for x in df['ptp']]
-        df['diff'] = df['yearly'] - float(data['input']['target'])
-    else:
-        df = pd.DataFrame(farasahmDb['fixIncomeHistori'].find({'name':name},{ 'dateInt':1, '_id':0,'close_price_change_percent':1})).set_index('dateInt')
-        day_list = Day_list()
-        day_list =  filter(lambda x: x >= df.index.min(), day_list)
-        day_list =  filter(lambda x: x <= df.index.max(), day_list)
-        df = df.join(pd.DataFrame(index=day_list), how='right')
-        df = df.sort_index(ascending=True)
-        df = df.where(df>0,0)
-        df['close_price_change_percent'] = (df['close_price_change_percent']/100)+1
-        if onDate==False:
-            df = df[df.index<=df.index.max()]
-        else:
-            df = df[df['index']<=int(onDate)]
-            if len(df)==0:
-                return json.dumps({'replay':False, 'msg':'اطلاعاتی موجود نیست'})
-        df = df.reset_index()
-        dic ={}
-        for i in periodList:
-            d = list(df[df.index>df.index.max()-i]['close_price_change_percent'])
-            if len(d)==i:
-                r = (np.prod(d))**(365/i)
-                dic[f'{i}'] = [int((np.prod(d)-1)*10000)/100, np.nan, int((r-1)*10000)/100, round((int((r-1)*10000)/100)-target,2)]
-            else:
-                dic[f'{i}'] = [np.nan, np.nan, np.nan, np.nan]
-        df = pd.DataFrame.from_dict(dic,orient='index')
-        df = df.reset_index()
-        df.columns = ['period','ptp','periodint','yearly','diff']
-    
-    dic = {'yearly':df['yearly'].max(),'diff':df['diff'].max()}
-
+    etf = farasahmDb['menu'].find_one({'name':data['access'][1]})
+    name = etf['symbol']
+    target = data['input']['target']
+    df = pd.DataFrame(farasahmDb['sandoq'].find({'type':'sabet'},{'_id':0}))
+    df = df[df['symbol']==name]
+    df = df.groupby(by='symbol').apply(Fnc.fund_compare_clu_ccp)
+    df = df.reset_index().drop(columns=['level_1']).to_dict('records')[0]
+    lst = [
+        {'indx':'7','ret':df['ret_period_7'],'ytm':df['ret_ytm_7'],'smp':df['ret_smp_7']},
+        {'indx':'14','ret':df['ret_period_14'],'ytm':df['ret_ytm_14'],'smp':df['ret_smp_14']},
+        {'indx':'30','ret':df['ret_period_30'],'ytm':df['ret_ytm_30'],'smp':df['ret_smp_30']},
+        {'indx':'90','ret':df['ret_period_90'],'ytm':df['ret_ytm_90'],'smp':df['ret_smp_90']},
+        {'indx':'180','ret':df['ret_period_180'],'ytm':df['ret_ytm_180'],'smp':df['ret_smp_180']},
+        {'indx':'365','ret':df['ret_period_365'],'ytm':df['ret_ytm_365'],'smp':df['ret_smp_365']},
+        {'indx':'730','ret':df['ret_period_730'],'ytm':df['ret_ytm_730'],'smp':df['ret_smp_730']},
+    ]
+    df = pd.DataFrame(lst)
+    df['dif'] = df['ytm'] - target
+    dic = {}
+    for i in ['ytm','smp','dif']:
+        dic[i] = df[i].max()
     df = df.to_dict(orient='records')
     return json.dumps({'replay':True,'df':df,'dic':dic})
 
-
 def getcompare(data):
-    periodList = [1,14,30,90,180,365,730]
-    etfSelect = [x['نماد'] for x in farasahmDb['fixIncome'].find({},{'_id':0,'نماد':1})]
-    dff = pd.DataFrame()
-    onDate = False
-    for i in etfSelect:
-            psPeriod = list(farasahmDb['fixIncome'].find({'نماد':i}))[0][' دوره تقسیم سود ']
-            if psPeriod=='ندارد':
-                df = pd.DataFrame(farasahmDb['fixIncomeHistori'].find({'name':i},{ 'dateInt':1, '_id':0,'final_price':1,'nav':1})).set_index('dateInt')
-                day_list = Day_list()
-                day_list =  filter(lambda x: x >= df.index.min(), day_list)
-                day_list =  filter(lambda x: x <= df.index.max(), day_list)
-                df = df.join(pd.DataFrame(index=day_list), how='right')
-                df = df.sort_index(ascending=True)
-                nav = df.iloc[-30:]
-                nav = nav[nav['nav']>0]
-                nav = nav[nav['nav']!=np.nan]
-                nav['diff'] = (nav['final_price'] / nav['nav'])-1
-                nav['diff'] = nav['diff'] * 100
-                navlast = nav['diff'].iloc[-1]
-                nav = nav['diff'].mean()
-                df = df.drop(columns='nav')
-                df['final_price'] = df['final_price'].fillna(method='ffill')
-                df = df.dropna()
-                df = df.reset_index()
-                for j in periodList:
-                    df[f'{j}'] = (df['final_price']/df['final_price'].shift(int(j)))-1
-                if onDate==False:
-                    df = df[df.index==df.index.max()]
-                else:
-                    df = df[df.index<=int(onDate)]
-                    df = df[df.index==df.index.max()]
-                if len(df)>0:
-                    dic = df.to_dict(orient='records')[0]
-                    if 'index' in dic:del dic['index']
-                    del dic["final_price"]
-                    df = pd.DataFrame(dic.items(),columns=['period','ptp'])
-                    df = df[df['period']!="dateInt"]
-                    df['periodint'] = [365/int(x) for x in periodList]
-                    df['yearly'] = round(((((df['ptp']+1)**df['periodint'])-1)*100),2)
-                    df['ptp'] = [round((x*100),2) for x in df['ptp']]
-                    df = df[['period','yearly']].fillna(0)
-                    df = pd.pivot_table(df,columns='period')
-                    df.index = [i.replace(' ','')]
-                    df['mean30PN'] = round(nav,2)
-                    df['navlast'] = round(navlast,2)
-                    dff = pd.concat([dff,df])
-            else:
-                df = pd.DataFrame(farasahmDb['fixIncomeHistori'].find({'name':i},{ 'dateInt':1, '_id':0,'close_price_change_percent':1,'final_price':1,'nav':1})).set_index('dateInt')
-                day_list = Day_list()
-                day_list =  filter(lambda x: x >= df.index.min(), day_list)
-                day_list =  filter(lambda x: x <= df.index.max(), day_list)
-                df = df.join(pd.DataFrame(index=day_list), how='right')
-                df = df.sort_index(ascending=True)
-                nav = df.iloc[-30:]
-                nav = df.iloc[-30:]
-                nav = nav[nav['nav']>0]
-                nav = nav[nav['nav']!=np.nan]
-                nav['diff'] = (nav['final_price'] / nav['nav'])-1
-                nav['diff'] = nav['diff'] * 100
-                navlast = nav['diff'].iloc[-1]
-                nav = nav['diff'].mean()
-                df = df.drop(columns=['nav','final_price'])
-                df = df.where(df>0,0)
-                df['close_price_change_percent'] = (df['close_price_change_percent']/100)+1
-                if onDate==False:
-                    df = df[df.index<=df.index.max()]
-                else:
-                    df = df[df.index<=int(onDate)]
-                    if len(df)==0:
-                        return json.dumps({'replay':False, 'msg':'اطلاعاتی موجود نیست'})
-                df = df.reset_index()
-                dic ={}
-                for j in periodList:
-                    d = list(df[df.index>df.index.max()-j]['close_price_change_percent'])
-                    if len(d)==j:
-                        r = (np.prod(d))**(365/j)
-                        dic[f'{j}'] = [int((np.prod(d)-1)*10000)/100, np.nan, int((r-1)*10000)/100]
-                    else:
-                        dic[f'{j}'] = [np.nan, np.nan, np.nan]
-                df = pd.DataFrame.from_dict(dic,orient='index')
-                df = df.reset_index()
-                df.columns = ['period','ptp','periodint','yearly']
-                df = df[['period','yearly']]
-                df = pd.pivot_table(df,columns='period')
-                df.index = [i.replace(' ','')]
+    etfs = pd.DataFrame(farasahmDb['sandoq'].find({'type':'sabet'},{'_id':0}))
+    etfs = etfs.groupby(by='symbol').apply(Fnc.fund_compare_clu_ccp)
+    etfs = etfs.reset_index().drop(columns=['level_1'])
+    
+    dic = {}
+    for i in etfs.columns:
+        if not i == 'symbol':
+            dic['i'] = etfs[i].max()
             
-                df['mean30PN'] = 0#round(nav,2)
-                df['navlast'] = 0#round(navlast,2)
+    df = etfs.to_dict('records')
+    return json.dumps({'replay':True,'df':df,'dic':dic}) 
 
-                dff = pd.concat([dff,df])
-    if len(dff)==0:
-        return json.dumps({'replay':False, 'msg':'اطلاعاتی موجود نیست'})
-    else:
-        dff = dff.reset_index()
-        dff = dff.fillna(0)
-
-        dic ={'d1':float(dff['1'].max()),'d14':float(dff['14'].max()),'d180':float(dff['180'].max()),'d30':float(dff['30'].max()),'d365':float(dff['365'].max()),'d730':float(dff['730'].max()),'mean30PN':float(dff['mean30PN'].max()),'navlast':float(dff['navlast'].max())}
-        dff = dff.to_dict(orient='records')
-
-    return json.dumps({'replay':True,'df':dff,'dic':dic})
+#def getcompare(data):
+#    periodList = [1,14,30,90,180,365,730]
+#    etfSelect = [x['نماد'] for x in farasahmDb['fixIncome'].find({},{'_id':0,'نماد':1})]
+#    dff = pd.DataFrame()
+#    onDate = False
+#    for i in etfSelect:
+#            psPeriod = list(farasahmDb['fixIncome'].find({'نماد':i}))[0][' دوره تقسیم سود ']
+#            if psPeriod=='ندارد':
+#                df = pd.DataFrame(farasahmDb['fixIncomeHistori'].find({'name':i},{ 'dateInt':1, '_id':0,'final_price':1,'nav':1})).set_index('dateInt')
+#                day_list = Day_list()
+#                day_list =  filter(lambda x: x >= df.index.min(), day_list)
+#                day_list =  filter(lambda x: x <= df.index.max(), day_list)
+#                df = df.join(pd.DataFrame(index=day_list), how='right')
+#                df = df.sort_index(ascending=True)
+#                nav = df.iloc[-30:]
+#                nav = nav[nav['nav']>0]
+#                nav = nav[nav['nav']!=np.nan]
+#                nav['diff'] = (nav['final_price'] / nav['nav'])-1
+#                nav['diff'] = nav['diff'] * 100
+#                navlast = nav['diff'].iloc[-1]
+#                nav = nav['diff'].mean()
+#                df = df.drop(columns='nav')
+#                df['final_price'] = df['final_price'].fillna(method='ffill')
+#                df = df.dropna()
+#                df = df.reset_index()
+#                for j in periodList:
+#                    df[f'{j}'] = (df['final_price']/df['final_price'].shift(int(j)))-1
+#                if onDate==False:
+#                    df = df[df.index==df.index.max()]
+#                else:
+#                    df = df[df.index<=int(onDate)]
+#                    df = df[df.index==df.index.max()]
+#                if len(df)>0:
+#                    dic = df.to_dict(orient='records')[0]
+#                    if 'index' in dic:del dic['index']
+#                    del dic["final_price"]
+#                    df = pd.DataFrame(dic.items(),columns=['period','ptp'])
+#                    df = df[df['period']!="dateInt"]
+#                    df['periodint'] = [365/int(x) for x in periodList]
+#                    df['yearly'] = round(((((df['ptp']+1)**df['periodint'])-1)*100),2)
+#                    df['ptp'] = [round((x*100),2) for x in df['ptp']]
+#                    df = df[['period','yearly']].fillna(0)
+#                    df = pd.pivot_table(df,columns='period')
+#                    df.index = [i.replace(' ','')]
+#                    df['mean30PN'] = round(nav,2)
+#                    df['navlast'] = round(navlast,2)
+#                    dff = pd.concat([dff,df])
+#            else:
+#                df = pd.DataFrame(farasahmDb['fixIncomeHistori'].find({'name':i},{ 'dateInt':1, '_id':0,'close_price_change_percent':1,'final_price':1,'nav':1})).set_index('dateInt')
+#                day_list = Day_list()
+#                day_list =  filter(lambda x: x >= df.index.min(), day_list)
+#                day_list =  filter(lambda x: x <= df.index.max(), day_list)
+#                df = df.join(pd.DataFrame(index=day_list), how='right')
+#                df = df.sort_index(ascending=True)
+#                nav = df.iloc[-30:]
+#                nav = df.iloc[-30:]
+#                nav = nav[nav['nav']>0]
+#                nav = nav[nav['nav']!=np.nan]
+#                nav['diff'] = (nav['final_price'] / nav['nav'])-1
+#                nav['diff'] = nav['diff'] * 100
+#                navlast = nav['diff'].iloc[-1]
+#                nav = nav['diff'].mean()
+#                df = df.drop(columns=['nav','final_price'])
+#                df = df.where(df>0,0)
+#                df['close_price_change_percent'] = (df['close_price_change_percent']/100)+1
+#                if onDate==False:
+#                    df = df[df.index<=df.index.max()]
+#                else:
+#                    df = df[df.index<=int(onDate)]
+#                    if len(df)==0:
+#                        return json.dumps({'replay':False, 'msg':'اطلاعاتی موجود نیست'})
+#                df = df.reset_index()
+#                dic ={}
+#                for j in periodList:
+#                    d = list(df[df.index>df.index.max()-j]['close_price_change_percent'])
+#                    if len(d)==j:
+#                        r = (np.prod(d))**(365/j)
+#                        dic[f'{j}'] = [int((np.prod(d)-1)*10000)/100, np.nan, int((r-1)*10000)/100]
+#                    else:
+#                        dic[f'{j}'] = [np.nan, np.nan, np.nan]
+#                df = pd.DataFrame.from_dict(dic,orient='index')
+#                df = df.reset_index()
+#                df.columns = ['period','ptp','periodint','yearly']
+#                df = df[['period','yearly']]
+#                df = pd.pivot_table(df,columns='period')
+#                df.index = [i.replace(' ','')]
+#            
+#                df['mean30PN'] = 0#round(nav,2)
+#                df['navlast'] = 0#round(navlast,2)
+#
+#                dff = pd.concat([dff,df])
+#    if len(dff)==0:
+#        return json.dumps({'replay':False, 'msg':'اطلاعاتی موجود نیست'})
+#    else:
+#        dff = dff.reset_index()
+#        dff = dff.fillna(0)
+#
+#        dic ={'d1':float(dff['1'].max()),'d14':float(dff['14'].max()),'d180':float(dff['180'].max()),'d30':float(dff['30'].max()),'d365':float(dff['365'].max()),'d730':float(dff['730'].max()),'mean30PN':float(dff['mean30PN'].max()),'navlast':float(dff['navlast'].max())}
+#        dff = dff.to_dict(orient='records')
+#
+#    return json.dumps({'replay':True,'df':dff,'dic':dic})
 
 
 def getshareholders(data):

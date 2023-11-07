@@ -297,7 +297,7 @@ def has_number(input_str):
     return has_digit
 
 def is_Fund(name):
-    fund_type_a = 'صندوق س.' in name
+    fund_type_a = 'صندوق س' in name
     if fund_type_a:
         return True
     fund_type_b = 'ص.س.' in name
@@ -345,3 +345,47 @@ def type_fund(name):
     
 
 
+def fund_compare_clu_ccp(group):
+    group['changeClosePrice'] = group['close_price'] - group['close_price'].shift(-1)
+    group['changeClosePrice'] = group['changeClosePrice'].fillna(0)
+    group['changeClosePriceRatre'] = group['changeClosePrice'] / group['close_price']
+    group['changeClosePriceRatre'] = group['changeClosePriceRatre'].fillna(0)
+    tagsim_sod = group['changeClosePrice'].min()<0
+    if tagsim_sod:
+        group['tagsim_sod'] = group['changeClosePrice'].apply(lambda x: x if x < 0 else 0)
+        group = group.sort_index()
+        group['tagsim_sod'] = group['tagsim_sod'][::-1].cumsum()[::-1]
+        group['tagsim_sod'] = group['tagsim_sod'] * -1
+        group['close_price'] = group['tagsim_sod'] + group['close_price']
+        group = group.drop(columns=['tagsim_sod'])
+    periodList = [7,14,30,90,180,365,730]
+    dic = {}
+    for i in periodList:
+        endDateJalali = group['dateInt'].max()
+        endDate = dateIntJalaliToGorgian(endDateJalali)
+        endDate = datetime.datetime.strptime(endDate, '%Y-%m-%dT%H:%M:%S')
+        startDate = endDate - datetime.timedelta(days=i)
+        startDateJalali = gorgianIntToJalaliInt(startDate)
+        startDateJalali = group[group['dateInt']>=startDateJalali]
+        startDateJalali = startDateJalali['dateInt'].min()
+        diff_date = dateIntJalaliToGorgian(startDateJalali)
+        diff_date = (datetime.datetime.strptime(diff_date, '%Y-%m-%dT%H:%M:%S')  - startDate).days
+        if abs(diff_date)>1:
+            dic[f'ret_period_{i}'] = 0
+            dic[f'ret_ytm_{i}'] = 0
+            dic[f'ret_smp_{i}'] = 0
+        else:
+            end_price = group[group['dateInt'] == endDateJalali]['close_price'].values[0]
+            start_price = group[group['dateInt'] == startDateJalali]['close_price'].values[0]
+            rate_return_in_period = end_price / start_price
+            rate_return_yearly_ytm = (rate_return_in_period ** (365/i)-1)
+            rate_return_yearly_smp = (rate_return_in_period - 1) * (365/i)
+            dic[f'ret_period_{i}'] = int((rate_return_in_period-1) * 10000) / 100
+            dic[f'ret_ytm_{i}'] = int(rate_return_yearly_ytm * 10000) / 100
+            dic[f'ret_smp_{i}'] = int(rate_return_yearly_smp * 10000) / 100
+
+
+    
+    group = pd.DataFrame([dic])
+
+    return group

@@ -46,23 +46,29 @@ class TseCrawling:
         df = df.to_dict('records')
         return df
 
-    @classmethod
+
     def getHistoriPriceByFullName(self,fullName,symbol,type):
         self.driver.get('http://tsetmc.com/')
         wait = WebDriverWait(self.driver, 60)
+        time.sleep(2)
         wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/div/div/header/div/div/div[2]/a[5]")))
         time.sleep(1)
         self.driver.find_element(By.XPATH, "/html/body/div/div/header/div/div/div[2]/a[5]").click()
         wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/div[2]/div[3]/div/input")))
         self.driver.find_element(By.XPATH, "/html/body/div[2]/div[3]/div/input").click()
         self.driver.find_element(By.XPATH, "/html/body/div[2]/div[3]/div/input").send_keys(fullName)
+        self.driver.find_element(By.XPATH, "/html/body/div[2]/div[3]/div/input").send_keys(' ')
         wait.until(EC.presence_of_element_located((By.XPATH, f"//a[contains(text(), '{fullName}')]")))
         element = self.driver.find_element(By.XPATH, f"//a[contains(text(), '{fullName}')]")
         link = element.get_attribute('href')
         self.driver.get(link)
+        time.sleep(3)
         wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/div/div/div[2]/div[3]/div[3]/div[1]/div[2]/div[6]/table/tbody/tr[1]/td[2]")))
-        nav = self.driver.find_element(By.XPATH,"/html/body/div/div/div[2]/div[3]/div[3]/div[1]/div[2]/div[6]/table/tbody/tr[1]/td[2]").text
-        nav = int(nav.replace(',',''))
+        try:
+            nav = self.driver.find_element(By.XPATH,"/html/body/div/div/div[2]/div[3]/div[3]/div[1]/div[2]/div[6]/table/tbody/tr[1]/td[2]").text
+            nav = int(nav.replace(',',''))
+        except:
+            nav = 0
         wait.until(EC.presence_of_element_located((By.XPATH, "/html/body/div/div/div[2]/div[2]/ul/li[3]/a")))
         self.driver.find_element(By.XPATH, "/html/body/div/div/div[2]/div[2]/ul/li[3]/a").click()
         time.sleep(3)
@@ -101,9 +107,11 @@ class TseCrawling:
             count_try = 0
             while count_try < 5:
                 try:
+                    print(i['نماد'])
                     self.getHistoriPriceByFullName(i['نام'],i['نماد'],i['type'])
-                    count_try += 1
+                    count_try = 10
                 except:
+                    count_try += 1
                     print(f'error {i}')
             
             
