@@ -113,6 +113,7 @@ class TseCrawling:
                 except:
                     count_try += 1
                     print(f'error {i}')
+    
             
             
 

@@ -230,7 +230,6 @@ def getnav(data):
     etf = farasahmDb['menu'].find_one({'name':data['access'][1]})
     symbol = etf['symbol']
     history = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'date':1,'final_price':1,'nav':1,'trade_volume':1}))
-    print(history)
     history['diff'] = history['nav'] - history['final_price']
     history['rate'] = ((history['nav'] / history['final_price'])-1)*100
     history['rate'] = [round(x,2) for x in history['rate']]
@@ -1081,7 +1080,6 @@ def desk_broker_gettraders(data):
         return json.dumps({'replay':False})
     symbol = farasahmDb['menu'].find_one({'name':data['access'][1]})['symbol']
     date = Fnc.timestumpToJalalInt(data['date'])
-    print({'dateInt':date,'TradeSymbolAbs':symbol})
     df = pd.DataFrame(farasahmDb['TradeListBroker'].find(
         {'dateInt':date,'TradeSymbolAbs':symbol},
         {'_id':0,'AddedValueTax':0,'BondDividend':0,'BranchID':0,'Discount':0,'InstrumentCategory':0,'MarketInstrumentISIN':0,'page':0,'Update':0,'dateInt':0,
@@ -1511,7 +1509,6 @@ def desk_todo_gettask(data):
     dateCuroser = datetime.datetime.now()
     while dateCuroser <= datetime.datetime.fromtimestamp(toDate) + datetime.timedelta(days=1):
         JdateCuroser = Fnc.JalaliDate.to_jalali(dateCuroser)
-        print(JdateCuroser)
         JdateCuroser = str(JdateCuroser).replace('-','/')
         dic[JdateCuroser] = []
         dateCuroser = dateCuroser + datetime.timedelta(days=1)
@@ -1566,7 +1563,6 @@ def desk_todo_getcontrol(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     df = pd.DataFrame(farasahmDb['Todo'].find({'symbol':symbol}))
 
-    print( len( df ) )
     if   len( df) == 0:
         return json.dumps({'reply':True,'df':list()})
     
@@ -1615,3 +1611,51 @@ def desk_todo_deltask(data):
     del_todo= farasahmDb['Todo'].delete_many({'_id': idd})
     del_todoact= farasahmDb['TodoAct'].delete_many({'task_id': data['idTask']})
     return json.dumps({'reply':True,'msg':"ok"})
+
+
+
+def getassetfund(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol},{'_id':0}))
+    asset = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},{'_id':0}))
+    asset = asset[asset['date']==asset['date'].max()]
+    asset = asset[['MarketInstrumentTitle','VolumeInPrice','type']]
+    asset = asset.rename(columns={'MarketInstrumentTitle':'name','VolumeInPrice':'value'})
+    bank = bank.rename(columns={'balance':'value'})
+    bank['type'] = 'سپرده بانکی'
+    bank = bank[['name','value','type']]
+    if len(bank)>0:
+        df = pd.concat([asset,bank])
+    else:
+        df = asset
+    df['type'] = df['type'].replace('saham','سهام').replace('non-gov','اوراق شرکتی').replace('gov','اوراق دولتی')
+    df['value'] = df['value'].apply(int)
+    df['rate'] = df['value'] / df['value'].sum()
+    df['warnint'] = ''
+    df = df.reset_index().drop(columns=['index'])
+    for i in df.index:
+        if df['type'][i] == 'سپرده بانکی' and df['value'][i] / df['value'].sum() > 0.133:
+            df['warnint'][i] = 'این سپرده بیش از 13.3% است'
+        elif df['type'][i] == 'سپرده بانکی' and df[df['type']=='سپرده بانکی']['value'].sum()/df['value'].sum() > 0.40:
+            df['warnint'][i] = 'مجموع سپرده های بانکی بیش از 40% است'
+        elif df['type'][i] == 'اوراق دولتی' and df[df['type']=='اوراق دولتی']['value'].sum()/df['value'].sum() > 0.30:
+            df['warnint'][i] = 'مجموع اوراق دولتی بیش از 30% است'
+        elif df['type'][i] == 'اوراق دولتی' and df[df['type']=='اوراق دولتی']['value'].sum()/df['value'].sum() < 0.25:
+            df['warnint'][i] = 'مجموع اوراق دولتی کمتر از 25% است'
+        elif 'اوراق' in df['type'][i] and (df[df['type']=='اوراق دولتی']['value'].sum() + df[df['type']=='اوراق شرکتی']['value'].sum()) /df['value'].sum() < 0.40:
+            df['warnint'][i] = 'مجموع اوراق کمتر از 40% است'
+        elif df['type'][i] == 'سهام' and df['value'][i] / df['value'].sum() > 0.03:
+            df['warnint'][i] = 'این سهم  بیش از 3% است'
+        elif df['type'][i] == 'سهام' and df[df['type']=='سهام']['value'].sum()/df['value'].sum() > 0.1:
+            df['warnint'][i] = 'مجموع کل سهم بیش از 10% است'
+        else:
+            df['warnint'][i] = ''
+    df['rate'] = (df['rate'] * 10000).apply(int)/100
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})

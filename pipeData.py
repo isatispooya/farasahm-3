@@ -13,15 +13,17 @@ while True:
         print('ended GetAllTradeInDate')
         desk_broker_volumeTrade_cal()
         desk_broker_turnover_cal()
+        ApiMethods.get_asset_funds()
 
     if Fnc.is_time_between(17,23):
         Fnc.getTse30LastDay()
         ApiMethods.GetAllTradeLastDate()
 
     # این بخش اطلاعات صندوق ها را از tse میگیرد و در دیتابیس میریزد
-    if Fnc.is_time_between(18,21):
+    if Fnc.is_time_between(18,19):
         Tse = TseCrawling()
         Tse.get_all_fund()
+        time.sleep(60*60)
 
     print('End of circle')
     time.sleep(60)

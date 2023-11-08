@@ -389,3 +389,17 @@ def fund_compare_clu_ccp(group):
     group = pd.DataFrame([dic])
 
     return group
+
+
+
+
+def setTypeInFundBySymbol(symbol):
+    absSymbol = str(symbol)[:-1]
+    hasNumber = has_number(absSymbol)
+    if not hasNumber:
+        return 'saham'
+    for i in ['اخزا', 'اراد', 'افاد']:
+        if i in symbol:
+            return 'gov'
+    return 'non-gov'
+

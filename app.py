@@ -229,6 +229,16 @@ def deltransaction():
     data = request.get_json()
     return dataManagment.deltransaction(data)
 
+@app.route('/setnewbankbalance',methods = ['POST', 'GET'])
+def setnewbankbalance():
+    data = request.get_json()
+    return dataManagment.setnewbankbalance(data)
+
+@app.route('/getassetfund',methods = ['POST', 'GET'])
+def getassetfund():
+    data = request.get_json()
+    return report.getassetfund(data)
+
 @app.route('/settransaction',methods = ['POST', 'GET'])
 def setTransaction():
     data = request.get_json()

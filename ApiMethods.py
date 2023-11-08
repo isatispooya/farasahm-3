@@ -463,3 +463,22 @@ def GetAllTradeLastDate():
 
 
 
+
+
+def get_asset_funds():
+    lst_code = [{'code':'61580209324','symbol':'خاتم'}]
+    date = Fnc.todayIntJalali()
+    for i in lst_code:
+        df = pd.DataFrame(GetCustomerMomentaryAssets(i['code']))
+        df['VolumeInPrice'] = df['VolumeInPrice'].apply(int)
+        df['Volume'] = df['Volume'].apply(int)
+        df['Price'] = df['VolumeInPrice'] / df['Volume']
+        df['Fund'] = i['symbol']
+        df['date'] = date
+        df = df.drop(columns=['CustomerTitle','TradeCode','TradeSystemId'])
+        df['type'] = df['Symbol'].apply(Fnc.setTypeInFundBySymbol)
+        df = df.to_dict('records')
+
+        farasahmDb['assetFunds'].delete_many({'Fund':i['symbol'],'date':date})
+        farasahmDb['assetFunds'].insert_many(df)
+

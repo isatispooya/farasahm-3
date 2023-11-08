@@ -773,3 +773,21 @@ def getdatepriority(data):
         return json.dumps({'reply':False,'msg':'رویدداد افزایش سرمایه یافت نشد'})
     df = df.to_dict('records')
     return json.dumps({'reply':True,'lst':df})
+
+
+
+def setnewbankbalance(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    dic = data['bank']
+    startDate = data['startDate']/1000
+    startDate = datetime.datetime.fromtimestamp(startDate)
+    dic['startDate'] = startDate
+    dic['symbol'] = symbol
+    farasahmDb['bankBalance'].insert_one(dic)
+    return json.dumps({'reply':True})
