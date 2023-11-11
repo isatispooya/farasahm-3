@@ -13,7 +13,6 @@ import os
 import Fnc
 warnings.filterwarnings("ignore")
 
-warnings.filterwarnings("ignore")
 client = pymongo.MongoClient()
 farasahm_db = client['farasahm2']
 
@@ -101,6 +100,7 @@ class TseCrawling:
             farasahm_db['sandoq'].insert_many(df)
         return True
     
+    @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
     def get_all_fund(self):
         list_fund = self.fund_list()
         for i in list_fund:
@@ -113,8 +113,27 @@ class TseCrawling:
                 except:
                     count_try += 1
                     print(f'error {i}')
+                    
+    @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
+    def getOragh(self):
+        update = Fnc.todayIntJalali()
+        url_ifb = 'https://www.ifb.ir/ytm.aspx'
+        wait = WebDriverWait(self.driver, 60)
+        self.driver.get(url_ifb)
+        time.sleep(5)
+        KhazanehGrid = pd.read_html(self.driver.find_element(By.CLASS_NAME,'KhazanehGrid').get_attribute('outerHTML'))[0]
+        KhazanehGrid['type'] = 'بدون کوپن'
+        mGrid = pd.read_html(self.driver.find_element(By.CLASS_NAME,'mGrid').get_attribute('outerHTML'))[0]
+        mGrid['type'] = 'با کوپن'
+        df = pd.concat([KhazanehGrid, mGrid])
+        df = df.drop(columns=['ردیف'])
+        df['YTM'] = [float(str(x).replace('/','.').replace('%','')) for x in df['YTM']]
+        df['بازده ساده'] = [float(str(x).replace('/','.').replace('%','')) for x in df['بازده ساده']]
+        df['update'] = update
+        df = df.to_dict('records')
+        farasahm_db['oraghYTM'].delete_many({'update':update})
+        farasahm_db['oraghYTM'].insert_many(df)
+
     
             
-            
-
-
+    

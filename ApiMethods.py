@@ -414,7 +414,7 @@ def get_asset_customer(today = Fnc.todayIntJalali()):
                     farasahmDb['assetsCoustomerBroker'].delete_many({"TradeCode":TradeCode,"dateInt":today})
                     farasahmDb['assetsCoustomerBroker'].insert_many(assets)
 
-
+@Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJalali()):
     page = 1
     farasahmDb['TradeListBroker'].delete_many({'DateYrInt':doDay[0],'DateMnInt':doDay[1],'DateDyInt':doDay[2]})
@@ -451,7 +451,7 @@ def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJal
 
 
 
-
+@Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def GetAllTradeLastDate():
     today = datetime.datetime.now()
     for d in range(1,30):
@@ -464,7 +464,7 @@ def GetAllTradeLastDate():
 
 
 
-
+@Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def get_asset_funds():
     lst_code = [{'code':'61580209324','symbol':'خاتم'}]
     date = Fnc.todayIntJalali()

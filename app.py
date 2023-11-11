@@ -173,6 +173,11 @@ def getcompare():
     data = request.get_json()
     return report.getcompare(data)
 
+@app.route('/getoraghytm',methods = ['POST', 'GET'])
+def getoraghytm():
+    data = request.get_json()
+    return report.getoraghytm(data)
+
 @app.route('/getshareholders',methods = ['POST', 'GET'])
 def getshareholders():
     data = request.get_json()

@@ -7,8 +7,28 @@ from persiantools import characters, digits
 import pymongo
 from pymongo import ASCENDING,DESCENDING
 import time
+import threading
+import Fnc
+
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
+
+def retry_decorator(max_retries=3, sleep_duration=10):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            for _ in range(max_retries + 1):
+                try:
+                    thread = threading.Thread(target=func, args=args, kwargs=kwargs)
+                    thread.start()
+                    thread.join()
+                    break  # اگر تابع بدون مشکل اجرا شود، از حلقه خارج شود
+                except Exception as e:
+                    print(f'Error: {e}')
+                    time.sleep(sleep_duration)  # تاخیر دهید و دوباره تلاش کنید
+
+        return wrapper
+    return decorator
+
 
 def gorgianIntToJalaliInt(date):
     date = str(date).replace('-','')
@@ -25,6 +45,24 @@ def JalalistrToGorgia(date):
     m = int(str(date)[4:6])
     d = int(str(date)[6:8])
     return JalaliDate(y,m,d).to_gregorian()
+
+
+def jalaliStrDifToday(date):
+    try:
+        lst = str(date).split('-')
+        if len(lst) == 3:
+            lst = [int(x) for x in lst]
+            date = JalaliDate(lst[0],lst[1],lst[2]).to_gregorian()
+            date = str(date).split('-')
+            date = [int(x) for x in date]
+            date = datetime.datetime(date[0],date[1],date[2])
+            day = date - datetime.datetime.now()
+            day = day.days
+            return day
+        return 0
+    except:
+        return 0
+
 
 def gorgianIntToJalali(date):
     date = str(date).replace('-','')
@@ -137,7 +175,8 @@ def isOragh(name):
             return True
     else:
         return False
-    
+
+@retry_decorator(max_retries=3, sleep_duration=5)
 def getTseDate(date=datetime.datetime.now()):
     dt = datetime.datetime(date.year,date.month,date.day,15,0,0)
     jalali = JalaliDate.to_jalali(date)
@@ -164,7 +203,8 @@ def getTseDate(date=datetime.datetime.now()):
                 df = df.to_dict('records')
                 farasahmDb['tse'].delete_many({'dataInt':jalaliInt})
                 farasahmDb['tse'].insert_many(df)
-
+                
+@Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def getTse30LastDay():
     for d in range(1,30):
         day = datetime.datetime.now() - datetime.timedelta(days=d)
@@ -402,4 +442,7 @@ def setTypeInFundBySymbol(symbol):
         if i in symbol:
             return 'gov'
     return 'non-gov'
+
+
+
 

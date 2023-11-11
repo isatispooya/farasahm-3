@@ -684,7 +684,7 @@ def delprioritytransaction(data):
     return json.dumps({'replay':True})
 
 
-
+@Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def desk_broker_volumeTrade_cal():
     print('start cal volume trade')
     pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
@@ -721,7 +721,7 @@ def desk_broker_volumeTrade_cal():
 
 
 
-
+@Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def desk_broker_turnover_cal():
     pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
     df = list(farasahmDb['TradeListBroker'].aggregate(pipeline))

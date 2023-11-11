@@ -1627,10 +1627,10 @@ def getassetfund(data):
     asset = asset[asset['date']==asset['date'].max()]
     asset = asset[['MarketInstrumentTitle','VolumeInPrice','type']]
     asset = asset.rename(columns={'MarketInstrumentTitle':'name','VolumeInPrice':'value'})
-    bank = bank.rename(columns={'balance':'value'})
-    bank['type'] = 'سپرده بانکی'
-    bank = bank[['name','value','type']]
     if len(bank)>0:
+        bank = bank.rename(columns={'balance':'value'})
+        bank['type'] = 'سپرده بانکی'
+        bank = bank[['name','value','type']]
         df = pd.concat([asset,bank])
     else:
         df = asset
@@ -1659,3 +1659,20 @@ def getassetfund(data):
     df['rate'] = (df['rate'] * 10000).apply(int)/100
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
+
+
+
+def getoraghytm(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['oraghYTM'].find({},{'_id':0,'بازده ساده':0}))
+    df['LastDay'] = df['تاریخ سررسید'].apply(Fnc.jalaliStrDifToday)
+    df = df.fillna(0)
+    dic = {'YTM':int(df['YTM'].max()),'LastDay':int(df['LastDay'].max())}
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df, 'dic':dic})
