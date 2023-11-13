@@ -446,3 +446,27 @@ def setTypeInFundBySymbol(symbol):
 
 
 
+def calnder():
+    end_date = datetime.datetime(2026,1,1)
+    now = datetime.datetime.now()
+    cruses = now
+    holiday = ['1402-09-26','1402-11-22','1402-12-06','1403-01-01','1403-01-04','1403-01-12','1403-01-13',
+           '1403-02-16','1403-02-14','1403-02-15','1403-02-28','1403-04-05','1403-04-26','1403-04-27',
+           '1403-06-04','1403-06-12','1403-06-14','1403-06-31','1403-10-25','1403-11-09','1403-11-22',
+           '1403-11-27','1403-12-29','1404-01-02','1404-01-03','1404-01-04','1404-01-11','1404-01-12',
+           '1404-01-13','1404-03-14','1404-03-17','1404-03-25','1404-04-14','1404-04-15','1404-06-01',
+           '1404-06-02','1404-06-10','1404-06-19','1404-09-04','1404-10-13','1404-10-27',
+           ]
+    clnd = []
+    while cruses <= end_date:
+        ja_date = JalaliDate(cruses.date())
+        week = ja_date.weekday()
+        cruses = cruses + datetime.timedelta(days=1)
+        workday = True
+        if int(week)>=5:
+            workday = False
+        if str(ja_date) in holiday:
+            workday = False
+        dic = {'date':str(cruses.date()),'ja_date':str(ja_date),'week':week,'workday':workday}
+        clnd.append(dic)
+    return clnd

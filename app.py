@@ -178,6 +178,12 @@ def getoraghytm():
     data = request.get_json()
     return report.getoraghytm(data)
 
+@app.route('/getpriceforward',methods = ['POST', 'GET'])
+def getpriceforward():
+    data = request.get_json()
+    return report.getpriceforward(data)
+
+
 @app.route('/getshareholders',methods = ['POST', 'GET'])
 def getshareholders():
     data = request.get_json()

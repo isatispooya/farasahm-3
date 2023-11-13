@@ -155,7 +155,7 @@ def codeRegister(data):
     return json.dumps({'replay':True,'cookie':dic})
 
 def coderegistered(data):
-    registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['nationalCode']})
+    registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['nationalCode']},sort=[('date', -1)], limit=1)
     if registerNoBours != None:
         phone = registerNoBours['شماره تماس']
     else:
@@ -177,7 +177,7 @@ def checkcookie(data):
         cookie = literal_eval(decrypt(str(cookie).encode()))
         phone = cookie['phone']
         nationalCode = cookie['nationalCode']
-        registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':nationalCode})
+        registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':nationalCode},sort=[('date', -1)], limit=1)
         if registerNoBours != None:
             if registerNoBours['شماره تماس'] == phone:
                 return json.dumps({'replay':True,'name':registerNoBours['نام و نام خانوادگی']})

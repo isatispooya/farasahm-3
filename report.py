@@ -1676,3 +1676,15 @@ def getoraghytm(data):
     dic = {'YTM':int(df['YTM'].max()),'LastDay':int(df['LastDay'].max())}
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df, 'dic':dic})
+
+
+def getpriceforward(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'dateInt':1,'final_price':1}))
+    return json.dumps({'reply':True})
