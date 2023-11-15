@@ -392,8 +392,8 @@ def fund_compare_clu_ccp(group):
     group['changeClosePriceRatre'] = group['changeClosePriceRatre'].fillna(0)
     tagsim_sod = group['changeClosePrice'].min()<0
     if tagsim_sod:
+        group = group.sort_values(by=['dateInt'])
         group['tagsim_sod'] = group['changeClosePrice'].apply(lambda x: x if x < 0 else 0)
-        group = group.sort_index()
         group['tagsim_sod'] = group['tagsim_sod'][::-1].cumsum()[::-1]
         group['tagsim_sod'] = group['tagsim_sod'] * -1
         group['close_price'] = group['tagsim_sod'] + group['close_price']
@@ -418,11 +418,13 @@ def fund_compare_clu_ccp(group):
             end_price = group[group['dateInt'] == endDateJalali]['close_price'].values[0]
             start_price = group[group['dateInt'] == startDateJalali]['close_price'].values[0]
             rate_return_in_period = end_price / start_price
+            print(endDateJalali,startDateJalali,endDateJalali>startDateJalali,i,'-',end_price,start_price,end_price>start_price)
             rate_return_yearly_ytm = (rate_return_in_period ** (365/i)-1)
             rate_return_yearly_smp = (rate_return_in_period - 1) * (365/i)
             dic[f'ret_period_{i}'] = int((rate_return_in_period-1) * 10000) / 100
             dic[f'ret_ytm_{i}'] = int(rate_return_yearly_ytm * 10000) / 100
             dic[f'ret_smp_{i}'] = int(rate_return_yearly_smp * 10000) / 100
+
 
 
     
@@ -448,8 +450,7 @@ def setTypeInFundBySymbol(symbol):
 
 def calnder():
     end_date = datetime.datetime(2026,1,1)
-    now = datetime.datetime.now()
-    cruses = now
+    cruses = datetime.datetime(2023,10,23)
     holiday = ['1402-09-26','1402-11-22','1402-12-06','1403-01-01','1403-01-04','1403-01-12','1403-01-13',
            '1403-02-16','1403-02-14','1403-02-15','1403-02-28','1403-04-05','1403-04-26','1403-04-27',
            '1403-06-04','1403-06-12','1403-06-14','1403-06-31','1403-10-25','1403-11-09','1403-11-22',
@@ -470,3 +471,26 @@ def calnder():
         dic = {'date':str(cruses.date()),'ja_date':str(ja_date),'week':week,'workday':workday}
         clnd.append(dic)
     return clnd
+
+def calculate_future_holidays(row, df):
+    if row['workday']:
+        future_holidays_count = 0
+        idx = row.name + 1  # شروع از ردیف بعدی
+        while idx < len(df) and not df.loc[idx, 'workday']:
+            future_holidays_count += 1
+            idx += 1
+        return future_holidays_count
+    else:
+        return 0
+    
+
+def calculate_past_holidays(row, df):
+    if row['workday']:
+        past_holidays_count = 0
+        idx = row.name - 1  # شروع از ردیف قبلی
+        while idx >= 0 and not df.loc[idx, 'workday']:
+            past_holidays_count += 1
+            idx -= 1
+        return past_holidays_count
+    else:
+        return 0

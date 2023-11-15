@@ -271,7 +271,7 @@ def getcompare(data):
     etfs = pd.DataFrame(farasahmDb['sandoq'].find({'type':'sabet'},{'_id':0}))
     etfs = etfs.groupby(by='symbol').apply(Fnc.fund_compare_clu_ccp)
     etfs = etfs.reset_index().drop(columns=['level_1'])
-    
+
     dic = {}
     for i in etfs.columns:
         if not i == 'symbol':
@@ -1687,4 +1687,36 @@ def getpriceforward(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     df = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'dateInt':1,'final_price':1}))
-    return json.dumps({'reply':True})
+    lastUpdate = df['dateInt'].max()
+    df = df[df['dateInt']==lastUpdate]
+    df['dateInt'] = [int(x) for x in df['dateInt']]
+    df = df.set_index('dateInt')
+    dateDf = pd.DataFrame(Fnc.calnder())
+    dateDf['dateInt'] = [int(x.replace('-','')) for x in dateDf['ja_date']]
+    dateDf = dateDf.set_index('dateInt')
+    df = df.join(dateDf,how='outer').reset_index()
+    df = df[df['dateInt']>=lastUpdate].reset_index().drop(columns=['index'])
+    df['future_holidays'] = df.apply(lambda row: Fnc.calculate_future_holidays(row, df), axis=1)
+    df['past_holidays'] = df.apply(lambda row: Fnc.calculate_past_holidays(row, df), axis=1)
+    grow_rate = ((int(data['target'])/100)+1) ** (1/365)
+    befor_grow_rate = ((int(data['befor'])/100) * (grow_rate - 1)) + 1
+    after_grow_rate = ((int(data['after'])/100) * (grow_rate - 1)) + 1
+    df['grow_rate'] = grow_rate #** df.index
+    df['grow_holiday_fut'] =  befor_grow_rate ** df['future_holidays']
+    df['grow_holiday_pas'] =  after_grow_rate ** df['past_holidays']
+    df['grow_Fin'] = (df['grow_rate'] * df['workday']) * df['grow_holiday_fut'] * df['grow_holiday_pas']
+    df['grow_Fin'] = df['grow_Fin'].replace(0,np.NaN)
+    df['final_price'] = df['final_price'].fillna(method='ffill')
+    df['grow_Fin'] = df['grow_Fin'].fillna(1)
+    df['grow_Fin'] = df['grow_Fin'].cumprod()
+    df['fut_price'] = df['final_price'] * df['grow_Fin']
+    df['fut_price'] = df['fut_price'].apply(round)
+    df = df[df.index<=365]
+    df = df[['ja_date','week','workday','fut_price']]
+    df['week'] = df['week'].replace(0,'شنبه').replace(1,'یکشنبه').replace(2,'دوشنبه').replace(3,'سه شنبه').replace(4,'چهارشنبه').replace(5,'پنج شنبه').replace(6,'جمعه')
+    df['workday'] = df['workday'].replace(True,'کاری').replace(False,'تعطیل')
+    df['Chng_price'] = ((df['fut_price'] / df['fut_price'].shift(1)) - 1) * 100000
+    df['Chng_price'] = df['Chng_price'].fillna(0)
+    df['Chng_price'] = df['Chng_price'].apply(int)/1000
+    df = df.to_dict('records')
+    return json.dumps({'reply':True, 'df':df})

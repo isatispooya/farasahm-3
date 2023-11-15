@@ -195,7 +195,7 @@ def CookieToUser(cookie):
         user = literal_eval(decrypt(str(cookie).encode()))
         phone = user['phone']
         nationalCode = user['nationalCode']
-        registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':nationalCode})
+        registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':nationalCode},sort=[('date', -1)], limit=1)
         if registerNoBours != None:
             if registerNoBours['شماره تماس'] == phone:
                 return {'replay':True, 'user':user}
@@ -213,6 +213,7 @@ def groupGetCompy(group):
 
 def getcompany(data):
     user = CookieToUser(data['cookie'])
+    print(user)
     if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
     user = user['user']
     
@@ -470,8 +471,6 @@ def getSheetpng(data):
 
 
 def getSheetpngAdmin(data):
-    print(data)
-
     access = data['access'][0]
     symbol = data['access'][1]
     company = farasahmDb['companyList'].find_one({'symbol':symbol})
