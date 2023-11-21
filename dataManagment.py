@@ -723,6 +723,7 @@ def desk_broker_volumeTrade_cal():
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def desk_broker_turnover_cal():
+    print('get turnover in broker')
     pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
     df = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
     df = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in df]
@@ -735,7 +736,6 @@ def desk_broker_turnover_cal():
     df_stock = df[df['fund']==False][['date','value']].rename(columns={'value':'سهام'}).set_index('date')
     df = df_stock.join(df_fund,how='outer').join(df_oragh,how='outer').fillna(0)
     sabadCode = farasahmDb['codeTraderInSabad'].distinct('code')
-    #sabadCode = ['61580281855','61580155499','61580186248','61580209324','6156185287','6156293799','6156185291','6156274220','6156227513','6156233785','6156292015','6156259476']
     pipeline = [{"$match": {"TradeCode": {"$in": sabadCode}}},{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
     sabad = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
     sabad = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in sabad]
@@ -790,4 +790,20 @@ def setnewbankbalance(data):
     dic['startDate'] = startDate
     dic['symbol'] = symbol
     farasahmDb['bankBalance'].insert_one(dic)
+    return json.dumps({'reply':True})
+
+
+
+def delbankassetfund(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    row = data['row']
+    if row['type'] != 'سپرده بانکی':
+        return json.dumps({'reply':False,'msg':'این نوع دارایی قابل حذف نیست'})
+    farasahmDb['bankBalance'].delete_many({'name':row['name'],'num':row['num']})
     return json.dumps({'reply':True})

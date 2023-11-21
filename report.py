@@ -22,6 +22,7 @@ from bson import ObjectId
 import Fnc
 from ApiMethods import GetCustomerMomentaryAssets
 import time
+from bson import Binary
 
 farasahmDb = client['farasahm2']
 
@@ -229,14 +230,20 @@ def getdetailstrade(data):
 def getnav(data):
     etf = farasahmDb['menu'].find_one({'name':data['access'][1]})
     symbol = etf['symbol']
-    history = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'date':1,'final_price':1,'nav':1,'trade_volume':1}))
+    history = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'date':1,'final_price':1,'nav':1,'trade_volume':1,'navAmary':1}))
     history['diff'] = history['nav'] - history['final_price']
     history['rate'] = ((history['nav'] / history['final_price'])-1)*100
     history['rate'] = [round(x,2) for x in history['rate']]
+
+    history['diffAmary'] = history['navAmary'] - history['final_price']
+    history['rateAmary'] = ((history['navAmary'] / history['final_price'])-1)*100
+    history['rateAmary'] = [round(x,2) for x in history['rateAmary']]
+
     history['trade_volume'] = [int(x) for x in history['trade_volume']]
     history['date'] = [int(str(x).replace('/','')) for x in history['date']]
-    history = history.sort_values(by=['date'],ascending=False)
-    dic = {'diff':float(history['diff'].max()), 'rate':float(history['rate'].max()),'volume':float(history['trade_volume'].max())}
+    history = history.sort_values(by=['date'],ascending=False).reset_index()
+    history = history.drop(columns='index')
+    dic = {'diff':float(history['diff'].max()), 'rate':float(history['rate'].max()),'diffAmary':float(history['diffAmary'].max()), 'rateAmary':float(history['rateAmary'].max()),'volume':float(history['trade_volume'].max())}
     history = history.to_dict('records')
     return json.dumps({'replay':True,'df':history,'dic':dic})
 
@@ -249,7 +256,10 @@ def getreturn(data):
     df = pd.DataFrame(farasahmDb['sandoq'].find({'type':'sabet'},{'_id':0}))
     df = df[df['symbol']==name]
     df = df.groupby(by='symbol').apply(Fnc.fund_compare_clu_ccp)
-    df = df.reset_index().drop(columns=['level_1']).to_dict('records')[0]
+    df = df.reset_index()
+    if 'level_1' in df.columns:
+        df = df.drop(columns=['level_1'])
+    df = df.to_dict('records')[0]
     lst = [
         {'indx':'7','ret':df['ret_period_7'],'ytm':df['ret_ytm_7'],'smp':df['ret_smp_7']},
         {'indx':'14','ret':df['ret_period_14'],'ytm':df['ret_ytm_14'],'smp':df['ret_smp_14']},
@@ -1623,39 +1633,77 @@ def getassetfund(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol},{'_id':0}))
+
     asset = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},{'_id':0}))
     asset = asset[asset['date']==asset['date'].max()]
     asset = asset[['MarketInstrumentTitle','VolumeInPrice','type']]
     asset = asset.rename(columns={'MarketInstrumentTitle':'name','VolumeInPrice':'value'})
+    asset['num'] = ''
     if len(bank)>0:
         bank = bank.rename(columns={'balance':'value'})
         bank['type'] = 'سپرده بانکی'
-        bank = bank[['name','value','type']]
+        bank = bank[['name','value','type','num']]
         df = pd.concat([asset,bank])
     else:
         df = asset
     df['type'] = df['type'].replace('saham','سهام').replace('non-gov','اوراق شرکتی').replace('gov','اوراق دولتی')
     df['value'] = df['value'].apply(int)
     df['rate'] = df['value'] / df['value'].sum()
-    df['warnint'] = ''
+    df['warning'] = ''
+
+
+    dff = []
+    #saham
+    df_saham = df[df['type']=='سهام']
+    if len(df_saham)>0:
+        value = df_saham['value'].sum()
+        rate = value/df['value'].sum()
+        warning = ''
+        if rate>0.1:
+            warning = 'مجموع سهام بیش از 10 % است'
+        df_saham = df_saham.to_dict('records')
+        for i in range(0,len(df_saham)):
+            if df_saham[i]['rate']>0.03:
+                df_saham[i]['warning'] = 'این سهم بیش از 3 % است'
+        dff.append({'type':'سهام', 'value':value, 'rate':rate, 'warning':warning, '_children':df_saham})
+    else:
+        dff.append({'type':'سهام', 'value':0, 'rate':0, 'warning':'', '_children':[]})
+
+    
+    #oragh
+    df_oragh = pd.concat([df[df['type']=='اوراق دولتی'],df[df['type']=='اوراق شرکتی']])
+    if len(df_oragh)>0:
+        value = df_oragh['value'].sum()
+        rate = value/df['value'].sum()
+        warning = ''
+        if rate<0.4:
+            warning = 'مجموع کمتر از 40 % است'
+        dic = {'type':'اوراق', 'value':value, 'rate':rate, 'warning':warning, '_children':[]}
+        df_dolati = df_oragh[df_oragh['اوراق دولتی']]
+        
+        print(df_oragh)
+    else:
+        dff.append({'type':'اوراق', 'value':0, 'rate':0, 'warning':'مجموع کمتر از 40 % است', '_children':[]})
+
+        
+
+
+
+    
+
+
     df = df.reset_index().drop(columns=['index'])
     for i in df.index:
         if df['type'][i] == 'سپرده بانکی' and df['value'][i] / df['value'].sum() > 0.133:
-            df['warnint'][i] = 'این سپرده بیش از 13.3% است'
+            df['warning'][i] = 'این سپرده بیش از 13.3% است'
         elif df['type'][i] == 'سپرده بانکی' and df[df['type']=='سپرده بانکی']['value'].sum()/df['value'].sum() > 0.40:
-            df['warnint'][i] = 'مجموع سپرده های بانکی بیش از 40% است'
+            df['warning'][i] = 'مجموع سپرده های بانکی بیش از 40% است'
         elif df['type'][i] == 'اوراق دولتی' and df[df['type']=='اوراق دولتی']['value'].sum()/df['value'].sum() > 0.30:
-            df['warnint'][i] = 'مجموع اوراق دولتی بیش از 30% است'
+            df['warning'][i] = 'مجموع اوراق دولتی بیش از 30% است'
         elif df['type'][i] == 'اوراق دولتی' and df[df['type']=='اوراق دولتی']['value'].sum()/df['value'].sum() < 0.25:
-            df['warnint'][i] = 'مجموع اوراق دولتی کمتر از 25% است'
-        elif 'اوراق' in df['type'][i] and (df[df['type']=='اوراق دولتی']['value'].sum() + df[df['type']=='اوراق شرکتی']['value'].sum()) /df['value'].sum() < 0.40:
-            df['warnint'][i] = 'مجموع اوراق کمتر از 40% است'
-        elif df['type'][i] == 'سهام' and df['value'][i] / df['value'].sum() > 0.03:
-            df['warnint'][i] = 'این سهم  بیش از 3% است'
-        elif df['type'][i] == 'سهام' and df[df['type']=='سهام']['value'].sum()/df['value'].sum() > 0.1:
-            df['warnint'][i] = 'مجموع کل سهم بیش از 10% است'
+            df['warning'][i] = 'مجموع اوراق دولتی کمتر از 25% است'
         else:
-            df['warnint'][i] = ''
+            df['warning'][i] = ''
     df['rate'] = (df['rate'] * 10000).apply(int)/100
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
@@ -1720,3 +1768,192 @@ def getpriceforward(data):
     df['Chng_price'] = df['Chng_price'].apply(int)/1000
     df = df.to_dict('records')
     return json.dumps({'reply':True, 'df':df})
+
+
+def addcompany(access, key, name, idTax, idNum):
+    accesss = str(access).split(',')
+    access = accesss[0]
+    symbol = accesss[1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    key = Binary(key.read()).decode()
+    dic = {'key':key, 'name':name, 'idTax':idTax, 'idNum':idNum,'date':datetime.datetime.now(), 'symbol':symbol}
+    if farasahmDb['companyMoadian'].find_one({'name':name}) != None:
+        return json.dumps({'reply':False,'msg':'نام شرکت تکراری است'})
+    if farasahmDb['companyMoadian'].find_one({'idTax':idTax}) != None:
+        return json.dumps({'reply':False,'msg':'شناسه حافظه تکراری است'})
+    if farasahmDb['companyMoadian'].find_one({'idNum':idNum}) != None:
+        return json.dumps({'reply':False,'msg':'شناسه اقتصادی/ملی تکراری است'})
+    farasahmDb['companyMoadian'].insert_one(dic)
+    return json.dumps({'reply':True})
+
+
+def getcompanymoadian(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['companyMoadian'].find({},{'_id':0,'key':0,'symbol':0}))
+    df['date'] = df['date'].apply(Fnc.gorgianIntToJalaliInt)
+    df['key'] = '*'*10
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
+
+def delcompanymoadian(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    row = data['row']
+    farasahmDb['companyMoadian'].delete_many({'idNum':row['idNum'],'name':row['name']})
+    return json.dumps({'reply':True})
+
+def getlistcompanymoadian(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['companyMoadian'].find({},{'_id':0,'name':1,'idNum':1})).to_dict('records')
+    if len(df)==0:
+        return json.dumps({'reply':False,'msg':'هیچ شرکتی ثبت نشده'})
+    return json.dumps({'reply':True,'df':df})
+
+
+
+def saveinvoce(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    
+    invoceData = data['invoceData']
+    sellerDic = farasahmDb['companyMoadian'].find_one({'idNum':invoceData['sellerId']})
+    if sellerDic == None:
+        return json.dumps({'reply':False,'msg':'فروشنده یافت نشد'})
+    bodyDf = pd.DataFrame(invoceData['body'])
+    bodyDf['sumBeforOff'] = bodyDf['sumBeforOff'].apply(int)
+    bodyDf['off'] = bodyDf['off'].apply(int)
+    bodyDf['taxRate'] = bodyDf['taxRate'].apply(int)
+    bodyDf['cash'] = bodyDf['cash'].apply(int)
+    bodyDf['sumAfterOff'] = bodyDf['sumBeforOff'] - bodyDf['off']
+    bodyDf['sumTax'] = bodyDf['sumAfterOff'] * (bodyDf['taxRate'] /100)
+    bodyDf['sumTax'] = bodyDf['sumTax'].apply(round,0)
+    bodyDf['sumFin'] = bodyDf['sumAfterOff'] + bodyDf['sumTax']
+    
+    mmrit = sellerDic['idTax']
+    indatim = int(invoceData['createDate']/1000)
+    Indati2m = int(invoceData['addDate']/1000)
+    if indatim>Indati2m:
+        return json.dumps({'reply':False,'msg':'تاریخ صدور نمیتواند قبل از تاریخ فروش باشد'})
+    date = datetime.datetime.fromtimestamp(indatim)
+    dateJalali = Fnc.gorgianIntToJalali(date)
+
+    inno = int(Fnc.generatIdInternal(str(dateJalali)+str(indatim)))
+    taxid = Fnc.generate_tax_id(mmrit,date,inno)
+    if bodyDf['cash'].sum() == 0:
+        setm = 3
+        tvop = 0
+    elif bodyDf['cash'].sum() == bodyDf['sumFin'].sum():
+        setm = 1
+        tvop = bodyDf['sumTax'].sum()
+    else:
+        setm = 2
+        tvop = int((bodyDf['cash'].sum()/bodyDf['sumFin'].sum()) * bodyDf['sumTax'].sum())
+
+
+    header = {
+            "taxid": taxid,
+            "indatim": indatim,
+            "indati2m": Indati2m,
+            "inty": int(invoceData['type']),
+            "inno" : inno,
+            "irtaxid" : None,
+            "inp": int(invoceData['patern']),
+            "ins" : 0, # موقع ارسال باید عوض شود
+            "tins" : str(sellerDic['idNum']),
+            "tinb" : str(invoceData['buyerId']),
+            "tob" : int(invoceData['buerType']),
+            "tob" : int(invoceData['buerType']),
+            "bid" : None,
+            "sbc" : None,
+            "bpc" : None,
+            "bbc" : None,
+            "ft" : None,
+            "bpn" : None,
+            "scln" : None,
+            "scc" : None,
+            "crn" : None,
+            "billid" :None,
+            "tprdis" : int(bodyDf['sumBeforOff'].sum()),
+            "tdis" : int(bodyDf['off'].sum()),
+            "tadis" : int(bodyDf['sumAfterOff'].sum()),
+            "tvam" : bodyDf['sumTax'].sum(),
+            "todam" : 0,
+            "tbill" : bodyDf['sumFin'].sum(),
+            "setm" : setm,
+            "cap" : int(bodyDf['cash'].sum()),
+            "insp" : int(bodyDf['sumFin'].sum() - bodyDf['cash'].sum()),
+            "tvop" : tvop,
+            "tax17" : None, 
+        }
+    body = []
+    bodyDf = bodyDf.to_dict('records')
+    for i in bodyDf:
+        row ={
+            "sstid" : str(i['idProduct']),
+            "sstt" : str(i['discription']),
+            "am" : int(i['count']),
+            "mu": None,
+            "fee" : int(i['sumBeforOff'] / int(i['count'])),
+            "cfee" : None,
+            "cut" : None,
+            "exr" : None,
+            "prdis" : i['sumBeforOff'],
+            "dis" : i['off'],
+            "adis" : i['sumAfterOff'],
+            "vam" : i['sumTax'],
+            "odt" : None,
+            "odr" : None,
+            "odam" : None,
+            "olt" : None,
+            "olr" : None,
+            "olam" : None,
+            "consfee" : None,
+            "spro" : None,
+            "bros" : None,
+            "tcpbs" : None,
+            "cop" : i['cash'],
+            "vop" : round(i['cash'] * (i['sumTax']/100),0),
+            "bsrn" : None,
+            "tsstam" : i['sumFin'],
+        }
+        body.append(row)
+    invoice = {
+        'header' : header,
+        'body' : body,
+        'payments' : []
+    }
+    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice}
+    for i in dic['invoice']['header']:
+        print(i,type(dic['invoice']['header'][i]))
+    
+    print(dic)
+    farasahmDb['invoiceMoadian'].insert_one(dic)
+
+    return json.dumps({'reply':True})
+    

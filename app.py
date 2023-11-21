@@ -183,6 +183,35 @@ def getpriceforward():
     data = request.get_json()
     return report.getpriceforward(data)
 
+@app.route('/addcompany',methods = ['POST', 'GET'])
+def addcompany():
+    if 'key' not in request.files:
+        return json.dumps({'reply': False,'msg':'کلید یافت نشد'})
+    key = request.files['key']
+    if key.filename == '':
+        return json.dumps({'reply': False,'msg':'کلید یافت نشد'})
+    name = request.form.get('name', '')
+    idTax = request.form.get('idTax', '')
+    idNum = request.form.get('idNum', '')
+    access = request.form.get('access', '')
+    return report.addcompany(access, key, name, idTax, idNum)
+
+
+@app.route('/getcompanymoadian',methods = ['POST', 'GET'])
+def getcompanymoadian():
+    data = request.get_json()
+    return report.getcompanymoadian(data)
+
+
+@app.route('/delcompanymoadian',methods = ['POST', 'GET'])
+def delcompanymoadian():
+    data = request.get_json()
+    return report.delcompanymoadian(data)
+
+@app.route('/getlistcompanymoadian',methods = ['POST', 'GET'])
+def getlistcompanymoadian():
+    data = request.get_json()
+    return report.getlistcompanymoadian(data)
 
 @app.route('/getshareholders',methods = ['POST', 'GET'])
 def getshareholders():
@@ -269,6 +298,12 @@ def personalinassembly():
 def addpersonalassembly():
     data = request.get_json()
     return dataManagment.addpersonalassembly(data)
+
+@app.route('/delbankassetfund',methods = ['POST', 'GET'])
+def delbankassetfund():
+    data = request.get_json()
+    return dataManagment.delbankassetfund(data)
+
 
 @app.route('/gettransactions',methods = ['POST', 'GET'])
 def gettransactions():
@@ -540,6 +575,13 @@ def desk_broker_dateavalibale():
 def desk_broker_datenow():
     data = request.get_json()
     return report.datenow(data)
+
+
+@app.route('/saveinvoce',methods = ['POST', 'GET'])
+def saveinvoce():
+    data = request.get_json()
+    return report.saveinvoce(data)
+
 
 @app.route('/desk/todo/addtask',methods = ['POST', 'GET'])
 def desk_todo_addtask():

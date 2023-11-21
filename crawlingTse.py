@@ -30,8 +30,6 @@ class TseCrawling:
         self.options.add_experimental_option('prefs', prefs)
         self.driver = webdriver.Edge(executable_path='msedgedriver.exe',options=self.options)
 
-
-
     def fund_list(self):
         df = requests.get('http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d=0').content
         df = pd.read_excel(df,header=2)
@@ -102,6 +100,7 @@ class TseCrawling:
     
     @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
     def get_all_fund(self):
+        print('get_all_fund')
         list_fund = self.fund_list()
         for i in list_fund:
             count_try = 0
@@ -116,9 +115,9 @@ class TseCrawling:
                     
     @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
     def getOragh(self):
+        print('get farabourse for oragh')
         update = Fnc.todayIntJalali()
         url_ifb = 'https://www.ifb.ir/ytm.aspx'
-        wait = WebDriverWait(self.driver, 60)
         self.driver.get(url_ifb)
         time.sleep(5)
         KhazanehGrid = pd.read_html(self.driver.find_element(By.CLASS_NAME,'KhazanehGrid').get_attribute('outerHTML'))[0]
@@ -133,7 +132,26 @@ class TseCrawling:
         df = df.to_dict('records')
         farasahm_db['oraghYTM'].delete_many({'update':update})
         farasahm_db['oraghYTM'].insert_many(df)
+    @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
+    def getAmariNav(self):
+        print('get Nav Amari')
+        lst = [
+            {'symbol':'خاتم','url':'http://etf.isatispm.com/','elementAmari':'/html/body/div[4]/div[3]/div[4]/div/span[2]','emelentDate':'/html/body/div[4]/div[3]/div[1]/div/span[2]'},
+        ]
+        for i in lst:
+            self.driver.get(i['url'])
+            time.sleep(5)
+            amari = self.driver.find_element(By.XPATH,i['elementAmari']).text
+            dateAmary = self.driver.find_element(By.XPATH,i['emelentDate']).text
+            amari = amari.replace('ریال','')
+            dateAmary = dateAmary.replace('/','')
+            amari = int(amari.replace(',',''))
+            dateAmary = int(dateAmary.replace('/',''))
+            farasahm_db['sandoq'].update_many({'symbol':i['symbol'],'dateInt':dateAmary},{'$set':{'navAmary':amari}})
 
-    
-            
+
+
+
+
+
     

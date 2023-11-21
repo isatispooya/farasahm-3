@@ -439,7 +439,6 @@ def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJal
             df['TradeSymbolAbs'] = df['TradeSymbol'].apply(Fnc.remove_non_alphanumeric)
             df = df.set_index('TradeSymbolAbs').join(symbolList.set_index('نماد'))
             df = df.reset_index()
-            print(df)
             df = df.to_dict('records')
             farasahmDb['TradeListBroker'].insert_many(df)
             print(doDay[0],doDay[1],doDay[2],page,'broker')
@@ -453,6 +452,7 @@ def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJal
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def GetAllTradeLastDate():
+    print('GetAllTradeLastDate')
     today = datetime.datetime.now()
     for d in range(1,30):
         date = today - datetime.timedelta(days=d)
@@ -469,6 +469,7 @@ def get_asset_funds():
     lst_code = [{'code':'61580209324','symbol':'خاتم'}]
     date = Fnc.todayIntJalali()
     for i in lst_code:
+        print(i, 'get asset')
         df = pd.DataFrame(GetCustomerMomentaryAssets(i['code']))
         df['VolumeInPrice'] = df['VolumeInPrice'].apply(int)
         df['Volume'] = df['Volume'].apply(int)
@@ -478,7 +479,6 @@ def get_asset_funds():
         df = df.drop(columns=['CustomerTitle','TradeCode','TradeSystemId'])
         df['type'] = df['Symbol'].apply(Fnc.setTypeInFundBySymbol)
         df = df.to_dict('records')
-
         farasahmDb['assetFunds'].delete_many({'Fund':i['symbol'],'date':date})
         farasahmDb['assetFunds'].insert_many(df)
 

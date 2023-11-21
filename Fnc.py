@@ -183,7 +183,7 @@ def getTseDate(date=datetime.datetime.now()):
     jalaliStr = str(jalali).replace('-','/')
     jalaliInt =int(str(jalali).replace('-',''))
     avalibale = farasahmDb['tse'].find_one({'dataInt':jalaliInt})
-    print('start get tse in', jalaliInt)
+    print('start get tse in', jalaliInt,'for sandoq')
     if (date != datetime.datetime.now() and avalibale!=None) == False:
         if date != datetime.datetime.now():
             res = requests.get(url=f'http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d={jalali}')
@@ -291,8 +291,11 @@ def Apply_Trade_Symbol(group,symbol,date):
         group['CustomerTitle'] = balanceRegister[0]['نام خانوادگی ']
     else:
         group['CustomerTitle'] = 'نامشخص'
-
     return group
+
+
+
+
 
 def convert_TradeCode_To_name(code):
     pass
@@ -386,12 +389,14 @@ def type_fund(name):
 
 
 def fund_compare_clu_ccp(group):
+    group = group.sort_values(by=['dateInt'],ascending=False)
     group['changeClosePrice'] = group['close_price'] - group['close_price'].shift(-1)
     group['changeClosePrice'] = group['changeClosePrice'].fillna(0)
     group['changeClosePriceRatre'] = group['changeClosePrice'] / group['close_price']
     group['changeClosePriceRatre'] = group['changeClosePriceRatre'].fillna(0)
     tagsim_sod = group['changeClosePrice'].min()<0
     if tagsim_sod:
+        return pd.DataFrame()
         group = group.sort_values(by=['dateInt'])
         group['tagsim_sod'] = group['changeClosePrice'].apply(lambda x: x if x < 0 else 0)
         group['tagsim_sod'] = group['tagsim_sod'][::-1].cumsum()[::-1]
@@ -494,3 +499,74 @@ def calculate_past_holidays(row, df):
         return past_holidays_count
     else:
         return 0
+    
+def fiscal_id_to_number(fiscal_id):
+    result = ''
+    for char in fiscal_id:
+        if str.isdigit(char):
+            result += char
+        else:
+            result += str(ord(char))
+    return result
+
+
+MULTIPLICATION_TABLE = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+    [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
+    [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+    [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+    [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+    [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
+    [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+    [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
+    [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+]
+
+PERMUTATION_TABLE = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+    [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
+    [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+    [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
+    [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+    [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
+    [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
+]
+
+INVERSE_TABLE = [0, 4, 3, 2, 1, 5, 6, 7, 8, 9]
+
+def checkSum(number):
+    c = 0
+    len_ = len(number)
+    for i in range(len_):
+        c = MULTIPLICATION_TABLE[c][PERMUTATION_TABLE[(
+            (i + 1) % 8)][int(number[len_ - i - 1]) - 0]]
+    return INVERSE_TABLE[c]
+
+
+def generate_tax_id(fiscal_id, date, internal_invoice_id):
+    days_past_epoch = (date.date() - datetime.datetime(1970, 1, 1).date()).days
+    days_past_epoch_padded = str(days_past_epoch).rjust(6, "0")
+    hex_days_past_epoch_padded = str(f'{days_past_epoch:x}').rjust(5, "0")
+    numeric_fiscal_id = fiscal_id_to_number(fiscal_id)
+    internal_invoice_id_padded = str(internal_invoice_id).rjust(12, '0')
+    hex_internal_invoice_id_padded = str(
+        f'{int(internal_invoice_id):x}').rjust(10, '0')
+    decimal_invoice_id = str(numeric_fiscal_id) + \
+        str(days_past_epoch_padded) + str(internal_invoice_id_padded)
+    checksum = checkSum(decimal_invoice_id)
+    return (fiscal_id + str(hex_days_past_epoch_padded) + str(hex_internal_invoice_id_padded) + str(checksum)).upper()
+
+
+
+def generatIdInternal(idstr):
+    lst = farasahmDb['idintrnalMoadian'].find({"id":idstr})
+    lst = [x for x in lst]
+    if len(lst) == 0:
+        result = 1
+    else:
+        lst = [x["idintrnal"] for x in lst]
+        result = max(lst) + 1
+    farasahmDb['idintrnalMoadian'].insert_one({'id':idstr,'idintrnal':result})
+    return result
