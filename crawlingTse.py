@@ -132,22 +132,26 @@ class TseCrawling:
         df = df.to_dict('records')
         farasahm_db['oraghYTM'].delete_many({'update':update})
         farasahm_db['oraghYTM'].insert_many(df)
+
+
     @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
     def getAmariNav(self):
         print('get Nav Amari')
         lst = [
-            {'symbol':'خاتم','url':'http://etf.isatispm.com/','elementAmari':'/html/body/div[4]/div[3]/div[4]/div/span[2]','emelentDate':'/html/body/div[4]/div[3]/div[1]/div/span[2]'},
+            {'symbol':'خاتم','url':'http://etf.isatispm.com/','elementAmari':'/html/body/div[4]/div[3]/div[4]/div/span[2]','emelentDate':'/html/body/div[4]/div[3]/div[1]/div/span[2]','countunit':'/html/body/div[4]/div[3]/div[6]/div/span[2]'},
         ]
         for i in lst:
             self.driver.get(i['url'])
             time.sleep(5)
             amari = self.driver.find_element(By.XPATH,i['elementAmari']).text
             dateAmary = self.driver.find_element(By.XPATH,i['emelentDate']).text
+            countunit = self.driver.find_element(By.XPATH,i['countunit']).text
             amari = amari.replace('ریال','')
             dateAmary = dateAmary.replace('/','')
+            countunit = int(countunit.replace(',',''))
             amari = int(amari.replace(',',''))
             dateAmary = int(dateAmary.replace('/',''))
-            farasahm_db['sandoq'].update_many({'symbol':i['symbol'],'dateInt':dateAmary},{'$set':{'navAmary':amari}})
+            farasahm_db['sandoq'].update_many({'symbol':i['symbol'],'dateInt':dateAmary},{'$set':{'navAmary':amari,'countunit':countunit}})
 
 
 

@@ -106,6 +106,21 @@ def gettopbroker():
     data = request.get_json()
     return report.gettopbroker(data)
 
+@app.route('/getrateassetfixincom',methods = ['POST', 'GET'])
+def getrateassetfixincom():
+    data = request.get_json()
+    return report.getrateassetfixincom(data)
+
+@app.route('/getretrnprice',methods = ['POST', 'GET'])
+def getretrnprice():
+    data = request.get_json()
+    return report.getretrnprice(data)
+
+@app.route('/getdiffnavprc',methods = ['POST', 'GET'])
+def getdiffnavprc():
+    data = request.get_json()
+    return report.getdiffnavprc(data)
+
 @app.route('/getnewcomer',methods = ['POST', 'GET'])
 def getnewcomer():
     data = request.get_json()
@@ -167,6 +182,12 @@ def getnav():
 def getreturn():
     data = request.get_json()
     return report.getreturn(data)
+
+@app.route('/getdiffassetamarydash',methods = ['POST', 'GET'])
+def getdiffassetamarydash():
+    data = request.get_json()
+    return report.getdiffassetamarydash(data)
+
 
 @app.route('/getcompare',methods = ['POST', 'GET'])
 def getcompare():

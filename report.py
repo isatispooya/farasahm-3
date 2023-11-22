@@ -115,6 +115,7 @@ def gettopbroker(data):
     dfSel = dfSel[dfSel.index<10]
     dfSel.index = dfSel['name']
     dfBuy = dfBuy.to_dict(orient='dict')
+    print(dfBuy)
     dfSel = dfSel.to_dict(orient='dict')
     return json.dumps({'replay':True,'df':{'buy':dfBuy,'sel':dfSel}})
 
@@ -231,6 +232,7 @@ def getnav(data):
     etf = farasahmDb['menu'].find_one({'name':data['access'][1]})
     symbol = etf['symbol']
     history = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'date':1,'final_price':1,'nav':1,'trade_volume':1,'navAmary':1}))
+    history = history.fillna(0)
     history['diff'] = history['nav'] - history['final_price']
     history['rate'] = ((history['nav'] / history['final_price'])-1)*100
     history['rate'] = [round(x,2) for x in history['rate']]
@@ -1656,57 +1658,87 @@ def getassetfund(data):
     #saham
     df_saham = df[df['type']=='سهام']
     if len(df_saham)>0:
-        value = df_saham['value'].sum()
+        value = int(df_saham['value'].sum())
         rate = value/df['value'].sum()
         warning = ''
         if rate>0.1:
             warning = 'مجموع سهام بیش از 10 % است'
+        df_saham['rate'] = df_saham['rate'].apply(Fnc.StndRt)
         df_saham = df_saham.to_dict('records')
         for i in range(0,len(df_saham)):
-            if df_saham[i]['rate']>0.03:
+            if df_saham[i]['rate']>3:
                 df_saham[i]['warning'] = 'این سهم بیش از 3 % است'
-        dff.append({'type':'سهام', 'value':value, 'rate':rate, 'warning':warning, '_children':df_saham})
+        dff.append({'type':'سهام', 'value':value, 'rate':Fnc.StndRt(rate), 'warning':warning, '_children':df_saham})
     else:
         dff.append({'type':'سهام', 'value':0, 'rate':0, 'warning':'', '_children':[]})
-
     
     #oragh
     df_oragh = pd.concat([df[df['type']=='اوراق دولتی'],df[df['type']=='اوراق شرکتی']])
     if len(df_oragh)>0:
-        value = df_oragh['value'].sum()
+        value = int(df_oragh['value'].sum())
         rate = value/df['value'].sum()
         warning = ''
         if rate<0.4:
             warning = 'مجموع کمتر از 40 % است'
-        dic = {'type':'اوراق', 'value':value, 'rate':rate, 'warning':warning, '_children':[]}
-        df_dolati = df_oragh[df_oragh['اوراق دولتی']]
+        dic = {'type':'اوراق', 'value':value, 'rate':Fnc.StndRt(rate), 'warning':warning, '_children':[]}
+
+
+        df_dolati = df_oragh[df_oragh['type']=='اوراق دولتی']
+        if len(df_dolati)>0:
+            Value_dolati = int(df_dolati['value'].sum())
+            rate_dolati = Value_dolati / df['value'].sum()
+            warning_dolati =''
+            if rate_dolati>0.3:
+                warning_dolati = 'اوراق دولتی بیشتر از 30 % است'
+            elif rate_dolati<0.25:
+                warning_dolati = 'اوراق دولتی کمتر از 25 % است'
+            df_dolati['rate'] = df_dolati['rate'].apply(Fnc.StndRt)
+            dic_dolati = {'type':'دولتی', 'value':Value_dolati, 'rate':Fnc.StndRt(rate_dolati), 'warning':warning_dolati, '_children':df_dolati.to_dict('records')}
+        else:
+            dic_dolati = {'type':'دولتی', 'value':0, 'rate':0, 'warning':'اوراق دولتی کمتر از 25 % است', '_children':[]}
         
-        print(df_oragh)
+        df_sherkat = df_oragh[df_oragh['type']=='اوراق شرکتی']
+        if len(df_sherkat)>0:
+            value_sherkat = int(df_sherkat['value'].sum())
+            rate_sherkat = value_sherkat / df['value'].sum()
+            warning_sherkat = ''
+            df_sherkat['rate'] = df_sherkat['rate'].apply(Fnc.StndRt)
+            dic_sherkat = {'type':'شرکتی', 'value':value_sherkat, 'rate':Fnc.StndRt(rate_sherkat), 'warning':warning_sherkat, '_children':df_sherkat.to_dict('records')}
+        else:
+            dic_sherkat = {'type':'شرکتی', 'value':0, 'rate':0, 'warning':'', '_children':[]}
+
+
+        dic['_children'] = [dic_dolati,dic_sherkat]
+        dff.append(dic)
     else:
         dff.append({'type':'اوراق', 'value':0, 'rate':0, 'warning':'مجموع کمتر از 40 % است', '_children':[]})
 
         
+    # Bank
+    df_bank = df[df['type']=='سپرده بانکی']
+    if len(df_bank)>0:
+        value = int(df_bank['value'].sum())
+        rate = value / df['value'].sum()
+        warning = ''
+        if rate > 0.4:
+            warning = 'مجموع سپرده های بانکی بیش از 40 % است'
+        dic = {'type':'سپرده بانکی', 'value':value, 'rate':Fnc.StndRt(rate), 'warning':warning, '_children':[]}
 
+        for i in list(set(df_bank['name'])):
+            value_i = int(df_bank[df_bank['name']==i]['value'].sum())
+            rate_i = value_i / df['value'].sum()
+            warning = ''
+            if rate_i>0.133:
+                warning = 'سپرده بانکی در این بانک بیش از 13.3 % است'
+            df_i = df_bank[df_bank['name']==i]
+            df_i['rate'] = df_i['rate'].apply(Fnc.StndRt)
+            dic_i = [{'name':i,'type':'سپرده بانکی', 'value':value_i, 'rate':Fnc.StndRt(rate_i), 'warning':warning, '_children':df_i.to_dict('records')}]
+            dic['_children'] = dic['_children'] + dic_i
+    else:
+        dic = {'type':'سپرده بانکی', 'value':0, 'rate':0, 'warning':'', '_children':[]}
 
-
-    
-
-
-    df = df.reset_index().drop(columns=['index'])
-    for i in df.index:
-        if df['type'][i] == 'سپرده بانکی' and df['value'][i] / df['value'].sum() > 0.133:
-            df['warning'][i] = 'این سپرده بیش از 13.3% است'
-        elif df['type'][i] == 'سپرده بانکی' and df[df['type']=='سپرده بانکی']['value'].sum()/df['value'].sum() > 0.40:
-            df['warning'][i] = 'مجموع سپرده های بانکی بیش از 40% است'
-        elif df['type'][i] == 'اوراق دولتی' and df[df['type']=='اوراق دولتی']['value'].sum()/df['value'].sum() > 0.30:
-            df['warning'][i] = 'مجموع اوراق دولتی بیش از 30% است'
-        elif df['type'][i] == 'اوراق دولتی' and df[df['type']=='اوراق دولتی']['value'].sum()/df['value'].sum() < 0.25:
-            df['warning'][i] = 'مجموع اوراق دولتی کمتر از 25% است'
-        else:
-            df['warning'][i] = ''
-    df['rate'] = (df['rate'] * 10000).apply(int)/100
-    df = df.to_dict('records')
-    return json.dumps({'reply':True,'df':df})
+    dff.append(dic)
+    return json.dumps({'reply':True,'df':dff})
 
 
 
@@ -1719,9 +1751,29 @@ def getoraghytm(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     df = pd.DataFrame(farasahmDb['oraghYTM'].find({},{'_id':0,'بازده ساده':0}))
+    lastUpdate = df['update'].max()
+    per1Month = Fnc.JalaliIntToGorgia(lastUpdate) - datetime.timedelta(days=30)
+    per1Month = int(str(Fnc.gorgianIntToJalali(per1Month)).replace('-',''))
+    df = df[df['update']==lastUpdate]
+    df['owner'] = df['نماد'].apply(Fnc.setTypeInFundBySymbol)
+    df['owner'] = df['owner'].replace('gov','دولتی').replace('non-gov','دولتی')
+    tse = pd.DataFrame(farasahmDb['tse'].find({'dataInt':{'$gt':int(per1Month)}},{'نماد':1,'حجم':1,'_id':0,'dataInt':1}))
+    tse = tse.groupby(by=['نماد']).apply(Fnc.tseGrpByVol)
+    tse = tse.drop(columns=['dataInt','نماد'])
+    tse = tse.reset_index()
+    tse = tse.drop(columns=['level_1'])
+    tse = tse.set_index('نماد')
+    df = df.set_index('نماد')
+    df = df.join(tse,how='left')
+    df = df.reset_index()
+    df = df.fillna(0)
+    df = df.rename(columns={'حجم':'vol'})
+    df['vol'] = df['vol'].apply(int)
+    df['mean'] = df['mean'].apply(int)
+    df['count'] = df['count'].apply(int)
     df['LastDay'] = df['تاریخ سررسید'].apply(Fnc.jalaliStrDifToday)
     df = df.fillna(0)
-    dic = {'YTM':int(df['YTM'].max()),'LastDay':int(df['LastDay'].max())}
+    dic = {'YTM':int(df['YTM'].max()),'LastDay':int(df['LastDay'].max()),'count':int(df['count'].max()),'mean':int(df['mean'].max()),'vol':int(df['vol'].max())}
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df, 'dic':dic})
 
@@ -1956,4 +2008,124 @@ def saveinvoce(data):
     farasahmDb['invoiceMoadian'].insert_one(dic)
 
     return json.dumps({'reply':True})
+
+
+
+def getdiffassetamarydash(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    dic = farasahmDb['sandoq'].find_one({'symbol':symbol},sort=[('dateInt', -1)])
+    asset = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},sort=[('dateInt', -1)]))['VolumeInPrice'].sum()
+    bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol}))['balance'].sum()
+    allRegistered = int(asset) + int(bank)
+    allAmary = dic['navAmary'] * dic['countunit']
+    return json.dumps({'reply':True,'lab':{'ثبت شده':'ثبت شده','همه':'همه'},'val':{'ثبت شده':allRegistered,'همه':allAmary}})
+
+
+def getdiffnavprc(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+
+    condition = {'dateInt': {'$exists': True},'symbol':symbol}  # شرط لازم برای وجود فیلد dateInt
+    df = pd.DataFrame(farasahmDb['sandoq'].find(condition, sort=[('dateInt', -1)]).limit(30))
+    df = df[['dateInt','nav','close_price']]
+    df['dateInt'] = df['dateInt'].apply(str)
+    df = df.set_index(['dateInt'])
+    df['dateInt'] = df.index
+    df = df.to_dict('dict')
+    return json.dumps({'reply':True,'df':df})
+
+
+
+def getretrnprice(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'close_price':1,'dateInt':1}))
+    if data['period'] == 'روزانه':
+        df['period'] = df['dateInt']
+        mult = 1
+    elif data['period'] == 'هفتگی':
+        df['period'] = df['dateInt'].apply(Fnc.JalaliIntToWeekYearJalali)
+        mult = 7
+    elif data['period'] == 'ماهانه':
+        df['period'] = df['dateInt'].apply(Fnc.JalaliIntToMonthYearJalali)
+        mult = 30.5
+    elif data['period'] == 'فصلی':
+        df['period'] = df['dateInt'].apply(Fnc.JalaliIntToSencYearJalali)
+        mult = 91.5
     
+    df = df.groupby(by=['period']).apply(Fnc.retnFixInByPrd)
+    df = df.sort_values('dateInt',ascending=False).reset_index().drop(columns=['period','level_1'])
+    df['aft_price'] = df['close_price'].shift(1)
+    
+    df['YTM'] = df['aft_price'] / df['close_price']
+    df['YTM'] = df['YTM'] ** (365/mult)
+    df = df.dropna()
+    df['YTM'] = df['YTM'] - 1
+    df['YTM'] = df['YTM'] * 10000
+    df['YTM'] = df['YTM'].apply(int)/100
+    df = df[df.index<30]
+    df['date'] = df['dateInt']
+    df = df.set_index('dateInt')
+    df = df.to_dict('dict')
+    return json.dumps({'reply':True,'df':df})
+
+
+def getrateassetfixincom(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    res = getassetfund(data)
+    bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol},{'_id':0}))
+
+    if len(bank)>0:
+        bank = bank['balance'].sum()
+    else:
+        bank = 0
+
+    asset = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},{'_id':0}))
+    asset = asset[asset['date']==asset['date'].max()]
+    asset = asset[['MarketInstrumentTitle','VolumeInPrice','type']]
+
+    saham = asset[asset['type']=='saham']
+    if len(saham)>0:
+        saham = saham['VolumeInPrice'].sum()
+    else:
+        saham = 0
+    nogov = asset[asset['type']=='non-gov']
+    if len(nogov)>0:
+        nogov = nogov['VolumeInPrice'].sum()
+    else:
+        nogov =0
+
+    gov = asset[asset['type']=='gov']
+    if len(gov)>0:
+        gov = gov['VolumeInPrice'].sum()
+    else:
+        gov =0
+
+    lst = [bank, saham, nogov, gov]
+    lst = [int(x) for x in lst]
+    #lst = {'بانک':int(bank), 'سهام':int(saham), 'اوراق شرکتی':int(nogov), 'اوراق دولتی':int(gov)}
+    lab = {'بانک':'بانک','سهام':'سهام','اوراق شرکتی':'اوراق شرکتی','اوراق دولتی':'اوراق دولتی'}
+    lab = ['بانک','سهام','اوراق شرکتی','اوراق دولتی']
+    return json.dumps({'reply':True,'lab':lab, 'lst':lst})

@@ -35,7 +35,6 @@ def gorgianIntToJalaliInt(date):
     y = str(date)[:4]
     m = str(date)[4:6]
     d = str(date)[6:8]
-
     Jalali = JalaliDate.to_jalali(int(y),int(m),int(d))
     return int(str(Jalali).replace('-',''))
 
@@ -45,6 +44,43 @@ def JalalistrToGorgia(date):
     m = int(str(date)[4:6])
     d = int(str(date)[6:8])
     return JalaliDate(y,m,d).to_gregorian()
+
+
+def JalaliIntToGorgia(date):
+    date = str(date)
+    y = int(str(date)[:4])
+    m = int(str(date)[4:6])
+    d = int(str(date)[6:8])
+    return JalaliDate(y,m,d).to_gregorian()
+
+
+def JalaliIntToWeekYearJalali(date):
+    date = str(date)
+    y = int(str(date)[:4])
+    m = int(str(date)[4:6])
+    d = int(str(date)[6:8])
+    jalali = JalaliDate(y,m,d)
+    week = jalali.week_of_year()
+    return str(y) +'-'+ str(week)
+
+
+def JalaliIntToMonthYearJalali(date):
+    date = str(date)
+    y = int(str(date)[:4])
+    m = int(str(date)[4:6])
+    d = int(str(date)[6:8])
+    return str(y) +'-'+ str(m)
+
+def JalaliIntToSencYearJalali(date):
+    date = str(date)
+    y = int(str(date)[:4])
+    m = int(str(date)[4:6])
+    d = int(str(date)[6:8])
+    if m <= 3:ss = 1
+    elif m <= 6:ss = 2
+    elif m <= 9:ss = 3
+    elif m <= 12:ss = 4
+    return str(y) +'-'+ str(ss)
 
 
 def jalaliStrDifToday(date):
@@ -199,6 +235,8 @@ def getTseDate(date=datetime.datetime.now()):
                 df['data'] = jalaliStr
                 df['dataInt'] = jalaliInt
                 df['timestump'] = dt.timestamp()
+                df['navAmary'] = 0
+                df['countunit'] = 0
                 df['time'] = str(dt.hour) +':'+str(dt.minute)+':'+str(dt.second)
                 df = df.to_dict('records')
                 farasahmDb['tse'].delete_many({'dataInt':jalaliInt})
@@ -570,3 +608,24 @@ def generatIdInternal(idstr):
         result = max(lst) + 1
     farasahmDb['idintrnalMoadian'].insert_one({'id':idstr,'idintrnal':result})
     return result
+
+
+
+def StndRt(x):
+    x = x *10000
+    x = int(x) /100
+    return x
+
+
+
+def tseGrpByVol(group):
+    group['mean'] = group['حجم'].mean()
+    group['count'] = len(group['حجم'])
+    group = group[group['dataInt']==group['dataInt'].max()]
+    return group
+
+
+def retnFixInByPrd(group):
+    group = group[group['dateInt']==group['dateInt'].max()]
+    group = group.drop(columns=['period'])
+    return group
