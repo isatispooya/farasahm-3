@@ -483,3 +483,18 @@ def get_asset_funds():
         farasahmDb['assetFunds'].delete_many({'Fund':i['symbol'],'date':date})
         farasahmDb['assetFunds'].insert_many(df)
 
+@Fnc.retry_decorator(max_retries=3, sleep_duration=5)
+def getAssetCoustomerByFixincome():
+    conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
+    codelist = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'dateInt':1,'TradeCode':1}))
+    if len(codelist):
+        codelist = list(set(codelist[codelist['dateInt']==codelist['dateInt'].max()]['TradeCode']))
+        today = datetime.datetime.now()
+        dateInt = Fnc.gorgianIntToJalaliInt(today)
+        for i in codelist:
+            asset = pd.DataFrame(GetCustomerMomentaryAssets(i))
+            asset['datetime'] = today
+            asset['dateInt'] = dateInt
+            farasahmDb['assetCoustomerOwnerFix'].delete_many({'TradeCode':i, 'dateInt':dateInt})
+            farasahmDb['assetCoustomerOwnerFix'].insert_many(asset)
+

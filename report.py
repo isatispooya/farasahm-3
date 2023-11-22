@@ -115,7 +115,6 @@ def gettopbroker(data):
     dfSel = dfSel[dfSel.index<10]
     dfSel.index = dfSel['name']
     dfBuy = dfBuy.to_dict(orient='dict')
-    print(dfBuy)
     dfSel = dfSel.to_dict(orient='dict')
     return json.dumps({'replay':True,'df':{'buy':dfBuy,'sel':dfSel}})
 
@@ -236,11 +235,9 @@ def getnav(data):
     history['diff'] = history['nav'] - history['final_price']
     history['rate'] = ((history['nav'] / history['final_price'])-1)*100
     history['rate'] = [round(x,2) for x in history['rate']]
-
     history['diffAmary'] = history['navAmary'] - history['final_price']
     history['rateAmary'] = ((history['navAmary'] / history['final_price'])-1)*100
     history['rateAmary'] = [round(x,2) for x in history['rateAmary']]
-
     history['trade_volume'] = [int(x) for x in history['trade_volume']]
     history['date'] = [int(str(x).replace('/','')) for x in history['date']]
     history = history.sort_values(by=['date'],ascending=False).reset_index()
@@ -271,11 +268,12 @@ def getreturn(data):
         {'indx':'365','ret':df['ret_period_365'],'ytm':df['ret_ytm_365'],'smp':df['ret_smp_365']},
         {'indx':'730','ret':df['ret_period_730'],'ytm':df['ret_ytm_730'],'smp':df['ret_smp_730']},
     ]
+
     df = pd.DataFrame(lst)
     df['dif'] = df['ytm'] - target
     dic = {}
     for i in ['ytm','smp','dif']:
-        dic[i] = df[i].max()
+        dic[i] = df[i].apply(abs).max()
     df = df.to_dict(orient='records')
     return json.dumps({'replay':True,'df':df,'dic':dic})
 
@@ -1644,6 +1642,7 @@ def getassetfund(data):
     if len(bank)>0:
         bank = bank.rename(columns={'balance':'value'})
         bank['type'] = 'سپرده بانکی'
+        print(bank)
         bank = bank[['name','value','type','num']]
         df = pd.concat([asset,bank])
     else:
@@ -1755,8 +1754,8 @@ def getoraghytm(data):
     per1Month = Fnc.JalaliIntToGorgia(lastUpdate) - datetime.timedelta(days=30)
     per1Month = int(str(Fnc.gorgianIntToJalali(per1Month)).replace('-',''))
     df = df[df['update']==lastUpdate]
-    df['owner'] = df['نماد'].apply(Fnc.setTypeInFundBySymbol)
-    df['owner'] = df['owner'].replace('gov','دولتی').replace('non-gov','دولتی')
+    df['owner'] = df['نماد'].apply(Fnc.setTypeOraghBySymbol)
+    df['owner'] = df['owner'].replace('gov','دولتی').replace('non-gov','شرکتی')
     tse = pd.DataFrame(farasahmDb['tse'].find({'dataInt':{'$gt':int(per1Month)}},{'نماد':1,'حجم':1,'_id':0,'dataInt':1}))
     tse = tse.groupby(by=['نماد']).apply(Fnc.tseGrpByVol)
     tse = tse.drop(columns=['dataInt','نماد'])
@@ -2001,10 +2000,6 @@ def saveinvoce(data):
         'payments' : []
     }
     dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice}
-    for i in dic['invoice']['header']:
-        print(i,type(dic['invoice']['header'][i]))
-    
-    print(dic)
     farasahmDb['invoiceMoadian'].insert_one(dic)
 
     return json.dumps({'reply':True})
@@ -2019,11 +2014,13 @@ def getdiffassetamarydash(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    dic = farasahmDb['sandoq'].find_one({'symbol':symbol},sort=[('dateInt', -1)])
+    dic = farasahmDb['sandoq'].find_one({'symbol':symbol,'navAmary':{'$gt':0}},sort=[('dateInt', -1)])
     asset = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},sort=[('dateInt', -1)]))['VolumeInPrice'].sum()
-    bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol}))['balance'].sum()
+    bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol}))
+    bank['balance'] = bank['balance'].apply(int)
+    bank = bank['balance'].sum()
     allRegistered = int(asset) + int(bank)
-    allAmary = dic['navAmary'] * dic['countunit']
+    allAmary = int(dic['navAmary']) * int(dic['countunit'])
     return json.dumps({'reply':True,'lab':{'ثبت شده':'ثبت شده','همه':'همه'},'val':{'ثبت شده':allRegistered,'همه':allAmary}})
 
 
@@ -2098,7 +2095,9 @@ def getrateassetfixincom(data):
     bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol},{'_id':0}))
 
     if len(bank)>0:
+        bank['balance'] = bank['balance'].apply(int)
         bank = bank['balance'].sum()
+
     else:
         bank = 0
 
