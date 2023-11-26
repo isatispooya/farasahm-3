@@ -129,8 +129,9 @@ class TseCrawling:
         df['YTM'] = [float(str(x).replace('/','.').replace('%','')) for x in df['YTM']]
         df['بازده ساده'] = [float(str(x).replace('/','.').replace('%','')) for x in df['بازده ساده']]
         df['update'] = update
+        df['market'] = 'فرابورس'
         df = df.to_dict('records')
-        farasahm_db['oraghYTM'].delete_many({'update':update})
+        farasahm_db['oraghYTM'].delete_many({'update':update,'market':'فرابورس'})
         farasahm_db['oraghYTM'].insert_many(df)
 
 
@@ -153,9 +154,30 @@ class TseCrawling:
             dateAmary = int(dateAmary.replace('/',''))
             farasahm_db['sandoq'].update_many({'symbol':i['symbol'],'dateInt':dateAmary},{'$set':{'navAmary':amari,'countunit':countunit}})
 
-
-
-
+    @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
+    def getOraghBoursi(self):
+        print('get oragh bursi')
+        url = 'https://old.tse.ir/MarketWatch-ang.html?cat=debt'
+        self.driver.get(url)
+        time.sleep(5)
+        self.driver.find_element(By.XPATH, '/html/body/div/div[9]/div[1]/div[2]/ul[3]/li[4]/a').click()
+        time.sleep(5)
+        dir = os.listdir(self.download_path)
+        df = pd.read_excel('download/'+dir[0],header=2)
+        for file_name in dir:
+            file_path = os.path.join(self.download_path, file_name)
+            os.remove(file_path)
+        print(df.columns)
+        df = df[['Unnamed: 0','مقدار.2','تاریخ','YTM(%).1']]
+        df = df.rename(columns={'Unnamed: 0':'نماد','مقدار.2':'قیمت معامله شده هر ورقه','تاریخ':'تاریخ آخرین روز معاملاتی','YTM(%).1':'YTM'})
+        df['YTM'] = df['YTM'].apply(float)
+        df = df[df['df']>0]
+        df['type'] = 'بدون کوپن'
+        df['market'] = 'بورس'
+        update = Fnc.todayIntJalali()
+        df['update'] = Fnc.todayIntJalali()
+        farasahm_db['oraghYTM'].delete_many({'update':update,'market':'بورس'})
+        farasahm_db['oraghYTM'].insert_many(df.to_dict('records'))
 
 
     

@@ -9,6 +9,7 @@ Tse = TseCrawling()
 while True:
         Fnc.getTseDate()
         Tse.getOragh()
+        Tse.getOraghBoursi()
         Tse.get_all_fund()
         Tse.getAmariNav()
         time.sleep(60*10)

@@ -1642,7 +1642,6 @@ def getassetfund(data):
     if len(bank)>0:
         bank = bank.rename(columns={'balance':'value'})
         bank['type'] = 'سپرده بانکی'
-        print(bank)
         bank = bank[['name','value','type','num']]
         df = pd.concat([asset,bank])
     else:
@@ -2015,13 +2014,15 @@ def getdiffassetamarydash(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     dic = farasahmDb['sandoq'].find_one({'symbol':symbol,'navAmary':{'$gt':0}},sort=[('dateInt', -1)])
-    asset = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},sort=[('dateInt', -1)]))['VolumeInPrice'].sum()
+    asset = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol}))
+    asset = asset[asset['date']==asset['date'].max()]
+    asset = asset['VolumeInPrice'].apply(int).sum()
     bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol}))
     bank['balance'] = bank['balance'].apply(int)
     bank = bank['balance'].sum()
     allRegistered = int(asset) + int(bank)
     allAmary = int(dic['navAmary']) * int(dic['countunit'])
-    return json.dumps({'reply':True,'lab':{'ثبت شده':'ثبت شده','همه':'همه'},'val':{'ثبت شده':allRegistered,'همه':allAmary}})
+    return json.dumps({'reply':True,'lab':{'ارزش ثبت شده':'ارزش ثبت شده','ارزش کل':'ارزش کل'},'val':{'ارزش ثبت شده':allRegistered,'ارزش کل':allAmary}})
 
 
 def getdiffnavprc(data):
