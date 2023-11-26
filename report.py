@@ -1750,6 +1750,7 @@ def getoraghytm(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     df = pd.DataFrame(farasahmDb['oraghYTM'].find({},{'_id':0,'بازده ساده':0}))
     lastUpdate = df['update'].max()
+    df = df.fillna(0)
     per1Month = Fnc.JalaliIntToGorgia(lastUpdate) - datetime.timedelta(days=30)
     per1Month = int(str(Fnc.gorgianIntToJalali(per1Month)).replace('-',''))
     df = df[df['update']==lastUpdate]

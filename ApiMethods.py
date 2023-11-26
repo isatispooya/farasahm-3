@@ -485,6 +485,7 @@ def get_asset_funds():
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def getAssetCoustomerByFixincome():
+    print('get Asset Coustomer By Fixincome')
     conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
     codelist = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'dateInt':1,'TradeCode':1}))
     if len(codelist):
@@ -492,9 +493,14 @@ def getAssetCoustomerByFixincome():
         today = datetime.datetime.now()
         dateInt = Fnc.gorgianIntToJalaliInt(today)
         for i in codelist:
+            print(i)
             asset = pd.DataFrame(GetCustomerMomentaryAssets(i))
             asset['datetime'] = today
             asset['dateInt'] = dateInt
+            asset = asset.to_dict('records')
             farasahmDb['assetCoustomerOwnerFix'].delete_many({'TradeCode':i, 'dateInt':dateInt})
             farasahmDb['assetCoustomerOwnerFix'].insert_many(asset)
 
+
+
+getAssetCoustomerByFixincome()
