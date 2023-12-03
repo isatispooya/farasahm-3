@@ -493,7 +493,6 @@ def getAssetCoustomerByFixincome():
         today = datetime.datetime.now()
         dateInt = Fnc.gorgianIntToJalaliInt(today)
         for i in codelist:
-            print(i)
             asset = pd.DataFrame(GetCustomerMomentaryAssets(i))
             asset['datetime'] = today
             asset['dateInt'] = dateInt
@@ -501,6 +500,3 @@ def getAssetCoustomerByFixincome():
             farasahmDb['assetCoustomerOwnerFix'].delete_many({'TradeCode':i, 'dateInt':dateInt})
             farasahmDb['assetCoustomerOwnerFix'].insert_many(asset)
 
-
-
-getAssetCoustomerByFixincome()

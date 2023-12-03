@@ -116,6 +116,11 @@ def getretrnprice():
     data = request.get_json()
     return report.getretrnprice(data)
 
+@app.route('/getonwerfix',methods = ['POST', 'GET'])
+def getonwerfix():
+    data = request.get_json()
+    return report.getonwerfix(data)
+
 @app.route('/getdiffnavprc',methods = ['POST', 'GET'])
 def getdiffnavprc():
     data = request.get_json()
@@ -188,11 +193,20 @@ def getdiffassetamarydash():
     data = request.get_json()
     return report.getdiffassetamarydash(data)
 
+@app.route('/getpotentialcoustomer',methods = ['POST', 'GET'])
+def getpotentialcoustomer():
+    data = request.get_json()
+    return report.getpotentialcoustomer(data)
 
 @app.route('/getcompare',methods = ['POST', 'GET'])
 def getcompare():
     data = request.get_json()
     return report.getcompare(data)
+
+@app.route('/calcincass',methods = ['POST', 'GET'])
+def calcincass():
+    data = request.get_json()
+    return report.calcincass(data)
 
 @app.route('/getoraghytm',methods = ['POST', 'GET'])
 def getoraghytm():
@@ -228,6 +242,21 @@ def getcompanymoadian():
 def delcompanymoadian():
     data = request.get_json()
     return report.delcompanymoadian(data)
+
+@app.route('/getinvoce',methods = ['POST', 'GET'])
+def getinvoce():
+    data = request.get_json()
+    return report.getinvoce(data)
+
+@app.route('/inquiryinvoce',methods = ['POST', 'GET'])
+def inquiryinvoce():
+    data = request.get_json()
+    return report.inquiryinvoce(data)
+
+@app.route('/sendinvoce',methods = ['POST', 'GET'])
+def sendinvoce():
+    data = request.get_json()
+    return report.sendinvoce(data)
 
 @app.route('/getlistcompanymoadian',methods = ['POST', 'GET'])
 def getlistcompanymoadian():
@@ -299,6 +328,11 @@ def setnewbankbalance():
 def getassetfund():
     data = request.get_json()
     return report.getassetfund(data)
+
+@app.route('/getrankfixin',methods = ['POST', 'GET'])
+def getrankfixin():
+    data = request.get_json()
+    return report.getrankfixin(data)
 
 @app.route('/settransaction',methods = ['POST', 'GET'])
 def setTransaction():

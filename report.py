@@ -1,5 +1,6 @@
 
 from flask import send_file
+from sympy import symbols, Eq, solve
 
 import json
 import pandas as pd
@@ -23,6 +24,8 @@ import Fnc
 from ApiMethods import GetCustomerMomentaryAssets
 import time
 from bson import Binary
+from moadian import Moadian
+
 
 farasahmDb = client['farasahm2']
 
@@ -1098,6 +1101,7 @@ def desk_broker_gettraders(data):
         return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
     df = df[pd.to_numeric(df['NetPrice'], errors='coerce').notnull()]
     df = df.groupby(by=['TradeCode']).apply(Fnc.Apply_Trade_Symbol,symbol = symbol,date=date)
+    df = df.fillna(0)
     dic = {'Volume_Buy':int(df['Volume_Buy'].max()),'Volume_Sell':int(df['Volume_Buy'].max()),'Price_Buy':int(df['Price_Buy'].max()),'Price_Sell':int(df['Price_Sell'].max()),'balance':int(df['balance'].max())}
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df,'dic':dic})
@@ -1633,7 +1637,6 @@ def getassetfund(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol},{'_id':0}))
-
     asset = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},{'_id':0}))
     asset = asset[asset['date']==asset['date'].max()]
     asset = asset[['MarketInstrumentTitle','VolumeInPrice','type']]
@@ -1652,6 +1655,9 @@ def getassetfund(data):
     df['warning'] = ''
 
 
+    x = symbols('x')
+
+
     dff = []
     #saham
     df_saham = df[df['type']=='سهام']
@@ -1666,9 +1672,15 @@ def getassetfund(data):
         for i in range(0,len(df_saham)):
             if df_saham[i]['rate']>3:
                 df_saham[i]['warning'] = 'این سهم بیش از 3 % است'
-        dff.append({'type':'سهام', 'value':value, 'rate':Fnc.StndRt(rate), 'warning':warning, '_children':df_saham})
+                df_saham[i]['max'] = 0
+            equation = Eq((df_saham[i]['value'] + x) / (df['value'].sum() + x), 0.03)
+            df_saham[i]['max'] = int(solve(equation, x)[0])
+            df_saham[i]['min'] = 0
+
+        equation = Eq((value + x) / (df['value'].sum() + x), 0.1)
+        dff.append({'type':'سهام', 'value':value, 'rate':Fnc.StndRt(rate), 'warning':warning, '_children':df_saham,'max':int(solve(equation, x)[0]),'min':0})
     else:
-        dff.append({'type':'سهام', 'value':0, 'rate':0, 'warning':'', '_children':[]})
+        dff.append({'type':'سهام', 'value':0, 'rate':0, 'warning':'', '_children':[],'max':int(df['value'].sum()*0.1), 'min':0})
     
     #oragh
     df_oragh = pd.concat([df[df['type']=='اوراق دولتی'],df[df['type']=='اوراق شرکتی']])
@@ -1678,7 +1690,11 @@ def getassetfund(data):
         warning = ''
         if rate<0.4:
             warning = 'مجموع کمتر از 40 % است'
-        dic = {'type':'اوراق', 'value':value, 'rate':Fnc.StndRt(rate), 'warning':warning, '_children':[]}
+
+        equation = Eq((value + x) / (df['value'].sum() + x), 0.4)
+        EqMin = int(solve(equation, x)[0])
+
+        dic = {'type':'اوراق', 'value':value, 'rate':Fnc.StndRt(rate), 'warning':warning, '_children':[],'max':0,'min':EqMin}
 
 
         df_dolati = df_oragh[df_oragh['type']=='اوراق دولتی']
@@ -1690,28 +1706,38 @@ def getassetfund(data):
                 warning_dolati = 'اوراق دولتی بیشتر از 30 % است'
             elif rate_dolati<0.25:
                 warning_dolati = 'اوراق دولتی کمتر از 25 % است'
+                
+            equationMax = Eq((Value_dolati + x) / (df['value'].sum() + x), 0.3)
+            eqMax = int(solve(equationMax, x)[0])
+
+
+            equationMin = Eq((Value_dolati + x) / (df['value'].sum() + x), 0.25)
+            eqMin = int(solve(equationMin, x)[0])
+
             df_dolati['rate'] = df_dolati['rate'].apply(Fnc.StndRt)
-            dic_dolati = {'type':'دولتی', 'value':Value_dolati, 'rate':Fnc.StndRt(rate_dolati), 'warning':warning_dolati, '_children':df_dolati.to_dict('records')}
+            df_dolati['max'] = 0
+            df_dolati['min'] = 0
+            dic_dolati = {'type':'دولتی', 'value':Value_dolati, 'rate':Fnc.StndRt(rate_dolati), 'warning':warning_dolati, '_children':df_dolati.to_dict('records'),'max':eqMax,'min':eqMin}
         else:
-            dic_dolati = {'type':'دولتی', 'value':0, 'rate':0, 'warning':'اوراق دولتی کمتر از 25 % است', '_children':[]}
-        
+            equationMax = Eq((Value_dolati + x) / (df['value'].sum() + x), 0.3)
+            eqMax = int(solve(equationMax, x)[0])
+            dic_dolati = {'type':'دولتی', 'value':0, 'rate':0, 'warning':'اوراق دولتی کمتر از 25 % است', '_children':[],'max':eqMax,'min':0}
         df_sherkat = df_oragh[df_oragh['type']=='اوراق شرکتی']
         if len(df_sherkat)>0:
             value_sherkat = int(df_sherkat['value'].sum())
             rate_sherkat = value_sherkat / df['value'].sum()
             warning_sherkat = ''
             df_sherkat['rate'] = df_sherkat['rate'].apply(Fnc.StndRt)
-            dic_sherkat = {'type':'شرکتی', 'value':value_sherkat, 'rate':Fnc.StndRt(rate_sherkat), 'warning':warning_sherkat, '_children':df_sherkat.to_dict('records')}
+            df_sherkat['max'] = 0
+            df_sherkat['min'] = 0
+            dic_sherkat = {'type':'شرکتی', 'value':value_sherkat, 'rate':Fnc.StndRt(rate_sherkat), 'warning':warning_sherkat, '_children':df_sherkat.to_dict('records'),'max':0,'min':0}
         else:
-            dic_sherkat = {'type':'شرکتی', 'value':0, 'rate':0, 'warning':'', '_children':[]}
-
-
+            dic_sherkat = {'type':'شرکتی', 'value':0, 'rate':0, 'warning':'', '_children':[],'max':0,'min':0}
         dic['_children'] = [dic_dolati,dic_sherkat]
         dff.append(dic)
     else:
-        dff.append({'type':'اوراق', 'value':0, 'rate':0, 'warning':'مجموع کمتر از 40 % است', '_children':[]})
-
-        
+        dff.append({'type':'اوراق', 'value':0, 'rate':0, 'warning':'مجموع کمتر از 40 % است', '_children':[],'min':EqMin,'max':0})
+    
     # Bank
     df_bank = df[df['type']=='سپرده بانکی']
     if len(df_bank)>0:
@@ -1720,17 +1746,24 @@ def getassetfund(data):
         warning = ''
         if rate > 0.4:
             warning = 'مجموع سپرده های بانکی بیش از 40 % است'
-        dic = {'type':'سپرده بانکی', 'value':value, 'rate':Fnc.StndRt(rate), 'warning':warning, '_children':[]}
+        equationMax = Eq((value + x) / (df['value'].sum() + x), 0.4)
+        eqMax = int(solve(equationMax, x)[0])
+        dic = {'type':'سپرده بانکی', 'value':value, 'rate':Fnc.StndRt(rate), 'warning':warning, '_children':[],'max':eqMax,'min':0}
 
         for i in list(set(df_bank['name'])):
             value_i = int(df_bank[df_bank['name']==i]['value'].sum())
             rate_i = value_i / df['value'].sum()
             warning = ''
+            equationMax = Eq((value_i + x) / (df['value'].sum() + x), 0.133)
+            eqMax = int(solve(equationMax, x)[0])
+
             if rate_i>0.133:
                 warning = 'سپرده بانکی در این بانک بیش از 13.3 % است'
             df_i = df_bank[df_bank['name']==i]
             df_i['rate'] = df_i['rate'].apply(Fnc.StndRt)
-            dic_i = [{'name':i,'type':'سپرده بانکی', 'value':value_i, 'rate':Fnc.StndRt(rate_i), 'warning':warning, '_children':df_i.to_dict('records')}]
+            df_i['max'] = 0
+            df_i['min'] = 0
+            dic_i = [{'name':i,'type':'سپرده بانکی', 'value':value_i, 'rate':Fnc.StndRt(rate_i), 'warning':warning, '_children':df_i.to_dict('records'),'max':eqMax,'min':0}]
             dic['_children'] = dic['_children'] + dic_i
     else:
         dic = {'type':'سپرده بانکی', 'value':0, 'rate':0, 'warning':'', '_children':[]}
@@ -1935,7 +1968,7 @@ def saveinvoce(data):
             "inno" : inno,
             "irtaxid" : None,
             "inp": int(invoceData['patern']),
-            "ins" : 0, # موقع ارسال باید عوض شود
+            "ins" : 1, # موقع ارسال باید عوض شود
             "tins" : str(sellerDic['idNum']),
             "tinb" : str(invoceData['buyerId']),
             "tob" : int(invoceData['buerType']),
@@ -1999,7 +2032,7 @@ def saveinvoce(data):
         'body' : body,
         'payments' : []
     }
-    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice}
+    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None}
     farasahmDb['invoiceMoadian'].insert_one(dic)
 
     return json.dumps({'reply':True})
@@ -2036,7 +2069,18 @@ def getdiffnavprc(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
 
     condition = {'dateInt': {'$exists': True},'symbol':symbol}  # شرط لازم برای وجود فیلد dateInt
-    df = pd.DataFrame(farasahmDb['sandoq'].find(condition, sort=[('dateInt', -1)]).limit(30))
+    period = data['period']
+    if period == 'ماه':
+        limit = 30
+    elif period =='فصل':
+        limit = 90
+    elif period =='شش ماه':
+        limit = 180
+    elif period =='سال':
+        limit = 365
+    elif period =='همه':
+        limit = 900
+    df = pd.DataFrame(farasahmDb['sandoq'].find(condition, sort=[('dateInt', -1)]).limit(limit))
     df = df[['dateInt','nav','close_price']]
     df['dateInt'] = df['dateInt'].apply(str)
     df = df.set_index(['dateInt'])
@@ -2059,17 +2103,34 @@ def getretrnprice(data):
         df['period'] = df['dateInt']
         mult = 1
     elif data['period'] == 'هفتگی':
-        df['period'] = df['dateInt'].apply(Fnc.JalaliIntToWeekYearJalali)
+        df['dateGorgia'] = df['dateInt'].apply(Fnc.JalaliIntToGorgia)
+        maxDate = df['dateGorgia'].max()
+        df['period'] = (maxDate - df['dateGorgia']).dt.days // 7
+        df = df.drop(columns=['dateGorgia'])
         mult = 7
     elif data['period'] == 'ماهانه':
-        df['period'] = df['dateInt'].apply(Fnc.JalaliIntToMonthYearJalali)
-        mult = 30.5
+        df['dateGorgia'] = df['dateInt'].apply(Fnc.JalaliIntToGorgia)
+        maxDate = df['dateGorgia'].max()
+        df['period'] = (maxDate - df['dateGorgia']).dt.days // 30
+        df = df.drop(columns=['dateGorgia'])
+        mult = 30
     elif data['period'] == 'فصلی':
-        df['period'] = df['dateInt'].apply(Fnc.JalaliIntToSencYearJalali)
-        mult = 91.5
-    
+        df['dateGorgia'] = df['dateInt'].apply(Fnc.JalaliIntToGorgia)
+        maxDate = df['dateGorgia'].max()
+        df['period'] = (maxDate - df['dateGorgia']).dt.days // 30
+        df = df.drop(columns=['dateGorgia'])
+        mult = 90
+    elif data['period'] == 'شش ماهه':
+        df['dateGorgia'] = df['dateInt'].apply(Fnc.JalaliIntToGorgia)
+        maxDate = df['dateGorgia'].max()
+        df['period'] = (maxDate - df['dateGorgia']).dt.days // 180
+        df = df.drop(columns=['dateGorgia'])
+        mult = 180
+
     df = df.groupby(by=['period']).apply(Fnc.retnFixInByPrd)
-    df = df.sort_values('dateInt',ascending=False).reset_index().drop(columns=['period','level_1'])
+    df = df.sort_values('dateInt',ascending=False).reset_index()
+    try:df = df.drop(columns=['period','level_1'])
+    except:pass
     df['aft_price'] = df['close_price'].shift(1)
     
     df['YTM'] = df['aft_price'] / df['close_price']
@@ -2125,8 +2186,145 @@ def getrateassetfixincom(data):
         gov =0
 
     lst = [bank, saham, nogov, gov]
-    lst = [int(x) for x in lst]
+    lst = [round((int(x)/sum(lst))*100,1) for x in lst]
     #lst = {'بانک':int(bank), 'سهام':int(saham), 'اوراق شرکتی':int(nogov), 'اوراق دولتی':int(gov)}
     lab = {'بانک':'بانک','سهام':'سهام','اوراق شرکتی':'اوراق شرکتی','اوراق دولتی':'اوراق دولتی'}
     lab = ['بانک','سهام','اوراق شرکتی','اوراق دولتی']
     return json.dumps({'reply':True,'lab':lab, 'lst':lst})
+
+
+def getpotentialcoustomer(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['assetCoustomerOwnerFix'].find({},{'_id':0,'CustomerTitle':1,'MarketInstrumentTitle':1,'Symbol':1,'Volume':1,'VolumeInPrice':1,'dateInt':1,'TradeCode':1}))
+    conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
+    symbolTarget = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'TradeSymbol':1}))
+    symbolTarget = symbolTarget.drop_duplicates()['TradeSymbol'].to_list()
+    df['target'] = df['Symbol'].isin(symbolTarget)
+    df = df.groupby(by='TradeCode').apply(Fnc.grouppotential)
+    df = df.reset_index().drop(columns=['TradeCode','level_1'])
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
+
+
+def getonwerfix(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['assetCoustomerOwnerFix'].find({'Symbol':symbol+'1'},{'_id':0,'CustomerTitle':1,'Volume':1,'dateInt':1,'TradeCode':1}))
+    df = df.groupby('TradeCode').apply(Fnc.groupTradeCodeinLastDate)
+    df['Volume'] = df['Volume'].apply(int)
+    df = df.sort_values(by='Volume',ascending=False)
+    df = df.drop(columns=['TradeCode','dateInt']).reset_index()
+    df = df.drop(columns=['TradeCode','level_1'])
+    df = df[df['CustomerTitle']!='ETF کد رزرو صندوقهای سرمایه گذاری قابل معامله']
+    df = df[df.index<=20]
+    df.index = df['CustomerTitle']
+    df = df.to_dict('dict')
+    return json.dumps({'reply':True,'df':df})
+
+def getrankfixin(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['sandoq'].find({'type':'sabet'},{'_id':0}))
+    df = df.groupby(by='symbol').apply(Fnc.fund_compare_clu_ccp)
+    df = df[['ret_ytm_7','ret_ytm_14','ret_ytm_30','ret_ytm_90','ret_ytm_180','ret_ytm_365','ret_ytm_730']]
+    for i in df.columns:
+        df[f'{i}_count'] = len(df[df[i]>0])
+        df[i] = df[i].rank(ascending=False)
+    df = df.reset_index()
+    df = df[df['symbol']==symbol].drop(columns=['level_1'])
+    df = df.to_dict('records')[0]
+    return json.dumps({'reply':True,'df':df})
+    
+
+#ناقض
+def calcincass(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    data = data['inp']
+    return json.dumps({'reply':True})
+
+
+def getinvoce(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['invoiceMoadian'].find({},{'invoice':0}))
+    df['date'] = df['date'].apply(Fnc.gorgianIntToJalali)
+    df['date'] = df['date'].apply(str)
+    df['_id'] = df['_id'].apply(str)
+    df['uid'] = df['result'].apply(Fnc.resultToUid)
+    df['referenceNumber'] = df['result'].apply(Fnc.resultToReferenceNumber)
+    df['status'] = df['inquiry'].apply(Fnc.resultToStatus)
+    df['error'] = df['inquiry'].apply(Fnc.resultToError)
+
+    df = df.to_dict('records')
+    return json.dumps({'reply':True, 'df':df})
+
+    
+def sendinvoce(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    _idinv = ObjectId(data['id'])
+    invoce = farasahmDb['invoiceMoadian'].find_one({'_id':_idinv})['invoice']
+    seller = farasahmDb['companyMoadian'].find_one({'idNum':invoce['header']['tins']})
+    key = seller['key']
+    memoryId = seller['idTax']
+    moadian = Moadian(memoryId, key)
+    result = moadian.send_invoice(invoce)
+    result = result['result'][0]
+    farasahmDb['invoiceMoadian'].update_one({'_id':_idinv},{'$set':{'result':result,'inquiry':None}})
+    return json.dumps({'reply':True})
+
+
+def inquiryinvoce(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    _idinv = ObjectId(data['id'])
+    invoce = farasahmDb['invoiceMoadian'].find_one({'_id':_idinv})
+    print(invoce)
+    if 'referenceNumber' not in invoce['result']:
+        return json.dumps({'reply':False,'msg':'ابتدا باید ارسال شود'})
+    seller = farasahmDb['companyMoadian'].find_one({'idNum':invoce['invoice']['header']['tins']})
+    key = seller['key']
+    memoryId = seller['idTax']
+    moadian = Moadian(memoryId, key)
+    referenceNumber = invoce['result']['referenceNumber']
+    inquiry = moadian.inquiry_by_reference_number(referenceNumber)['result']['data'][0]
+    farasahmDb['invoiceMoadian'].update_one({'_id':_idinv},{'$set':{'inquiry':inquiry}})
+
+    return json.dumps({'reply':True})

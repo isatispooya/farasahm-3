@@ -7,10 +7,7 @@ from crawlingTse import TseCrawling
 Tse = TseCrawling()
 
 while True:
-        Fnc.getTseDate()
-        Tse.getOragh()
-        Tse.getOraghBoursi()
-        Tse.getAmariNav()
+        Tse.get_all_fund()
         time.sleep(60*10)
         print('sleep 10 min one loop')
 

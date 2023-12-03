@@ -38,6 +38,13 @@ def gorgianIntToJalaliInt(date):
     Jalali = JalaliDate.to_jalali(int(y),int(m),int(d))
     return int(str(Jalali).replace('-',''))
 
+def gorgianIntToJalali(date):
+    y = date.year
+    m = date.month
+    d = date.day
+    Jalali = JalaliDate.to_jalali(int(y),int(m),int(d))
+    return int(str(Jalali).replace('-',''))
+
 def JalalistrToGorgia(date):
     date = str(date).replace('-','')
     y = int(str(date)[:4])
@@ -60,9 +67,12 @@ def JalaliIntToWeekYearJalali(date):
     m = int(str(date)[4:6])
     d = int(str(date)[6:8])
     jalali = JalaliDate(y,m,d)
+    gorgia = jalali.to_gregorian()
     week = jalali.week_of_year()
     return str(y) +'-'+ str(week)
 
+def groupTradeCodeinLastDate(group):
+    return group[group['dateInt']==group['dateInt'].max()]
 
 def JalaliIntToMonthYearJalali(date):
     date = str(date)
@@ -432,18 +442,24 @@ def fund_compare_clu_ccp(group):
     group['changeClosePrice'] = group['changeClosePrice'].fillna(0)
     group['changeClosePriceRatre'] = group['changeClosePrice'] / group['close_price']
     group['changeClosePriceRatre'] = group['changeClosePriceRatre'].fillna(0)
-    countNeg = len(group[group['changeClosePrice']<0])
-    if countNeg == 0:
-        tagsim_sod = False
-    else:
-        startDate = JalaliIntToGorgia(group['dateInt'].min())
-        endDate = JalaliIntToGorgia(group['dateInt'].max())
-        diff =( endDate - startDate).days
-
-        tagsim_sod = (diff / countNeg)>29
-        print(diff / countNeg,tagsim_sod)
-    if tagsim_sod:
+    taghsimList = ['ارمغان','هامرز','امین یکم','پارند','آکام','ثابت اکسیژن','نخل','سام','کمند','کارین','رشد','سخند','گنجينه','آفاق','نیلی','همای','ثابت اكسيژن']
+    if list(set(group['symbol']))[0] in taghsimList:
         return pd.DataFrame()
+    
+    #group = group[group['taghsim']==False].drop(columns='taghsim')
+    #print(group)
+    #countNeg = len(group[group['changeClosePrice']<0])
+    #if countNeg == 0:
+    #    tagsim_sod = False
+    #else:
+    #    startDate = JalaliIntToGorgia(group['dateInt'].min())
+    #    endDate = JalaliIntToGorgia(group['dateInt'].max())
+    #    diff =( endDate - startDate).days
+#
+    #    tagsim_sod = (diff / countNeg)>29
+    #    print(diff / countNeg,tagsim_sod)
+    #if tagsim_sod:
+    #    return pd.DataFrame()
     #    group = group.sort_values(by=['dateInt'])
     #    group['tagsim_sod'] = group['changeClosePrice'].apply(lambda x: x if x < 0 else 0)
     #    group['tagsim_sod'] = group['tagsim_sod'][::-1].cumsum()[::-1]
@@ -643,3 +659,59 @@ def retnFixInByPrd(group):
     group = group[group['dateInt']==group['dateInt'].max()]
     group = group.drop(columns=['period'])
     return group
+
+
+
+def grouppotential(group):
+    if len(group[group['target']==True]) == 0:
+        return pd.DataFrame()
+    group = group[group['dateInt']==group['dateInt'].max()]
+    group['lenTarget'] = len(group[group['target']==True])
+    group['_children'] = [group[['Symbol','MarketInstrumentTitle','Volume','VolumeInPrice']].to_dict('records')]*len(group)
+    group['len'] = len(group)
+    group['VolumeInPrice'] = group['VolumeInPrice'].apply(int).sum()
+    group['VolumeInPriceTarget'] = (group['VolumeInPrice'] * group['target']).sum()
+    group = group[['CustomerTitle','dateInt','_children','len','VolumeInPrice','lenTarget','VolumeInPriceTarget']]
+    group = group[group.index==group.index.min()]
+    return group
+
+
+def resultToUid(data):
+    if data == None:
+        return ''
+    if 'uid' in data:
+        return data['uid']
+    else:
+        return ''
+    
+def resultToReferenceNumber(data):
+    if data == None:
+        return ''
+    if 'referenceNumber' in data:
+        return data['referenceNumber']
+    else:
+        return ''
+    
+def resultToStatus(data):
+    if data == None:
+        return ''
+    if 'status' in data:
+        return data['status']
+    else:
+        return ''
+    
+def resultToError(data):
+    if data == None:
+        return ''
+    if 'data' in data:
+        data = data['data']
+        if 'error' in data:
+            data = data['error']
+            datalst = ''
+            for d in data:
+                datalst += d['message'] + '\n'
+            return datalst
+        else:
+            return ''
+    else:
+        return ''
