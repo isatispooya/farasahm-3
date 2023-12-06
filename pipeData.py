@@ -11,5 +11,5 @@ while True:
         Fnc.getTse30LastDay()
         ApiMethods.GetAllTradeLastDate()
         ApiMethods.getAssetCoustomerByFixincome()
-        time.sleep(60*5)
-        print('sleep 60 one loop')
+        time.sleep(60*15)
+        print('sleep 15min loop')

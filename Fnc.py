@@ -632,10 +632,14 @@ def generatIdInternal(idstr):
     lst = farasahmDb['idintrnalMoadian'].find({"id":idstr})
     lst = [x for x in lst]
     if len(lst) == 0:
-        result = 1
+        result = str(1)
     else:
         lst = [x["idintrnal"] for x in lst]
-        result = max(lst) + 1
+        result = str(len(lst) + 1)
+    lens = len(result)
+    addlens = 10 - lens
+    addlens = '0' * addlens
+    result = addlens + result
     farasahmDb['idintrnalMoadian'].insert_one({'id':idstr,'idintrnal':result})
     return result
 
@@ -703,15 +707,18 @@ def resultToStatus(data):
 def resultToError(data):
     if data == None:
         return ''
-    if 'data' in data:
-        data = data['data']
-        if 'error' in data:
-            data = data['error']
-            datalst = ''
-            for d in data:
-                datalst += d['message'] + '\n'
-            return datalst
+    try:
+        if 'data' in data:
+            data = data['data']
+            if 'error' in data:
+                data = data['error']
+                datalst = ''
+                for d in data:
+                    datalst += d['message'] + '\n'
+                return datalst
+            else:
+                return ''
         else:
             return ''
-    else:
+    except:
         return ''

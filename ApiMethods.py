@@ -418,34 +418,34 @@ def get_asset_customer(today = Fnc.todayIntJalali()):
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJalali()):
     page = 1
-    farasahmDb['TradeListBroker'].delete_many({'DateYrInt':doDay[0],'DateMnInt':doDay[1],'DateDyInt':doDay[2]})
     while True:
-        try:
-            symbolList = farasahmDb['tse'].find({},{'نام':1,'نماد':1,'_id':0,'صندوق':1})
-            symbolList = pd.DataFrame(symbolList)
-            symbolList = symbolList.drop_duplicates()
-            symbolList['نماد'] = symbolList['نماد'].apply(Fnc.remove_non_alphanumeric)
-            df = GetDailyTradeList(doDay[0],doDay[1],doDay[2],page,1000)
-            if len(df) == 0:
-                break
-            df = pd.DataFrame(df)
-            df['DateYrInt'] = doDay[0]
-            df['DateMnInt'] = doDay[1]
-            df['DateDyInt'] = doDay[2]
-            df['dateInt'] = df['TradeDate'].apply(Fnc.dateStrToIntJalali)
-            df['page'] = page
-            for i in ['NetPrice','Price','TotalCommission','Volume']:
-                df[i] = df[i].apply(int)
-            df['Update'] = datetime.datetime.now()
-            df['TradeSymbolAbs'] = df['TradeSymbol'].apply(Fnc.remove_non_alphanumeric)
-            df = df.set_index('TradeSymbolAbs').join(symbolList.set_index('نماد'))
-            df = df.reset_index()
-            df = df.to_dict('records')
-            farasahmDb['TradeListBroker'].insert_many(df)
-            print(doDay[0],doDay[1],doDay[2],page,'broker')
-            page = page + 1
-        except:
-            pass
+        symbolList = farasahmDb['tse'].find({},{'نام':1,'نماد':1,'_id':0,'صندوق':1})
+        symbolList = pd.DataFrame(symbolList)
+        symbolList = symbolList.drop_duplicates()
+        symbolList['نماد'] = symbolList['نماد'].apply(Fnc.remove_non_alphanumeric)
+        df = GetDailyTradeList(doDay[0],doDay[1],doDay[2],page,1000)
+        if len(df) == 0:
+            break
+        df = pd.DataFrame(df)
+        df['DateYrInt'] = doDay[0]
+        df['DateMnInt'] = doDay[1]
+        df['DateDyInt'] = doDay[2]
+        df['dateInt'] = df['TradeDate'].apply(Fnc.dateStrToIntJalali)
+        df['page'] = page
+        for i in ['NetPrice','Price','TotalCommission','Volume']:
+            df[i] = df[i].apply(int)
+        df['Update'] = datetime.datetime.now()
+        df['TradeSymbolAbs'] = df['TradeSymbol'].apply(Fnc.remove_non_alphanumeric)
+        df = df.set_index('TradeSymbolAbs').join(symbolList.set_index('نماد'))
+        df = df.reset_index()
+        dff = farasahmDb['TradeListBroker'].find_one({'DateYrInt':doDay[0],'DateMnInt':doDay[1],'DateDyInt':doDay[2]})
+        df = pd.concat([dff,df])
+        df = df.drop_duplicates(subset=['TradeCode','TradeDate','TradeNumber','TradeSymbolAbs','NetPrice'])
+        df = df.to_dict('records')
+        farasahmDb['TradeListBroker'].delete_many({'DateYrInt':doDay[0],'DateMnInt':doDay[1],'DateDyInt':doDay[2]})
+        farasahmDb['TradeListBroker'].insert_many(df)
+        print(doDay[0],doDay[1],doDay[2],page,'broker')
+        page = page + 1
     Fnc.drop_duplicet_TradeListBroker(DateInt)
     get_asset_customer(DateInt)
 

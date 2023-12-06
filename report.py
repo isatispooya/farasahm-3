@@ -1940,14 +1940,14 @@ def saveinvoce(data):
     bodyDf['sumFin'] = bodyDf['sumAfterOff'] + bodyDf['sumTax']
     
     mmrit = sellerDic['idTax']
-    indatim = int(invoceData['createDate']/1000)
-    Indati2m = int(invoceData['addDate']/1000)
+    indatim = int(invoceData['createDate'])
+    Indati2m = int(invoceData['addDate'])
     if indatim>Indati2m:
         return json.dumps({'reply':False,'msg':'تاریخ صدور نمیتواند قبل از تاریخ فروش باشد'})
-    date = datetime.datetime.fromtimestamp(indatim)
+    date = datetime.datetime.fromtimestamp(indatim/1000)
     dateJalali = Fnc.gorgianIntToJalali(date)
 
-    inno = int(Fnc.generatIdInternal(str(dateJalali)+str(indatim)))
+    inno = Fnc.generatIdInternal(str(dateJalali))
     taxid = Fnc.generate_tax_id(mmrit,date,inno)
     if bodyDf['cash'].sum() == 0:
         setm = 3
@@ -1971,7 +1971,6 @@ def saveinvoce(data):
             "ins" : 1, # موقع ارسال باید عوض شود
             "tins" : str(sellerDic['idNum']),
             "tinb" : str(invoceData['buyerId']),
-            "tob" : int(invoceData['buerType']),
             "tob" : int(invoceData['buerType']),
             "bid" : None,
             "sbc" : None,
@@ -2154,7 +2153,6 @@ def getrateassetfixincom(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    res = getassetfund(data)
     bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol},{'_id':0}))
 
     if len(bank)>0:
@@ -2261,8 +2259,80 @@ def calcincass(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol},{'_id':0}))
+    asset = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},{'_id':0}))
+    asset = asset[asset['date']==asset['date'].max()]
+    asset = asset[['MarketInstrumentTitle','VolumeInPrice','type']]
+    asset = asset.rename(columns={'MarketInstrumentTitle':'name','VolumeInPrice':'value'})
+    asset['num'] = ''
+    if len(bank)>0:
+        bank = bank.rename(columns={'balance':'value'})
+        bank['type'] = 'bank'
+        bank = bank[['name','value','type']]
+        df = pd.concat([asset,bank])
     data = data['inp']
-    return json.dumps({'reply':True})
+    df['value'] = df['value'].apply(int)
+    df = df.groupby('type').sum()
+    df['rate_befor'] = df['value'] / df['value'].sum()
+    df['return'] = 0
+    increase = int(data['increase'])*1000
+    if 'bank' in df.index:
+        df['return']['bank'] = float(data['bank']) /100
+    if 'gov' in df.index:
+        df['return']['gov'] = float(data['gov']) /100
+    if 'non-gov' in df.index:
+        df['return']['non-gov'] = float(data['nogov']) /100
+    if 'saham' in df.index:
+        df['return']['saham'] = float(data['saham']) /100
+
+    olaviat = list(df.sort_values(by=['return'],ascending=False).index)
+    if data['type'] == 'محافظه کار':
+        if 'saham' in olaviat:
+            olaviat.remove('saham')
+            olaviat.append('saham')
+    
+    df['approve'] = 0
+    increaseCro = increase
+    for i in olaviat:
+        if increaseCro<=0:
+            break
+        if i == 'bank':
+            value = df['value'][i]
+            limit = int((df['value'].sum() + increase) * 0.4)
+            limit = limit - value
+            if limit >= increaseCro:
+                balance  = increaseCro
+            else:
+                balance = limit
+            if balance > 0:
+                df['approve'][i] = balance
+                increaseCro = increaseCro - balance
+
+        elif i == 'saham':
+            value = df['value'][i]
+            limit = int((df['value'].sum() + increase) * 0.1)
+            limit = limit - value
+
+            if limit >= increaseCro:
+                balance  = increaseCro
+            else:
+                balance = limit
+            increaseCro = increaseCro - balance
+            if balance > 0:
+                df['approve'][i] = balance
+
+        else:
+            balance  = increaseCro
+            increaseCro = 0
+            if balance > 0:
+                df['approve'][i] = balance
+
+    df['value_after'] = df['approve'] + df['value']
+    df['rate_after'] = df['value_after'] / df['value_after'].sum()
+    df = df.reset_index()
+    df['name'] = df['type'].replace('bank','بانک').replace('saham','سهم').replace('gov','اوراق دولتی').replace('non-gov','اوراق شرکتی')
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
 
 
 def getinvoce(data):
@@ -2316,7 +2386,6 @@ def inquiryinvoce(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     _idinv = ObjectId(data['id'])
     invoce = farasahmDb['invoiceMoadian'].find_one({'_id':_idinv})
-    print(invoce)
     if 'referenceNumber' not in invoce['result']:
         return json.dumps({'reply':False,'msg':'ابتدا باید ارسال شود'})
     seller = farasahmDb['companyMoadian'].find_one({'idNum':invoce['invoice']['header']['tins']})
@@ -2327,4 +2396,29 @@ def inquiryinvoce(data):
     inquiry = moadian.inquiry_by_reference_number(referenceNumber)['result']['data'][0]
     farasahmDb['invoiceMoadian'].update_one({'_id':_idinv},{'$set':{'inquiry':inquiry}})
 
+    return json.dumps({'reply':True})
+
+
+def getretassfix(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol},{'_id':0,'balance':1,'rate':1}))
+    bank['rate'] = bank['rate'].apply(float)
+    bank['balance'] = bank['balance'].apply(float)
+    bank['rate'] = bank['rate'] / 100
+    bank = round((bank['rate'] * bank['balance']).sum() / bank['balance'].sum(),3)*100
+    asset = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},{'_id':0}))
+    asset = asset[asset['date']==asset['date'].max()]
+    for i in asset.index:
+        sym = asset['MarketInstrumentTitle'][i]
+        dfSym = pd.DataFrame(farasahmDb['tse'].find({'نام':sym}))
+    print(data)
+    dic = {'bank':bank}
+
+    
     return json.dumps({'reply':True})

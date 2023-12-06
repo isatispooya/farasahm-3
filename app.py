@@ -208,6 +208,11 @@ def calcincass():
     data = request.get_json()
     return report.calcincass(data)
 
+@app.route('/getretassfix',methods = ['POST', 'GET'])
+def getretassfix():
+    data = request.get_json()
+    return report.getretassfix(data)
+
 @app.route('/getoraghytm',methods = ['POST', 'GET'])
 def getoraghytm():
     data = request.get_json()
