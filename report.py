@@ -282,13 +282,18 @@ def getreturn(data):
 
 def getcompare(data):
     etfs = pd.DataFrame(farasahmDb['sandoq'].find({'type':'sabet'},{'_id':0}))
+    ts = etfs[etfs['symbol']=='خاتم']
+    ts = ts.sort_values(by=['dateInt'],ascending=False)
+    print(ts)
+
     etfs = etfs.groupby(by='symbol').apply(Fnc.fund_compare_clu_ccp)
     etfs = etfs.reset_index().drop(columns=['level_1'])
 
     dic = {}
     for i in etfs.columns:
-        if not i == 'symbol':
+        if not i in ['symbol','update']:
             dic['i'] = etfs[i].max()
+    etfs = etfs.dropna()
             
     df = etfs.to_dict('records')
     return json.dumps({'replay':True,'df':df,'dic':dic}) 
@@ -1093,14 +1098,16 @@ def desk_broker_gettraders(data):
         return json.dumps({'replay':False})
     symbol = farasahmDb['menu'].find_one({'name':data['access'][1]})['symbol']
     date = Fnc.timestumpToJalalInt(data['date'])
+    farasahmDb['TradeListBroker'].create_index([("dateInt", pymongo.ASCENDING), ("TradeSymbol", pymongo.ASCENDING)])
     df = pd.DataFrame(farasahmDb['TradeListBroker'].find(
-        {'dateInt':date,'TradeSymbolAbs':symbol},
+        {'dateInt':date,'TradeSymbol':symbol+"1"},
         {'_id':0,'AddedValueTax':0,'BondDividend':0,'BranchID':0,'Discount':0,'InstrumentCategory':0,'MarketInstrumentISIN':0,'page':0,'Update':0,'dateInt':0,
          'صندوق':0,'DateYrInt':0,'DateMnInt':0,'DateDyInt':0,'TradeSymbolAbs':0,'TradeItemBroker':0,'TradeItemRayanBourse':0,'TradeNumber':0,'TradeSymbol':0,'نام':0}))
     if len(df) == 0:
         return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
     df = df[pd.to_numeric(df['NetPrice'], errors='coerce').notnull()]
     df = df.groupby(by=['TradeCode']).apply(Fnc.Apply_Trade_Symbol,symbol = symbol,date=date)
+    df['isCompany'] = [x[:4]=='6158' for x in df['TradeCode']]
     df = df.fillna(0)
     dic = {'Volume_Buy':int(df['Volume_Buy'].max()),'Volume_Sell':int(df['Volume_Buy'].max()),'Price_Buy':int(df['Price_Buy'].max()),'Price_Sell':int(df['Price_Sell'].max()),'balance':int(df['balance'].max())}
     df = df.to_dict('records')
@@ -1930,6 +1937,8 @@ def saveinvoce(data):
     if sellerDic == None:
         return json.dumps({'reply':False,'msg':'فروشنده یافت نشد'})
     bodyDf = pd.DataFrame(invoceData['body'])
+    print(bodyDf)
+
     bodyDf['sumBeforOff'] = bodyDf['sumBeforOff'].apply(int)
     bodyDf['off'] = bodyDf['off'].apply(int)
     bodyDf['taxRate'] = bodyDf['taxRate'].apply(int)
@@ -1947,8 +1956,9 @@ def saveinvoce(data):
     date = datetime.datetime.fromtimestamp(indatim/1000)
     dateJalali = Fnc.gorgianIntToJalali(date)
 
-    inno = Fnc.generatIdInternal(str(dateJalali))
-    taxid = Fnc.generate_tax_id(mmrit,date,inno)
+    inno = Fnc.generatIdInternal(str(mmrit)+str(indatim))
+
+    taxid = Fnc.generate_tax_id(mmrit,dateJalali,inno)
     if bodyDf['cash'].sum() == 0:
         setm = 3
         tvop = 0
@@ -1965,7 +1975,7 @@ def saveinvoce(data):
             "indatim": indatim,
             "indati2m": Indati2m,
             "inty": int(invoceData['type']),
-            "inno" : inno,
+            "inno" : format(inno, '010X'),
             "irtaxid" : None,
             "inp": int(invoceData['patern']),
             "ins" : 1, # موقع ارسال باید عوض شود
@@ -2009,6 +2019,7 @@ def saveinvoce(data):
             "prdis" : i['sumBeforOff'],
             "dis" : i['off'],
             "adis" : i['sumAfterOff'],
+            "vra" : i['taxRate'],
             "vam" : i['sumTax'],
             "odt" : None,
             "odr" : None,
@@ -2116,7 +2127,7 @@ def getretrnprice(data):
     elif data['period'] == 'فصلی':
         df['dateGorgia'] = df['dateInt'].apply(Fnc.JalaliIntToGorgia)
         maxDate = df['dateGorgia'].max()
-        df['period'] = (maxDate - df['dateGorgia']).dt.days // 30
+        df['period'] = (maxDate - df['dateGorgia']).dt.days // 90
         df = df.drop(columns=['dateGorgia'])
         mult = 90
     elif data['period'] == 'شش ماهه':
@@ -2133,7 +2144,16 @@ def getretrnprice(data):
     df['aft_price'] = df['close_price'].shift(1)
     
     df['YTM'] = df['aft_price'] / df['close_price']
-    df['YTM'] = df['YTM'] ** (365/mult)
+    try:
+        if data['method'] == 'مرکب':
+            df['YTM'] = df['YTM'] ** (365/mult)
+        elif data['method'] == 'ساده':
+            df['YTM'] = (df['YTM']-1) * (365/mult)
+            df['YTM'] = df['YTM'] + 1
+        else:
+            df['YTM'] = df['YTM']
+    except:
+        df['YTM'] = df['YTM'] ** (365/mult)
     df = df.dropna()
     df['YTM'] = df['YTM'] - 1
     df['YTM'] = df['YTM'] * 10000
@@ -2199,6 +2219,7 @@ def getpotentialcoustomer(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    
     df = pd.DataFrame(farasahmDb['assetCoustomerOwnerFix'].find({},{'_id':0,'CustomerTitle':1,'MarketInstrumentTitle':1,'Symbol':1,'Volume':1,'VolumeInPrice':1,'dateInt':1,'TradeCode':1}))
     conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
     symbolTarget = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'TradeSymbol':1}))
@@ -2417,7 +2438,6 @@ def getretassfix(data):
     for i in asset.index:
         sym = asset['MarketInstrumentTitle'][i]
         dfSym = pd.DataFrame(farasahmDb['tse'].find({'نام':sym}))
-    print(data)
     dic = {'bank':bank}
 
     

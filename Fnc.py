@@ -9,7 +9,7 @@ from pymongo import ASCENDING,DESCENDING
 import time
 import threading
 import Fnc
-
+import random
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
 
@@ -23,7 +23,6 @@ def retry_decorator(max_retries=3, sleep_duration=10):
                     thread.join()
                     break  # اگر تابع بدون مشکل اجرا شود، از حلقه خارج شود
                 except Exception as e:
-                    print(f'Error: {e}')
                     time.sleep(sleep_duration)  # تاخیر دهید و دوباره تلاش کنید
 
         return wrapper
@@ -229,7 +228,6 @@ def getTseDate(date=datetime.datetime.now()):
     jalaliStr = str(jalali).replace('-','/')
     jalaliInt =int(str(jalali).replace('-',''))
     avalibale = farasahmDb['tse'].find_one({'dataInt':jalaliInt})
-    print('start get tse in', jalaliInt,'for sandoq')
     if (date != datetime.datetime.now() and avalibale!=None) == False:
         if date != datetime.datetime.now():
             res = requests.get(url=f'http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d={jalali}')
@@ -284,14 +282,16 @@ def toBillionRial(x):
     
 
 def Apply_Trade_Symbol(group,symbol,date):
-    group['NetPrice_Buy'] = group[group['TradeType']=='Buy']['NetPrice'].sum()
-    group['Volume_Buy'] = group[group['TradeType']=='Buy']['Volume'].sum()
-    group['Price_Buy'] = group['NetPrice_Buy'] / group['Volume_Buy']
-    group['TotalCommission_Buy'] = group[group['TradeType']=='Buy']['TotalCommission'].sum()
-    group['NetPrice_Sell'] = group[group['TradeType']=='Sell']['NetPrice'].sum()
-    group['Volume_Sell'] = group[group['TradeType']=='Sell']['Volume'].sum()
-    group['Price_Sell'] = group['NetPrice_Sell'] / group['Volume_Sell']
-    group['TotalCommission_Sell'] = group[group['TradeType']=='Sell']['TotalCommission'].sum()
+    buy_group = group[group['TradeType'] == 'Buy']
+    sell_group = group[group['TradeType'] == 'Sell']
+    group['NetPrice_Buy'] = buy_group['NetPrice'].sum()
+    group['Volume_Buy'] = buy_group['Volume'].sum()
+    group['Price_Buy'] = group['NetPrice_Buy'] / group['Volume_Buy'].where(group['Volume_Buy'] != 0, 0)
+    group['TotalCommission_Buy'] = buy_group['TotalCommission'].sum()
+    group['NetPrice_Sell'] = sell_group['NetPrice'].sum()
+    group['Volume_Sell'] = sell_group['Volume'].sum()
+    group['Price_Sell'] = group['NetPrice_Sell'] / group['Volume_Sell'].where(group['Volume_Sell'] != 0, 0)
+    group['TotalCommission_Sell'] = sell_group['TotalCommission'].sum()
     tree = group[['Price','Volume','TradeDate','BranchTitle','TradeType','NetPrice','TotalCommission']]
     tree['NetPrice_Buy'] = tree[tree['TradeType']=='Buy']['NetPrice']
     tree['Volume_Buy'] = tree[tree['TradeType']=='Buy']['Volume']
@@ -313,15 +313,16 @@ def Apply_Trade_Symbol(group,symbol,date):
     group['Price_Buy'] = group['Price_Buy'].apply(int)
     group['Price_Sell'] = group['Price_Sell'].apply(int)
     TradeCode = group['TradeCode'][group.index.max()]
+    farasahmDb['assetsCoustomerBroker'].create_index([("TradeCode", pymongo.ASCENDING), ("dateInt", pymongo.ASCENDING)])
     df = pd.DataFrame(farasahmDb['assetsCoustomerBroker'].find({'TradeCode':TradeCode,'dateInt':date}))
     nc = str(TradeCode)[4:]
+    farasahmDb['register'].create_index([("کد ملی", pymongo.ASCENDING), ("تاریخ گزارش", pymongo.ASCENDING)])
     balanceRegister = farasahmDb['register'].find({'کد ملی':int(nc),'نماد کدال':symbol}).sort("تاریخ گزارش", DESCENDING).limit(1)
     balanceRegister = [x for x in balanceRegister]
     if len(balanceRegister)>0:
         group['balanceRegister'] = balanceRegister[0]['سهام کل']
     else:
         group['balanceRegister'] = 0
-
     name = farasahmDb['assetsCoustomerBroker'].find_one({'TradeCode':TradeCode},{'_id':0,'CustomerTitle':1})
     if len(df) == 0:
         group['balance'] = 0
@@ -332,7 +333,6 @@ def Apply_Trade_Symbol(group,symbol,date):
         group['balance'] = 0
     else:
         group['balance'] = int(df['Volume'][df.index.max()])
-    
     if name !=None:
         group['CustomerTitle'] = name['CustomerTitle']
     elif len(balanceRegister)>0:
@@ -351,7 +351,8 @@ def convert_TradeCode_To_name(code):
 
 def drop_duplicet_TradeListBroker(jalaliInt = todayIntJalali()):
     df = pd.DataFrame(farasahmDb['TradeListBroker'].find({"dateInt":jalaliInt},{'_id':0}))
-    df = df.drop_duplicates(subset=['BranchID','MarketInstrumentISIN','NetPrice','Price','TotalCommission','TradeCode','TradeDate','TradeItemBroker','TradeNumber','TradeSymbol','TradeType','Volume'])
+    df = df.drop_duplicates(subset=['NetPrice','Price','TotalCommission','TradeCode','dateInt','TradeNumber','TradeSymbol','TradeType','Volume'])
+    #df = df.drop_duplicates(subset=['BranchID','MarketInstrumentISIN','NetPrice','Price','TotalCommission','TradeCode','TradeDate','TradeItemBroker','TradeNumber','TradeSymbol','TradeType','Volume'])
     if len(df)>0:
         farasahmDb['TradeListBroker'].delete_many({"dateInt":jalaliInt})
         farasahmDb['TradeListBroker'].insert_many(df.to_dict('records'))
@@ -445,40 +446,21 @@ def fund_compare_clu_ccp(group):
     taghsimList = ['ارمغان','هامرز','امین یکم','پارند','آکام','ثابت اکسیژن','نخل','سام','کمند','کارین','رشد','سخند','گنجينه','آفاق','نیلی','همای','ثابت اكسيژن']
     if list(set(group['symbol']))[0] in taghsimList:
         return pd.DataFrame()
-    
-    #group = group[group['taghsim']==False].drop(columns='taghsim')
-    #print(group)
-    #countNeg = len(group[group['changeClosePrice']<0])
-    #if countNeg == 0:
-    #    tagsim_sod = False
-    #else:
-    #    startDate = JalaliIntToGorgia(group['dateInt'].min())
-    #    endDate = JalaliIntToGorgia(group['dateInt'].max())
-    #    diff =( endDate - startDate).days
-#
-    #    tagsim_sod = (diff / countNeg)>29
-    #    print(diff / countNeg,tagsim_sod)
-    #if tagsim_sod:
-    #    return pd.DataFrame()
-    #    group = group.sort_values(by=['dateInt'])
-    #    group['tagsim_sod'] = group['changeClosePrice'].apply(lambda x: x if x < 0 else 0)
-    #    group['tagsim_sod'] = group['tagsim_sod'][::-1].cumsum()[::-1]
-    #    group['tagsim_sod'] = group['tagsim_sod'] * -1
-    #    group['close_price'] = group['tagsim_sod'] + group['close_price']
-    #    group = group.drop(columns=['tagsim_sod'])
     periodList = [7,14,30,90,180,365,730]
     dic = {}
     endDateJalali = group['dateInt'].max()
     endDate = dateIntJalaliToGorgian(endDateJalali)
     endDate = datetime.datetime.strptime(endDate, '%Y-%m-%dT%H:%M:%S')
     for i in periodList:
+
         startDate = endDate - datetime.timedelta(days=i)
         startDateJalali = gorgianIntToJalaliInt(startDate)
         startDateJalali = group[group['dateInt']>=startDateJalali]
         startDateJalali = startDateJalali['dateInt'].min()
         diff_date = dateIntJalaliToGorgian(startDateJalali)
         diff_date = (datetime.datetime.strptime(diff_date, '%Y-%m-%dT%H:%M:%S')  - startDate).days
-        if abs(diff_date)>2:
+
+        if abs(diff_date)>3:
             dic[f'ret_period_{i}'] = 0
             dic[f'ret_ytm_{i}'] = 0
             dic[f'ret_smp_{i}'] = 0
@@ -491,13 +473,8 @@ def fund_compare_clu_ccp(group):
             dic[f'ret_period_{i}'] = int((rate_return_in_period-1) * 10000) / 100
             dic[f'ret_ytm_{i}'] = int(rate_return_yearly_ytm * 10000) / 100
             dic[f'ret_smp_{i}'] = int(rate_return_yearly_smp * 10000) / 100
-        
-
-
-
-    
+            dic['update'] = str(JalaliDate(endDate))
     group = pd.DataFrame([dic])
-
     return group
 
 
@@ -568,15 +545,21 @@ def calculate_past_holidays(row, df):
     else:
         return 0
     
-def fiscal_id_to_number(fiscal_id):
-    result = ''
-    for char in fiscal_id:
-        if str.isdigit(char):
-            result += char
-        else:
-            result += str(ord(char))
+def generatIdInternal(idstr):
+    return random.randint(100,999)
+    lst = farasahmDb['idintrnalMoadian'].find({"id":idstr})
+    lst = [x for x in lst]
+    if len(lst) == 0:
+        result = 1
+    else:
+        lst = [x["idintrnal"] for x in lst]
+        result = max(lst) + 1
+    farasahmDb['idintrnalMoadian'].insert_one({'id':idstr,'idintrnal':result})
     return result
 
+
+
+##########
 
 MULTIPLICATION_TABLE = [
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -604,6 +587,7 @@ PERMUTATION_TABLE = [
 
 INVERSE_TABLE = [0, 4, 3, 2, 1, 5, 6, 7, 8, 9]
 
+
 def checkSum(number):
     c = 0
     len_ = len(number)
@@ -613,7 +597,31 @@ def checkSum(number):
     return INVERSE_TABLE[c]
 
 
+def validate(number):
+    c = 0
+    len = len(number)
+    for i in range(len):
+        c = MULTIPLICATION_TABLE[c][PERMUTATION_TABLE[(
+            i % 8)][int(number[len - i - 1]) - 0]]
+    return c == 0
+
+
+
+
+def fiscal_id_to_number(fiscal_id):
+    result = ''
+    for char in fiscal_id:
+        if str.isdigit(char):
+            result += char
+        else:
+            result += str(ord(char))
+    return result
+
 def generate_tax_id(fiscal_id, date, internal_invoice_id):
+    dt = str(date).split("-")
+    dt =[int(x) for x in dt]
+    gorgian = JalaliDate(dt[0], dt[1], dt[2]).to_gregorian()
+    date = datetime.datetime(gorgian.year,gorgian.month,gorgian.day)
     days_past_epoch = (date.date() - datetime.datetime(1970, 1, 1).date()).days
     days_past_epoch_padded = str(days_past_epoch).rjust(6, "0")
     hex_days_past_epoch_padded = str(f'{days_past_epoch:x}').rjust(5, "0")
@@ -626,22 +634,6 @@ def generate_tax_id(fiscal_id, date, internal_invoice_id):
     checksum = checkSum(decimal_invoice_id)
     return (fiscal_id + str(hex_days_past_epoch_padded) + str(hex_internal_invoice_id_padded) + str(checksum)).upper()
 
-
-
-def generatIdInternal(idstr):
-    lst = farasahmDb['idintrnalMoadian'].find({"id":idstr})
-    lst = [x for x in lst]
-    if len(lst) == 0:
-        result = str(1)
-    else:
-        lst = [x["idintrnal"] for x in lst]
-        result = str(len(lst) + 1)
-    lens = len(result)
-    addlens = 10 - lens
-    addlens = '0' * addlens
-    result = addlens + result
-    farasahmDb['idintrnalMoadian'].insert_one({'id':idstr,'idintrnal':result})
-    return result
 
 
 

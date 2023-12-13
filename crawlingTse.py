@@ -103,7 +103,7 @@ class TseCrawling:
         print('get_all_fund')
         list_fund = self.fund_list()
 
-        self.getHistoriPriceByFullName("صندوق س خاتم ايساتيس پويا-ثابت","خاتم","type")
+        self.getHistoriPriceByFullName("صندوق س خاتم ايساتيس پويا-ثابت","خاتم","sabet")
         for i in list_fund:
             count_try = 0
             while count_try < 5:

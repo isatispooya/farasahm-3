@@ -430,6 +430,7 @@ def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJal
         df['DateYrInt'] = doDay[0]
         df['DateMnInt'] = doDay[1]
         df['DateDyInt'] = doDay[2]
+        print(doDay[0],doDay[1],doDay[2],page,'broker start')
         df['dateInt'] = df['TradeDate'].apply(Fnc.dateStrToIntJalali)
         df['page'] = page
         for i in ['NetPrice','Price','TotalCommission','Volume']:
@@ -438,15 +439,11 @@ def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJal
         df['TradeSymbolAbs'] = df['TradeSymbol'].apply(Fnc.remove_non_alphanumeric)
         df = df.set_index('TradeSymbolAbs').join(symbolList.set_index('نماد'))
         df = df.reset_index()
-        dff = farasahmDb['TradeListBroker'].find_one({'DateYrInt':doDay[0],'DateMnInt':doDay[1],'DateDyInt':doDay[2]})
-        df = pd.concat([dff,df])
-        df = df.drop_duplicates(subset=['TradeCode','TradeDate','TradeNumber','TradeSymbolAbs','NetPrice'])
+        print(doDay[0],doDay[1],doDay[2],page,'broker end')
         df = df.to_dict('records')
-        farasahmDb['TradeListBroker'].delete_many({'DateYrInt':doDay[0],'DateMnInt':doDay[1],'DateDyInt':doDay[2]})
         farasahmDb['TradeListBroker'].insert_many(df)
-        print(doDay[0],doDay[1],doDay[2],page,'broker')
+        Fnc.drop_duplicet_TradeListBroker(DateInt)
         page = page + 1
-    Fnc.drop_duplicet_TradeListBroker(DateInt)
     get_asset_customer(DateInt)
 
 
