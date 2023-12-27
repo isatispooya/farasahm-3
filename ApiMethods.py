@@ -399,7 +399,9 @@ def get_asset_customer(today = Fnc.todayIntJalali()):
     symbols = ['ویسا','بازرگام','خاتم']
     for symbol in symbols:
         print('get assets customer', symbol)
-        df = farasahmDb['TradeListBroker'].find({"dateInt":today,"TradeSymbolAbs":symbol})
+        today = farasahmDb['TradeListBroker'].distinct('dateInt')
+        today = max(today)
+        df = farasahmDb['TradeListBroker'].find({"dateInt":today,"TradeSymbol":symbol+'1'})
         df = pd.DataFrame(df)
         if len(df)>0:
             df = df.drop_duplicates(subset='TradeCode')

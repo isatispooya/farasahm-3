@@ -4,7 +4,9 @@ import ApiMethods
 from dataManagment import desk_broker_volumeTrade_cal, desk_broker_turnover_cal
 
 while True:
-        ApiMethods.GetAllTradeInDate()
+        toDay = Fnc.toDayJalaliListYMD()
+        toDayIntJal = Fnc.todayIntJalali()
+        ApiMethods.GetAllTradeInDate(toDay,toDayIntJal)
         desk_broker_volumeTrade_cal()
         desk_broker_turnover_cal()
         ApiMethods.get_asset_funds()

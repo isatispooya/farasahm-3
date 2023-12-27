@@ -284,7 +284,6 @@ def getcompare(data):
     etfs = pd.DataFrame(farasahmDb['sandoq'].find({'type':'sabet'},{'_id':0}))
     ts = etfs[etfs['symbol']=='خاتم']
     ts = ts.sort_values(by=['dateInt'],ascending=False)
-    print(ts)
 
     etfs = etfs.groupby(by='symbol').apply(Fnc.fund_compare_clu_ccp)
     etfs = etfs.reset_index().drop(columns=['level_1'])
@@ -1890,9 +1889,10 @@ def getcompanymoadian(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    df = pd.DataFrame(farasahmDb['companyMoadian'].find({},{'_id':0,'key':0,'symbol':0}))
-    df['date'] = df['date'].apply(Fnc.gorgianIntToJalaliInt)
-    df['key'] = '*'*10
+    df = pd.DataFrame(farasahmDb['companyMoadian'].find({'symbol':symbol},{'_id':0,'key':0,'symbol':0}))
+    if len(df) == 0:
+        df['date'] = df['date'].apply(Fnc.gorgianIntToJalaliInt)
+        df['key'] = '*'*10
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
 
@@ -1905,7 +1905,7 @@ def delcompanymoadian(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     row = data['row']
-    farasahmDb['companyMoadian'].delete_many({'idNum':row['idNum'],'name':row['name']})
+    farasahmDb['companyMoadian'].delete_many({'idNum':row['idNum'],'name':row['name'],'symbol':symbol})
     return json.dumps({'reply':True})
 
 def getlistcompanymoadian(data):
@@ -1916,7 +1916,7 @@ def getlistcompanymoadian(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    df = pd.DataFrame(farasahmDb['companyMoadian'].find({},{'_id':0,'name':1,'idNum':1})).to_dict('records')
+    df = pd.DataFrame(farasahmDb['companyMoadian'].find({'symbol':symbol},{'_id':0,'name':1,'idNum':1})).to_dict('records')
     if len(df)==0:
         return json.dumps({'reply':False,'msg':'هیچ شرکتی ثبت نشده'})
     return json.dumps({'reply':True,'df':df})
@@ -1937,7 +1937,6 @@ def saveinvoce(data):
     if sellerDic == None:
         return json.dumps({'reply':False,'msg':'فروشنده یافت نشد'})
     bodyDf = pd.DataFrame(invoceData['body'])
-    print(bodyDf)
 
     bodyDf['sumBeforOff'] = bodyDf['sumBeforOff'].apply(int)
     bodyDf['off'] = bodyDf['off'].apply(int)
@@ -2066,7 +2065,7 @@ def getdiffassetamarydash(data):
     bank = bank['balance'].sum()
     allRegistered = int(asset) + int(bank)
     allAmary = int(dic['navAmary']) * int(dic['countunit'])
-    return json.dumps({'reply':True,'lab':{'ارزش ثبت شده':'ارزش ثبت شده','ارزش کل':'ارزش کل'},'val':{'ارزش ثبت شده':allRegistered,'ارزش کل':allAmary}})
+    return json.dumps({'reply':True,'lab':{'ارزش ثبت شده':'ارزش ثبت شده','آماری سایت':'آماری سایت'},'val':{'ارزش ثبت شده':allRegistered,'آماری سایت':allAmary}})
 
 
 def getdiffnavprc(data):
@@ -2212,6 +2211,8 @@ def getrateassetfixincom(data):
 
 
 def getpotentialcoustomer(data):
+    start_time = time.time()
+
     access = data['access'][0]
     symbol = data['access'][1]
     symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
@@ -2219,12 +2220,14 @@ def getpotentialcoustomer(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    
+    start_time = time.time()
+
     df = pd.DataFrame(farasahmDb['assetCoustomerOwnerFix'].find({},{'_id':0,'CustomerTitle':1,'MarketInstrumentTitle':1,'Symbol':1,'Volume':1,'VolumeInPrice':1,'dateInt':1,'TradeCode':1}))
     conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
     symbolTarget = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'TradeSymbol':1}))
     symbolTarget = symbolTarget.drop_duplicates()['TradeSymbol'].to_list()
     df['target'] = df['Symbol'].isin(symbolTarget)
+    start_time = time.time()
     df = df.groupby(by='TradeCode').apply(Fnc.grouppotential)
     df = df.reset_index().drop(columns=['TradeCode','level_1'])
     df = df.to_dict('records')
@@ -2341,7 +2344,20 @@ def calcincass(data):
             increaseCro = increaseCro - balance
             if balance > 0:
                 df['approve'][i] = balance
+        
+        elif i == 'gov':
+            value = df['value'][i]
+            limit = int((df['value'].sum() + increase) * 0.35)
+            limit = limit - value
+            if limit >= increaseCro:
+                balance  = increaseCro
+            else:
+                balance = limit
+            increaseCro = increaseCro - balance
+            if balance > 0:
+                df['approve'][i] = balance
 
+                
         else:
             balance  = increaseCro
             increaseCro = 0
@@ -2432,13 +2448,36 @@ def getretassfix(data):
     bank['rate'] = bank['rate'].apply(float)
     bank['balance'] = bank['balance'].apply(float)
     bank['rate'] = bank['rate'] / 100
-    bank = round((bank['rate'] * bank['balance']).sum() / bank['balance'].sum(),3)*100
-    asset = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},{'_id':0}))
-    asset = asset[asset['date']==asset['date'].max()]
-    for i in asset.index:
-        sym = asset['MarketInstrumentTitle'][i]
-        dfSym = pd.DataFrame(farasahmDb['tse'].find({'نام':sym}))
-    dic = {'bank':bank}
+    bank = int(((bank['rate'] * bank['balance']).sum() / bank['balance'].sum())*1000)/10
+
+    df = pd.DataFrame(farasahmDb['oraghYTM'].find({},{'_id':0,'بازده ساده':0}))
+    lastUpdate = df['update'].max()
+    df = df.fillna(0)
+    per1Month = Fnc.JalaliIntToGorgia(lastUpdate) - datetime.timedelta(days=30)
+    per1Month = int(str(Fnc.gorgianIntToJalali(per1Month)).replace('-',''))
+    df = df[df['update']==lastUpdate]
+    df['owner'] = df['نماد'].apply(Fnc.setTypeOraghBySymbol)
+    tse = pd.DataFrame(farasahmDb['tse'].find({'dataInt':{'$gt':int(per1Month)}},{'نماد':1,'حجم':1,'_id':0,'dataInt':1}))
+    tse = tse.groupby(by=['نماد']).apply(Fnc.tseGrpByVol)
+    tse = tse.drop(columns=['dataInt','نماد'])
+    tse = tse.reset_index()
+    tse = tse.drop(columns=['level_1'])
+    tse = tse.set_index('نماد')
+    df = df.set_index('نماد')
+    df = df.join(tse,how='left')
+    df = df[['YTM', 'owner', 'mean']].dropna()
+
+    gov = df[df['owner']=='gov']
+    gov = gov.sort_values(by='mean', ascending=False).head(10)['YTM'].mean()
+    gov = round(gov,1)
+
+    nongov = df[df['owner']=='non-gov']
+    nongov = nongov.sort_values(by='mean', ascending=False).head(10)['YTM'].mean()
+    nongov = round(nongov,1)
+
+    print(df)
+
+    dic = {'bank':bank,'gov':gov,'nongov':nongov}
 
     
-    return json.dumps({'reply':True})
+    return json.dumps({'reply':True,'dic':dic})

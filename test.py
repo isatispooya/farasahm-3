@@ -1,6 +1,6 @@
 import pandas as pd
 import pymongo
-from ApiMethods import GetCustomerMomentaryAssets
+from ApiMethods import GetCustomerMomentaryAssets, get_asset_customer
 import datetime
 import Fnc
 import time
@@ -9,4 +9,4 @@ farasahmDb = client['farasahm2']
 
 
 
-farasahmDb['sandoq'].update_many({'symbol':'خاتم'},{"$set":{"type":"sabet"}})
+get_asset_customer()
