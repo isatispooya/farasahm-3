@@ -582,11 +582,12 @@ def addcapitalincrease(data):
                 dff = pd.concat([dff,semiDf])
             dff = dff.fillna(method='ffill').reset_index().drop(columns=['index'])
             dff['حق تقدم استفاده شده'] = 0
+            dff['enable'] = True
 
             dff = dff.to_dict('records')
             farasahmDb['Priority'].insert_many(dff)
             dic = {'date':str(JalaliDate(datetime.datetime.fromtimestamp(int(data['dateSelection'])/1000))).replace('-','/'),
-                   'newCount':int(data['data']['cuont']),'newCapitalIns':int(data['data']['capital']),'symbol':symbol,'methode':data['data']['methode'],'rate':grow*100}
+                   'newCount':int(data['data']['cuont']),'newCapitalIns':int(data['data']['capital']),'symbol':symbol,'methode':data['data']['methode'],'rate':grow*100, 'enable':True}
             farasahmDb['capitalIns'].insert_one(dic)
     return json.dumps({'replay':True})
 
@@ -652,7 +653,9 @@ def setpayprority(data):
 
 def getprioritypay(data):
     symbol = data['access'][1]
-    df = pd.DataFrame(farasahmDb['PriorityPay'].find({'symbol':symbol},{'_id':0,'symbol':0}))
+    df = pd.DataFrame(farasahmDb['PriorityPay'].find({'symbol':symbol, 'capDate':data['date']},{'_id':0,'symbol':0}))
+    if len(df) ==0:
+         return json.dumps({'replay':False,'msg':'یافت نشد'})
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df})
 

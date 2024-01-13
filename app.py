@@ -198,6 +198,11 @@ def getpotentialcoustomer():
     data = request.get_json()
     return report.getpotentialcoustomer(data)
 
+@app.route('/getreturnasset',methods = ['POST', 'GET'])
+def getreturnasset():
+    data = request.get_json()
+    return report.getreturnasset(data)
+
 @app.route('/getcompare',methods = ['POST', 'GET'])
 def getcompare():
     data = request.get_json()

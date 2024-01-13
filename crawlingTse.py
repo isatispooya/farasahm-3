@@ -73,11 +73,13 @@ class TseCrawling:
         df = self.driver.find_element(By.XPATH, "/html/body/div/div/div[2]/div[3]/div[1]/div[2]/div[4]").click()
         time.sleep(5)
         dir = os.listdir(self.download_path)
-        df = pd.read_csv('download/'+dir[0])
+        df = pd.read_csv('download/'+dir[0], encoding='latin-1', usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+        # اختصاص دادن نام به ستون‌های DataFrame
+        df.columns = ['<TICKER>', 'date', 'first_price', 'highest_price', 'lowest_price', 'close_price', 'trade_value', 'trade_volume', 'trade_number', '<PER>', 'first_price', 'final_price']
         for file_name in dir:
             file_path = os.path.join(self.download_path, file_name)
             os.remove(file_path)
-        df.columns = ['<TICKER>', 'date', 'first_price', 'highest_price', 'lowest_price', 'close_price','trade_value', 'trade_volume', 'trade_number', '<PER>', 'first_price', 'final_price']
+        df.columns = ['<TICKER>', 'date', 'first_price', 'highest_price', 'lowest_price', 'close_price', 'trade_value', 'trade_volume', 'trade_number', '<PER>', 'first_price', 'final_price']
         df = df[['highest_price','lowest_price','final_price','close_price','first_price','trade_value','trade_volume','trade_number','date']]
         df['dateInt'] = [Fnc.gorgianIntToJalaliInt(x) for x in df['date']]
         df['date'] = df['dateInt']

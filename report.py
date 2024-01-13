@@ -873,10 +873,16 @@ def getcapitalincrease(data):
 
 def getpriority(data):
     symbol = data['access'][1]
-    df = pd.DataFrame(farasahmDb['Priority'].find({'symbol':symbol},{'enable':0}))
-    dfPay = pd.DataFrame(farasahmDb['PriorityPay'].find({"symbol":symbol},{'enable':0}))
-    dfPay = dfPay.groupby(by=['frm']).sum(numeric_only=True)
-    df = df.set_index('نام و نام خانوادگی').join(dfPay).fillna(0)
+    datePriority = data['datePriority']
+    df = pd.DataFrame(farasahmDb['Priority'].find({'symbol':symbol,'تاریخ':datePriority},{'enable':0}))
+    dfPay = pd.DataFrame(farasahmDb['PriorityPay'].find({"symbol":symbol,'capDate':datePriority},{'enable':0}))
+    if len(dfPay)>0:
+        dfPay = dfPay.groupby(by=['frm']).sum(numeric_only=True)
+        df = df.set_index('نام و نام خانوادگی').join(dfPay).fillna(0)
+    else:
+        df['popUp'] = 0
+        df['value'] = 0
+
     df = df.rename(columns={"popUp":"تعداد واریز","value":"ارزش واریز"})
     df = df.reset_index()
     df['_id'] = df['_id'].astype(str)
@@ -889,11 +895,9 @@ def getpriority(data):
 
 def getprioritytransaction(data):
     symbol = data['access'][1]
-    df = pd.DataFrame(farasahmDb['PriorityTransaction'].find({'symbol':symbol},{'popUp':0,'symbol':0}))
+    df = pd.DataFrame(farasahmDb['PriorityTransaction'].find({'symbol':symbol, 'capDate':data['date']},{'popUp':0,'symbol':0}))
     if len(df)==0:
         return json.dumps({'replay':False,'msg':'تراکنشی یافت نشد'})
-    
-    
     df['_id'] = df['_id'].apply(str)
     df['date'] = df['date'].apply(JalaliDate.to_jalali)
     df['date'] = df['date'].apply(str)
@@ -2223,6 +2227,7 @@ def getpotentialcoustomer(data):
     start_time = time.time()
 
     df = pd.DataFrame(farasahmDb['assetCoustomerOwnerFix'].find({},{'_id':0,'CustomerTitle':1,'MarketInstrumentTitle':1,'Symbol':1,'Volume':1,'VolumeInPrice':1,'dateInt':1,'TradeCode':1}))
+    df = df.drop_duplicates()
     conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
     symbolTarget = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'TradeSymbol':1}))
     symbolTarget = symbolTarget.drop_duplicates()['TradeSymbol'].to_list()
@@ -2230,6 +2235,7 @@ def getpotentialcoustomer(data):
     start_time = time.time()
     df = df.groupby(by='TradeCode').apply(Fnc.grouppotential)
     df = df.reset_index().drop(columns=['TradeCode','level_1'])
+
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
 
@@ -2475,9 +2481,50 @@ def getretassfix(data):
     nongov = nongov.sort_values(by='mean', ascending=False).head(10)['YTM'].mean()
     nongov = round(nongov,1)
 
-    print(df)
 
     dic = {'bank':bank,'gov':gov,'nongov':nongov}
 
     
     return json.dumps({'reply':True,'dic':dic})
+
+
+
+def getreturnasset(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol},{'_id':0,"name":1,'balance':1,'num':1,'rate':1}))
+    df = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},{'_id':0,"MarketInstrumentTitle":1,'Symbol':1,'VolumeInPrice':1,'date':1,'type':1}))
+    df =df[df['date'] == df['date'].max()]
+    df = df[['MarketInstrumentTitle','Symbol','VolumeInPrice','type']]
+    df['rate'] = 0
+    bank = bank.rename(columns={'name':'MarketInstrumentTitle','balance':'VolumeInPrice','num':'Symbol'})
+    bank['type'] = 'bank'
+    bank = bank.replace('','1')
+    df = pd.concat([df,bank])
+    for i in df.index:
+        typ = df['type'][i]
+        if typ in ['non-gov','gov']:
+            sym = df['Symbol'][i]
+            sym = sym[:-1]
+            orq = pd.DataFrame(farasahmDb['oraghYTM'].find({'نماد':sym}))
+            if len(orq)>0:
+                orq = orq[orq['تاریخ آخرین روز معاملاتی'] == orq['تاریخ آخرین روز معاملاتی'].max()]
+                YTM = orq['YTM'].mean()
+                df['rate'][i] = YTM
+    df['VolumeInPrice'] = df['VolumeInPrice'].apply(int)
+    df['rate'] = df['rate'].apply(float)
+    df['retn'] = df['VolumeInPrice'] * df['rate']
+    retn = df['retn'].sum() / df['VolumeInPrice'].sum()
+    df['rate'] = df['rate'] *100
+    df['rate'] = df['rate'].apply(int)
+    df['rate'] = df['rate'] / 100
+    retn = retn *100
+    retn = int(retn)/100
+    df = df[['MarketInstrumentTitle','Symbol','VolumeInPrice','rate']]
+    df = df.to_dict('records')
+    return json.dumps({'reply':True, 'df':df,'retn':retn})
