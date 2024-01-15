@@ -407,6 +407,7 @@ def getshareholders(data):
     df= df[df['date']==df['date'].max()]
     df = df[['نام و نام خانوادگی','کد ملی','نام پدر','تعداد سهام','شماره تماس','_id']]
     df = df.sort_values(by=['تعداد سهام'], ascending=False)
+    df = df.drop_duplicates(subset=['کد ملی'])
     df['شماره تماس'] = df['شماره تماس'].fillna('')
     df['کد ملی'] = df['کد ملی'].fillna('')
     df['نام پدر'] = df['نام پدر'].fillna('')
@@ -907,14 +908,14 @@ def getprioritytransaction(data):
 
 
 def preemptioncard(data):
-    dt = farasahmDb['Priority'].find_one({'symbol':data['sym'],'کد ملی':data['nc']},{'_id':0,'تعداد سهام':0})
+    dt = farasahmDb['Priority'].find_one({'symbol':data['sym'],'کد ملی':data['nc'],'تاریخ':"1402/10/13"},{'_id':0,'تعداد سهام':0})
     if dt == None:return json.dumps({'replay':False})
     return json.dumps({'replay':True})
 
 
 
 def preemptioncardjpg(data):
-    dt = farasahmDb['Priority'].find_one({'symbol':data['sym'],'کد ملی':data['nc']},{'_id':0})
+    dt = farasahmDb['Priority'].find_one({'symbol':data['sym'],'کد ملی':data['nc'], 'تاریخ':"1402/10/13"},{'_id':0})
     saham = farasahmDb['registerNoBours'].find_one({'کد ملی':data['nc'],'symbol':data['sym']})
     if dt == None:return json.dumps({'replay':False})
     a4_width, a4_height = int(210 * 3.779527559), int(297 * 3.779527559)
@@ -939,11 +940,14 @@ def preemptioncardjpg(data):
     y_position_text = y_position_logo + logo_height_new + 25 
     text_color = (0, 0, 0)
     draw.text((x_position_text, y_position_text), textRow1, fill=text_color, font=font)
-    textRow2 = 'بنا به تصمیم مجمع عمومی فوق العاده مورخ 1401/08/09 شرکت مبنی بر افزایش سرمایه شرکت از '+ digits.en_to_fa('2000000000000')+ ' ريال \n'
-    textRow2 = textRow2 + digits.to_word(2000000000000) + ' به ' + digits.en_to_fa('6000000000000')  +  digits.to_word(6000000000000) + ' ریال ،' + ' شما میتوانید از حق تقدم خود معادل ' + digits.en_to_fa(str(dt['حق تقدم'])) + ' سهم به ارزش اسمی \n' 
+    textRow2 = 'بنا به تصمیم هیات مدیره شرکت و تفویض اختیار مصوبه ی مجمع فوق العاده مبنی بر افزایش سرمایه شرکت' + '\n'
+    textRow2 = textRow2 + 'از' + digits.en_to_fa('5293454025000')+ ' ريال ،'
+    textRow2 = textRow2 + 'پنج هزار و دویست و نود و سه میلیارد و چهارصد و پنجاه و چهار میلیون و پانصد و هزار و دویست و پنجاه' +'\n' #digits.to_word(5293454025000) + '\n'
+    textRow2 = textRow2 + ' به ' + digits.en_to_fa('8257788279000') + 'هشت هزار و دویست و پنجاه و هفت میلیارد و هفتصد و هشتاد و هشت میلیون و دویست و هفتاد و هشت هزار و دویست و نود' + ' ریال ' + '\n' #+  digits.to_word(8257788279000) + ' ریال ' + '\n'
+    textRow2 = textRow2 + ' شما میتوانید از حق تقدم خود معادل ' + digits.en_to_fa(str(dt['حق تقدم'])) + ' سهم به ارزش اسمی \n' 
     textRow2 = textRow2 + digits.en_to_fa('1000') + ' ریال استفاده نمایید.'  + ' لذا خواهشمند است با توجه به مصوبات موجود که مبلغ ' + digits.en_to_fa(str(int(dt['حق تقدم'])*1000)) + ' ریال به صورت آورده' + '\n'
-    textRow2 = textRow2 + ' نقدی طبق اعلامیه پذیرش نویسی در روز نامه پیمان یزد به شماره 5848 مورخ 1402/04/21 و به مدت ' + digits.en_to_fa('60') 
-    textRow2 = textRow2 + '\n' + ' روز نسبت به استفاده' + ' حق تقدم و پذیره نویسی تا تاریخ 1402/06/19 اقدام نمایید.'
+    textRow2 = textRow2 + ' نقدی طبق اعلامیه پذیرش نویسی در روز نامه پیمان یزد به شماره 5848 مورخ 1402/10/14 و به مدت ' + digits.en_to_fa('60') 
+    textRow2 = textRow2 + '\n' + ' روز نسبت به استفاده' + ' حق تقدم و پذیره نویسی تا تاریخ 1402/12/13 اقدام نمایید.'
     textRow2 = arabic_reshaper.reshape(textRow2)
     textRow2 = get_display(textRow2)
     font = ImageFont.truetype(font_path, font_size)
@@ -951,12 +955,12 @@ def preemptioncardjpg(data):
     x_position_text = (a4_width - text_width) - 30
     y_position_text = y_position_logo + logo_height_new + 55
     draw.text((x_position_text, y_position_text), textRow2, fill=text_color, font=font,align='right')
-    textRow3 = 'بنابر این مبلغ ....................... ريال بر اساس فیش نقدی به شماره ................بانک صادرات حساب شماره \n 0116875409002 به نام شرکت صنایع مفتول ایساتیس پویا به پیوست ارائه میگردد.'
+    textRow3 = 'بنابر این مبلغ ....................... ريال بر اساس فیش نقدی به شماره ................بانک توسعه صادرات حساب شماره \n 0200054690004 و شماره شبای IR270200000000200054690004 به نام شرکت صنایع مفتول ایساتیس پویا \n به پیوست ارائه میگردد.'
     textRow3 = arabic_reshaper.reshape(textRow3)
     textRow3 = get_display(textRow3)
     text_width, text_height = draw.textsize(textRow3, font=font)
     x_position_text = (a4_width - text_width) - 50
-    y_position_text = y_position_logo + logo_height_new + 160
+    y_position_text = y_position_logo + logo_height_new + 190
     draw.text((x_position_text, y_position_text), textRow3, fill=text_color, font=font,align='right')
     textRow3 = 'امضا'
     textRow3 = arabic_reshaper.reshape(textRow3)
@@ -1828,6 +1832,9 @@ def getpriceforward(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    date = Fnc.timestumpToJalalInt(data['date'])
+    
+    print(date)
     df = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'dateInt':1,'final_price':1}))
     lastUpdate = df['dateInt'].max()
     df = df[df['dateInt']==lastUpdate]

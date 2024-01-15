@@ -149,6 +149,18 @@ def GenerateDatetime(yr,mn,dy,hr,mi):
     fromDate = datetime.datetime(fromJalali[0],fromJalali[1],fromJalali[2],int(hr),int(mi))
     return fromDate.strftime("%Y-%m-%dT%H:%M:%S")
 
+def GenerateDatetime2(date):
+    date = str(date)
+    yr = int(date[:4])
+    mn = int(date[4:6])
+    dy = int(date[6:8])
+    
+    fromJalali = JalaliDate(yr, mn, dy).to_gregorian()
+    fromJalali = str(fromJalali).split('-')
+    fromJalali = [int(x) for x in fromJalali]
+    fromDate = datetime.datetime(fromJalali[0],fromJalali[1],fromJalali[2],int(12),int(00))
+    return fromDate
+
 def GenerateDate(yr,mn,dy):
     fromDate = JalaliDate(yr, mn, dy).to_gregorian()
     return fromDate.strftime("%Y-%m-%d")
@@ -443,7 +455,7 @@ def fund_compare_clu_ccp(group):
     group['changeClosePrice'] = group['changeClosePrice'].fillna(0)
     group['changeClosePriceRatre'] = group['changeClosePrice'] / group['close_price']
     group['changeClosePriceRatre'] = group['changeClosePriceRatre'].fillna(0)
-    taghsimList = ['ارمغان','هامرز','امین یکم','پارند','آکام','ثابت اکسیژن','نخل','سام','کمند','کارین','رشد','سخند','گنجينه','آفاق','نیلی','همای','ثابت اكسيژن']
+    taghsimList = ['ارمغان','هامرز','امین یکم','پارند','آکام','ثابت اکسیژن','نخل','سام','کمند','کارین','رشد','سخند','گنجينه','آفاق','نیلی','همای','ثابت اكسيژن','كمند','آكام','نيلي','هماي']
     if list(set(group['symbol']))[0] in taghsimList:
         return pd.DataFrame()
     periodList = [7,14,30,90,180,365,730]
@@ -460,6 +472,12 @@ def fund_compare_clu_ccp(group):
         diff_date = dateIntJalaliToGorgian(startDateJalali)
         diff_date = (datetime.datetime.strptime(diff_date, '%Y-%m-%dT%H:%M:%S')  - startDate).days
 
+        st_dif = GenerateDatetime2(startDateJalali)
+        ed_dif = GenerateDatetime2(endDateJalali)
+        dif = ed_dif - st_dif
+        dif = dif.days
+        
+
         if abs(diff_date)>3:
             dic[f'ret_period_{i}'] = 0
             dic[f'ret_ytm_{i}'] = 0
@@ -468,8 +486,8 @@ def fund_compare_clu_ccp(group):
             end_price = group[group['dateInt'] == endDateJalali]['close_price'].values[0]
             start_price = group[group['dateInt'] == startDateJalali]['close_price'].values[0]
             rate_return_in_period = end_price / start_price
-            rate_return_yearly_ytm = (rate_return_in_period ** (365/i)-1)
-            rate_return_yearly_smp = (rate_return_in_period - 1) * (365/i)
+            rate_return_yearly_ytm = (rate_return_in_period ** (365/dif)-1)
+            rate_return_yearly_smp = (rate_return_in_period - 1) * (365/dif)
             dic[f'ret_period_{i}'] = int((rate_return_in_period-1) * 10000) / 100
             dic[f'ret_ytm_{i}'] = int(rate_return_yearly_ytm * 10000) / 100
             dic[f'ret_smp_{i}'] = int(rate_return_yearly_smp * 10000) / 100
@@ -714,3 +732,22 @@ def resultToError(data):
             return ''
     except:
         return ''
+    
+
+def dateSlashToInt(date):
+    date = str(date).replace('/','')
+    return int(date)
+
+
+def separate_string(input_str):
+    # چک کنید که طول ورودی کافی است یا نه
+    if len(input_str) < 3:
+        return "ورودی باید حداقل 3 کاراکتر داشته باشد."
+    
+    # جدا کردن هر سه کاراکتر از راست و قرار دادن آنها در یک لیست
+    separated_chars = [input_str[i:i+3] for i in range(len(input_str)-1, -1, -3)]
+    
+    # تبدیل لیست به رشته با جداکننده ","
+    result_string = ",".join(separated_chars[::-1])
+    
+    return result_string
