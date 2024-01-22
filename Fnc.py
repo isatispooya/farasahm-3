@@ -677,18 +677,29 @@ def retnFixInByPrd(group):
 
 
 def grouppotential(group):
-    if len(group[group['target']==True]) == 0:
-        return pd.DataFrame()
     group = group[group['dateInt']==group['dateInt'].max()]
-    group['lenTarget'] = len(group[group['target']==True])
+    group['lenTarget'] = len(group)
     group['_children'] = [group[['Symbol','MarketInstrumentTitle','Volume','VolumeInPrice']].to_dict('records')]*len(group)
-    group['len'] = len(group)
     group['VolumeInPrice'] = group['VolumeInPrice'].apply(int).sum()
-    group['VolumeInPriceTarget'] = (group['VolumeInPrice'] * group['target']).sum()
-    group = group[['CustomerTitle','dateInt','_children','len','VolumeInPrice','lenTarget','VolumeInPriceTarget']]
+    group = group[['CustomerTitle','dateInt','_children','VolumeInPrice','lenTarget']]
     group = group[group.index==group.index.min()]
     return group
 
+def grouppotentialNoChild(group):
+    group = group[group['dateInt']==group['dateInt'].max()]
+    group['lenTarget'] = len(group)
+    group['VolumeInPrice'] = group['VolumeInPrice'].apply(int).sum()
+    group = group[['CustomerTitle','dateInt','VolumeInPrice','lenTarget']]
+    group = group[group.index==group.index.min()]
+    return group
+
+def grouppotentialSymbol(group):
+    group = group[group['dateInt']==group['dateInt'].max()]
+    group['lenTarget'] = len(group)
+    group['VolumeInPrice'] = group['VolumeInPrice'].apply(int).sum()
+    group = group[['dateInt','VolumeInPrice','lenTarget']]
+    group = group[group.index==group.index.min()]
+    return group
 
 def resultToUid(data):
     if data == None:
@@ -751,3 +762,10 @@ def separate_string(input_str):
     result_string = ",".join(separated_chars[::-1])
     
     return result_string
+
+
+
+def assetByLastDate(group):
+    group = group[group['dateInt'] == group['dateInt'].max()]
+    print(group)
+    return group

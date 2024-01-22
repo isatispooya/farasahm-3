@@ -4,9 +4,6 @@ import json
 from flask_cors import CORS
 import pymongo
 import warnings
-import datetime
-import random
-from cryptography.fernet import Fernet
 import winreg as reg
 from waitress import serve
 import dataManagment
@@ -151,7 +148,6 @@ def getbroker():
     data = request.get_json()
     return report.getbroker(data)
 
-
 @app.route('/getstockman',methods = ['POST', 'GET'])
 def getstockman():
     data = request.get_json()
@@ -177,7 +173,6 @@ def getdetailstrade():
     data = request.get_json()
     return report.getdetailstrade(data)
 
-
 @app.route('/getnav',methods = ['POST', 'GET'])
 def getnav():
     data = request.get_json()
@@ -198,10 +193,25 @@ def getpotentialcoustomer():
     data = request.get_json()
     return report.getpotentialcoustomer(data)
 
+@app.route('/dashpotantialsymbol',methods = ['POST', 'GET'])
+def dashpotantialsymbol():
+    data = request.get_json()
+    return report.dashpotantialsymbol(data)
+
 @app.route('/getreturnasset',methods = ['POST', 'GET'])
 def getreturnasset():
     data = request.get_json()
     return report.getreturnasset(data)
+
+@app.route('/staticownerincomp',methods = ['POST', 'GET'])
+def staticownerincomp():
+    data = request.get_json()
+    return report.staticownerincomp(data)
+
+@app.route('/saverateretasst',methods = ['POST', 'GET'])
+def saverateretasst():
+    data = request.get_json()
+    return report.saverateretasst(data)
 
 @app.route('/getcompare',methods = ['POST', 'GET'])
 def getcompare():
@@ -684,6 +694,11 @@ def desk_broker_turnover():
     data = request.get_json()
     return report.desk_broker_turnover(data)
 
+@app.route('/getratretasst',methods = ['POST', 'GET'])
+def getratretasst():
+    data = request.get_json()
+    return report.getratretasst(data)
+
 @app.route('/desk/getinfocode',methods = ['POST', 'GET'])
 def desk_getinfocode():
     data = request.get_json()
@@ -693,6 +708,11 @@ def desk_getinfocode():
 def desk_sabad_addcodetrader():
     data = request.get_json()
     return report.desk_sabad_addcodetrader(data)
+
+@app.route('/dashpotantial',methods = ['POST', 'GET'])
+def dashpotantial():
+    data = request.get_json()
+    return report.dashpotantial(data)
 
 @app.route('/desk/sabad/codetrader',methods = ['POST', 'GET'])
 def desk_sabad_codetrader():

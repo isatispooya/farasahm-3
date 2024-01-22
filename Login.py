@@ -7,7 +7,7 @@ import json
 import requests
 import random
 from GuardPyCaptcha.Captch import GuardPyCaptcha
-
+import datetime
 key = 'KPms1b_Kibq5XR6M0d88rJTsjjgdlBFzbFN4irIxiHo='
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
@@ -17,15 +17,15 @@ usrnm = 'isatispooya'
 psswrd ='5246043adeleh'
 
 def SendSms(snd,txt):
-    resp = requests.get(url=f'http://tsms.ir/url/tsmshttp.php?from={frm}&to={snd}&username={usrnm}&password={psswrd}&message={txt}').json()
+    resp = 0 #requests.get(url=f'http://tsms.ir/url/tsmshttp.php?from={frm}&to={snd}&username={usrnm}&password={psswrd}&message={txt}').json()
     print(txt)
     return resp
 
 
 def VerificationPhone(phone):
     code = str(random.randint(10000,99999))
-    farasahmDb['VerificationPhone'].delete_many({'phone':phone})
-    farasahmDb['VerificationPhone'].insert_one({'phone':phone,'code':code})
+    #farasahmDb['VerificationPhone'].delete_many({'phone':phone})
+    farasahmDb['VerificationPhone'].insert_one({'phone':phone,'code':code,'datetime':datetime.datetime.now()})
     text = 'کد تایید فراسهم \n' + str(code)
     res = SendSms(phone,text)
     return json.dumps({'replay':True})

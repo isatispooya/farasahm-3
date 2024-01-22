@@ -943,7 +943,7 @@ def preemptioncardjpg(data):
     textRow2 = 'بنا به تصمیم هیات مدیره شرکت و تفویض اختیار مصوبه ی مجمع فوق العاده مبنی بر افزایش سرمایه شرکت' + '\n'
     textRow2 = textRow2 + 'از' + digits.en_to_fa('5293454025000')+ ' ريال ،'
     textRow2 = textRow2 + 'پنج هزار و دویست و نود و سه میلیارد و چهارصد و پنجاه و چهار میلیون و پانصد و هزار و دویست و پنجاه' +'\n' #digits.to_word(5293454025000) + '\n'
-    textRow2 = textRow2 + ' به ' + digits.en_to_fa('8257788279000') + 'هشت هزار و دویست و پنجاه و هفت میلیارد و هفتصد و هشتاد و هشت میلیون و دویست و هفتاد و هشت هزار و دویست و نود' + ' ریال ' + '\n' #+  digits.to_word(8257788279000) + ' ریال ' + '\n'
+    textRow2 = textRow2 + ' به ' + digits.en_to_fa('8257788279000') + 'هشت هزار و دویست و پنجاه و هفت میلیارد و هفتصد و هشتاد و هشت میلیون و دویست و هفتاد '+ '\n' +' و هشت هزار و دویست و نود' + ' ریال ' + '\n' #+  digits.to_word(8257788279000) + ' ریال ' + '\n'
     textRow2 = textRow2 + ' شما میتوانید از حق تقدم خود معادل ' + digits.en_to_fa(str(dt['حق تقدم'])) + ' سهم به ارزش اسمی \n' 
     textRow2 = textRow2 + digits.en_to_fa('1000') + ' ریال استفاده نمایید.'  + ' لذا خواهشمند است با توجه به مصوبات موجود که مبلغ ' + digits.en_to_fa(str(int(dt['حق تقدم'])*1000)) + ' ریال به صورت آورده' + '\n'
     textRow2 = textRow2 + ' نقدی طبق اعلامیه پذیرش نویسی در روز نامه پیمان یزد به شماره 5848 مورخ 1402/10/14 و به مدت ' + digits.en_to_fa('60') 
@@ -960,7 +960,7 @@ def preemptioncardjpg(data):
     textRow3 = get_display(textRow3)
     text_width, text_height = draw.textsize(textRow3, font=font)
     x_position_text = (a4_width - text_width) - 50
-    y_position_text = y_position_logo + logo_height_new + 190
+    y_position_text = y_position_logo + logo_height_new + 210
     draw.text((x_position_text, y_position_text), textRow3, fill=text_color, font=font,align='right')
     textRow3 = 'امضا'
     textRow3 = arabic_reshaper.reshape(textRow3)
@@ -1723,8 +1723,6 @@ def getassetfund(data):
                 
             equationMax = Eq((Value_dolati + x) / (df['value'].sum() + x), 0.3)
             eqMax = int(solve(equationMax, x)[0])
-
-
             equationMin = Eq((Value_dolati + x) / (df['value'].sum() + x), 0.25)
             eqMin = int(solve(equationMin, x)[0])
 
@@ -1751,7 +1749,6 @@ def getassetfund(data):
         dff.append(dic)
     else:
         dff.append({'type':'اوراق', 'value':0, 'rate':0, 'warning':'مجموع کمتر از 40 % است', '_children':[],'min':EqMin,'max':0})
-    
     # Bank
     df_bank = df[df['type']=='سپرده بانکی']
     if len(df_bank)>0:
@@ -1781,7 +1778,6 @@ def getassetfund(data):
             dic['_children'] = dic['_children'] + dic_i
     else:
         dic = {'type':'سپرده بانکی', 'value':0, 'rate':0, 'warning':'', '_children':[]}
-
     dff.append(dic)
     return json.dumps({'reply':True,'df':dff})
 
@@ -1833,23 +1829,28 @@ def getpriceforward(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     date = Fnc.timestumpToJalalInt(data['date'])
-    
-    print(date)
     df = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'dateInt':1,'final_price':1}))
     lastUpdate = df['dateInt'].max()
-    df = df[df['dateInt']==lastUpdate]
+    df = df[df['dateInt']>=date]
     df['dateInt'] = [int(x) for x in df['dateInt']]
     df = df.set_index('dateInt')
     dateDf = pd.DataFrame(Fnc.calnder())
     dateDf['dateInt'] = [int(x.replace('-','')) for x in dateDf['ja_date']]
+    dateDf = dateDf[dateDf['dateInt']>=date]
     dateDf = dateDf.set_index('dateInt')
-    df = df.join(dateDf,how='outer').reset_index()
-    df = df[df['dateInt']>=lastUpdate].reset_index().drop(columns=['index'])
+    df = df.join(dateDf,how='outer').sort_index().reset_index()
+    df['final_price'] = df['final_price'].fillna(method='ffill')
     df['future_holidays'] = df.apply(lambda row: Fnc.calculate_future_holidays(row, df), axis=1)
     df['past_holidays'] = df.apply(lambda row: Fnc.calculate_past_holidays(row, df), axis=1)
+    df['real'] = df['dateInt']<=lastUpdate
     grow_rate = ((int(data['target'])/100)+1) ** (1/365)
     befor_grow_rate = ((int(data['befor'])/100) * (grow_rate - 1)) + 1
     after_grow_rate = ((int(data['after'])/100) * (grow_rate - 1)) + 1
+    df['real'] = df['final_price'] * df['real']
+    df['final_price'] = df[df['dateInt']==df['dateInt'].min()].to_dict('records')[0]['final_price']
+    dfZero = df[df.index==0]
+    dfZero = dfZero[['ja_date','week','workday','real']]
+    df = df[df.index>0]
     df['grow_rate'] = grow_rate #** df.index
     df['grow_holiday_fut'] =  befor_grow_rate ** df['future_holidays']
     df['grow_holiday_pas'] =  after_grow_rate ** df['past_holidays']
@@ -1861,7 +1862,12 @@ def getpriceforward(data):
     df['fut_price'] = df['final_price'] * df['grow_Fin']
     df['fut_price'] = df['fut_price'].apply(round)
     df = df[df.index<=365]
-    df = df[['ja_date','week','workday','fut_price']]
+    df = df[['ja_date','week','workday','fut_price','real']]
+    dfZero['fut_price'] = dfZero['real']
+    df = pd.concat([dfZero,df])
+    df['diff'] = df['fut_price'] - df['real']
+    df['diff'] = df['diff'] * ((df['real']>0)*1)
+    df['diff'] = df['diff'].cumsum()
     df['week'] = df['week'].replace(0,'شنبه').replace(1,'یکشنبه').replace(2,'دوشنبه').replace(3,'سه شنبه').replace(4,'چهارشنبه').replace(5,'پنج شنبه').replace(6,'جمعه')
     df['workday'] = df['workday'].replace(True,'کاری').replace(False,'تعطیل')
     df['Chng_price'] = ((df['fut_price'] / df['fut_price'].shift(1)) - 1) * 100000
@@ -2222,7 +2228,6 @@ def getrateassetfixincom(data):
 
 
 def getpotentialcoustomer(data):
-    start_time = time.time()
 
     access = data['access'][0]
     symbol = data['access'][1]
@@ -2231,18 +2236,25 @@ def getpotentialcoustomer(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    start_time = time.time()
+
 
     df = pd.DataFrame(farasahmDb['assetCoustomerOwnerFix'].find({},{'_id':0,'CustomerTitle':1,'MarketInstrumentTitle':1,'Symbol':1,'Volume':1,'VolumeInPrice':1,'dateInt':1,'TradeCode':1}))
     df = df.drop_duplicates()
-    conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
-    symbolTarget = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'TradeSymbol':1}))
-    symbolTarget = symbolTarget.drop_duplicates()['TradeSymbol'].to_list()
-    df['target'] = df['Symbol'].isin(symbolTarget)
-    start_time = time.time()
-    df = df.groupby(by='TradeCode').apply(Fnc.grouppotential)
-    df = df.reset_index().drop(columns=['TradeCode','level_1'])
 
+    #conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
+    #symbolTarget = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'TradeSymbol':1}))
+    #symbolTarget = symbolTarget.drop_duplicates()['TradeSymbol'].to_list()
+
+    symbolTarget = ['نهال1', 'زرفام1', 'طلا1', 'سحرخیز1', 'عیار1', 'نفیس1', 'گوهر1', 'مثقال1', 'زر1', 'سکه مرکزی1', 'دارا یکم1', 'خاتم1', 'افران1', 'سپر1', 'کیان1', 'کمند1', 'پارند1', 'تصمیم1', 'اهرم1', 'پالایش1', 'پتروآگاه1', 'دیبا1', 'تمشک1', 'ترمه1', 'امین یکم1', 'ارزش1', 'همای1', 'سرو1', 'هامرز1', 'آرام1', 'مانی1', 'آکورد1', 'کارا1', 'آگاس1', 'ثبات1', 'سپیدما1', 'توان1', 'گام0208151', 'اطلس1', 'هم وزن1', 'اعتماد1', 'کامیاب1', 'پاداش1', 'آوند1', 'ثنا1', 'کاج1', 'الماس1', 'لبخند1', 'آساس1', 'رماس1', 'نخل1', 'کاریس1', 'داریک1', 'کارین1', 'فیروزا1', 'انار1', 'فردا1', 'کهربا1', 'کاردان1', 'سلام1', 'آفاق1', 'دریا1', 'زیتون1', 'اراد501', 'گنج1', 'ویستا1', 'آسامید1', 'سام1', 'یاقوت1', 'ثهام1', 'آوا1', 'آتیمس1', 'داریوش1', 'تدبیر041', 'رشد1', 'فراز1', 'ثمین1', 'فیروزه1', 'وصندوق1', 'اوصتا1', 'اعتبار1', 'ساحل1', 'هیوا1', 'برلیان1', 'اکسیژن1', 'زرین1', 'دارا1', 'آسام1', 'رابین1', 'یارا1', 'آلتون1', 'درسا1', 'وبازار1', 'اخزا1031', 'اخزا1032', 'اخزا0022', 'اخزا0021', 'درین1', 'گام0208132', 'گام0208131', 'گنجینه1', 'پادا1', 'صنم', 'مروارید1', 'صنوین1', 'بذر1', 'صایند1', 'اوج1', 'اخزا0031', 'اخزا0032', 'گام0207132', 'افق ملت1', 'اگ0201551', 'ضمان1', 'پرتو1', 'اخزا9101', 'سپاس1', 'اخزا9091', 'اخزا1011', 'ثروتم1', 'اخزا0051', 'اخزا0071', 'عقیق1', 'سخند1', 'اخزا9081', 'گنجین1', 'تاراز1', 'اخزا0091', 'اراد502', 'اخزا9141', 'اخزا1061', 'اخزا1071', 'اخزا1012', 'اخزا0101', 'اخزا0102', 'پتروما1', 'مهریران1', 'ناب1', 'اخزا9102', 'رایکا1', 'اراد871', 'اخزا8211', 'اخزا0042', 'اخزا0072', 'اخزا0041', 'اخزا1041', 'اخزا0052', 'اراد991', 'اخزا0012', 'اخزا0011', 'اخزا8201', 'نیلی1', 'گام0207561', 'اخزا1042', 'گام0208152', 'گواهی ظرفیت1', 'شتاب1', 'آکام1', 'اخزا0061', 'اخزا0062', 'پایا1', 'گام0206132', 'جهش1', 'اخزا9142', 'اراد1121', 'اخزا1051', 'صنفت13121', 'اخزا0092', 'اخزا9082', 'اخزا1081', 'آلا1', 'صبا14041', 'اخزا1082', 'سیناد1', 'استیل1', 'فاخر1', 'اخزا1044', 'صپترو7051', 'اگ0205551', 'صنهال1', 'بازده1', 'پتروداریوش1', 'نشان1', 'طلوع1', 'صدف1', 'سمان1', 'پتروصبا1', 'هوشیار1', 'بهین رو1', 'خاتم2', 'ترمه2', 'توسکا1', 'اراد1371', 'تیام1', 'فلزفارابی1', 'اراد1071', 'آذرین1', 'متال1', 'کرمان4621', 'اخزا1072', 'اخزا1062', 'اراد992', 'جواهر1', 'خورشید1', 'صاف فیلم521', 'ماهور1', 'تابش1', 'اتوآگاه1', 'خلیج1', 'پیروز1', 'اخزا2021', 'اخزا2022', 'آفرین1', 'صترا5092']
+    df['target'] = df['Symbol'].isin(symbolTarget)
+    df = df[df['target']==True]
+    df['VolumeInPrice'] = df['VolumeInPrice'].apply(int)
+    df = df[df['VolumeInPrice']>=500000000]
+
+    df = df.groupby(by='TradeCode').apply(Fnc.grouppotential)
+
+
+    df = df.reset_index().drop(columns=['TradeCode','level_1'])
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
 
@@ -2496,6 +2508,62 @@ def getretassfix(data):
 
 
 
+
+
+
+def getratretasst(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    dff = pd.DataFrame(farasahmDb['ReturnRateAssetFund'].find({'symbol':symbol}))
+    df = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},{'_id':0,'MarketInstrumentTitle':1,'type':1,'date':1}))
+    if len(df)==0:
+        return json.dumps({'reply':False, 'msg':'هیچ دارایی یافت نشد'})
+    df = df[df['date'] == df['date'].max()]
+    df['type'] = df['type'].replace("non-gov","شرکتی").replace("gov","دولتی").replace("saham","سهم")
+    if len(dff) == 0:
+        df['rate'] = 0
+        df = df[['MarketInstrumentTitle', 'type', 'rate']]
+        df = df.to_dict('records')
+        return json.dumps({'reply':True,'df':df})
+    dff = dff[dff['date']==dff['date'].max()]
+    dff = dff[['MarketInstrumentTitle','rate']]
+    df = dff.set_index('MarketInstrumentTitle').join(df.set_index('MarketInstrumentTitle'), how='right')
+    df = df.fillna(0)
+    df = df.reset_index()
+    df = df[['MarketInstrumentTitle', 'type', 'rate']]
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
+
+
+def saverateretasst(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(data['df'])
+    df = df[['MarketInstrumentTitle','rate']]
+    try:
+        df['rate'] = df['rate'].apply(float)
+    except:
+        return json.dumps({'reply':False,'msg':'نرخ های باید بصورت عدد وارد شوند'})
+    df['symbol'] = symbol
+    today = Fnc.todayIntJalali()
+    df['date'] = today
+    df = df.to_dict('records')
+    farasahmDb['ReturnRateAssetFund'].delete_many({'symbol':symbol,'date':today})
+    farasahmDb['ReturnRateAssetFund'].insert_many(df)
+    return json.dumps({'reply':True})
+
+
+
 def getreturnasset(data):
     access = data['access'][0]
     symbol = data['access'][1]
@@ -2504,25 +2572,41 @@ def getreturnasset(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol},{'_id':0,"name":1,'balance':1,'num':1,'rate':1}))
-    df = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},{'_id':0,"MarketInstrumentTitle":1,'Symbol':1,'VolumeInPrice':1,'date':1,'type':1}))
-    df =df[df['date'] == df['date'].max()]
-    df = df[['MarketInstrumentTitle','Symbol','VolumeInPrice','type']]
-    df['rate'] = 0
-    bank = bank.rename(columns={'name':'MarketInstrumentTitle','balance':'VolumeInPrice','num':'Symbol'})
-    bank['type'] = 'bank'
+
+
+    dff = pd.DataFrame(farasahmDb['ReturnRateAssetFund'].find({'symbol':symbol}))
+    df = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbol},{'_id':0,'MarketInstrumentTitle':1,'type':1,'date':1,'VolumeInPrice':1}))
+    if len(df)==0:
+        return json.dumps({'reply':False, 'msg':'هیچ دارایی یافت نشد'})
+    df = df[df['date'] == df['date'].max()]
+    df['type'] = df['type'].replace("non-gov","شرکتی").replace("gov","دولتی").replace("saham","سهم")
+    if len(dff) == 0:
+        df['rate'] = 0
+        df = df[['MarketInstrumentTitle', 'type', 'rate','VolumeInPrice']]
+    else:
+        dff = dff[dff['date']==dff['date'].max()]
+        dff = dff[['MarketInstrumentTitle','rate']]
+        df = dff.set_index('MarketInstrumentTitle').join(df.set_index('MarketInstrumentTitle'), how='right')
+        df = df.fillna(0)
+        df = df.reset_index()
+        df = df[['MarketInstrumentTitle', 'type', 'rate','VolumeInPrice']]
+    
+    asset = df
+    bank = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbol},{'_id':0,"name":1,'balance':1,'rate':1,'return':1}))
+    bank = bank.rename(columns={'name':'MarketInstrumentTitle','balance':'VolumeInPrice'})
+    for i in bank.index:
+        if bank['return'][i] == 'monthly':
+            rateYtm = float(bank['rate'][i])
+            rateYtm = rateYtm / 100
+            rateYtm = rateYtm / 12
+            rateYtm = rateYtm + 1
+            rateYtm = rateYtm ** 12
+            rateYtm = rateYtm - 1
+            bank['rate'][i] = rateYtm
+    bank['type'] = 'بانک'
     bank = bank.replace('','1')
+    bank = bank[['MarketInstrumentTitle','VolumeInPrice','rate']]
     df = pd.concat([df,bank])
-    for i in df.index:
-        typ = df['type'][i]
-        if typ in ['non-gov','gov']:
-            sym = df['Symbol'][i]
-            sym = sym[:-1]
-            orq = pd.DataFrame(farasahmDb['oraghYTM'].find({'نماد':sym}))
-            if len(orq)>0:
-                orq = orq[orq['تاریخ آخرین روز معاملاتی'] == orq['تاریخ آخرین روز معاملاتی'].max()]
-                YTM = orq['YTM'].mean()
-                df['rate'][i] = YTM
     df['VolumeInPrice'] = df['VolumeInPrice'].apply(int)
     df['rate'] = df['rate'].apply(float)
     df['retn'] = df['VolumeInPrice'] * df['rate']
@@ -2532,6 +2616,89 @@ def getreturnasset(data):
     df['rate'] = df['rate'] / 100
     retn = retn *100
     retn = int(retn)/100
-    df = df[['MarketInstrumentTitle','Symbol','VolumeInPrice','rate']]
+    df = df[['MarketInstrumentTitle','VolumeInPrice','rate']]
     df = df.to_dict('records')
     return json.dumps({'reply':True, 'df':df,'retn':retn})
+
+
+
+def staticownerincomp(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = farasahmDb['TradeListBroker'].find({'TradeSymbol':symbol+'1'},{'_id':0,'TradeCode':1, 'Volume':1, 'dateInt':1,  "TradeType":1})
+    df = pd.DataFrame(df)
+    df = df[['Volume', 'dateInt','TradeType']]
+    df['len'] = 1
+    df['Volume'] = pd.to_numeric(df['Volume'], errors='coerce').fillna(0).astype(int)
+    df['Volume_Buy'] = df['Volume'] * (df['TradeType'] == 'Buy')
+    df['Volume_Sel'] = df['Volume'] * (df['TradeType'] != 'Buy')
+    df = df.groupby('dateInt').sum()
+    dff = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'dateInt':1,'trade_volume':1,'trade_number':1,'_id':0}))
+    dff = dff.set_index('dateInt')
+    df = df.join(dff)
+    df = df.dropna()
+    df = df.sort_index(ascending=False)
+    df['dateInt'] = df.index
+    df['trade_volume'] = pd.to_numeric(df['trade_volume'], errors='coerce').fillna(0).astype(int)
+    df = df[['trade_volume', 'Volume_Buy','Volume_Sel','dateInt']]
+    df = df.to_dict('dict')
+    return json.dumps({'reply':True, 'df':df})
+
+
+def dashpotantial(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    
+    df = pd.DataFrame(farasahmDb['assetCoustomerOwnerFix'].find({},{'_id':0,'CustomerTitle':1,'MarketInstrumentTitle':1,'Symbol':1,'Volume':1,'VolumeInPrice':1,'dateInt':1,'TradeCode':1}))
+    df = df.drop_duplicates()
+    df = df[df['Symbol']!=symbol+'1']
+    symbolTarget = ['نهال1', 'زرفام1', 'طلا1', 'سحرخیز1', 'عیار1', 'نفیس1', 'گوهر1', 'مثقال1', 'زر1', 'سکه مرکزی1', 'دارا یکم1', 'خاتم1', 'افران1', 'سپر1', 'کیان1', 'کمند1', 'پارند1', 'تصمیم1', 'اهرم1', 'پالایش1', 'پتروآگاه1', 'دیبا1', 'تمشک1', 'ترمه1', 'امین یکم1', 'ارزش1', 'همای1', 'سرو1', 'هامرز1', 'آرام1', 'مانی1', 'آکورد1', 'کارا1', 'آگاس1', 'ثبات1', 'سپیدما1', 'توان1', 'گام0208151', 'اطلس1', 'هم وزن1', 'اعتماد1', 'کامیاب1', 'پاداش1', 'آوند1', 'ثنا1', 'کاج1', 'الماس1', 'لبخند1', 'آساس1', 'رماس1', 'نخل1', 'کاریس1', 'داریک1', 'کارین1', 'فیروزا1', 'انار1', 'فردا1', 'کهربا1', 'کاردان1', 'سلام1', 'آفاق1', 'دریا1', 'زیتون1', 'اراد501', 'گنج1', 'ویستا1', 'آسامید1', 'سام1', 'یاقوت1', 'ثهام1', 'آوا1', 'آتیمس1', 'داریوش1', 'تدبیر041', 'رشد1', 'فراز1', 'ثمین1', 'فیروزه1', 'وصندوق1', 'اوصتا1', 'اعتبار1', 'ساحل1', 'هیوا1', 'برلیان1', 'اکسیژن1', 'زرین1', 'دارا1', 'آسام1', 'رابین1', 'یارا1', 'آلتون1', 'درسا1', 'وبازار1', 'اخزا1031', 'اخزا1032', 'اخزا0022', 'اخزا0021', 'درین1', 'گام0208132', 'گام0208131', 'گنجینه1', 'پادا1', 'صنم', 'مروارید1', 'صنوین1', 'بذر1', 'صایند1', 'اوج1', 'اخزا0031', 'اخزا0032', 'گام0207132', 'افق ملت1', 'اگ0201551', 'ضمان1', 'پرتو1', 'اخزا9101', 'سپاس1', 'اخزا9091', 'اخزا1011', 'ثروتم1', 'اخزا0051', 'اخزا0071', 'عقیق1', 'سخند1', 'اخزا9081', 'گنجین1', 'تاراز1', 'اخزا0091', 'اراد502', 'اخزا9141', 'اخزا1061', 'اخزا1071', 'اخزا1012', 'اخزا0101', 'اخزا0102', 'پتروما1', 'مهریران1', 'ناب1', 'اخزا9102', 'رایکا1', 'اراد871', 'اخزا8211', 'اخزا0042', 'اخزا0072', 'اخزا0041', 'اخزا1041', 'اخزا0052', 'اراد991', 'اخزا0012', 'اخزا0011', 'اخزا8201', 'نیلی1', 'گام0207561', 'اخزا1042', 'گام0208152', 'گواهی ظرفیت1', 'شتاب1', 'آکام1', 'اخزا0061', 'اخزا0062', 'پایا1', 'گام0206132', 'جهش1', 'اخزا9142', 'اراد1121', 'اخزا1051', 'صنفت13121', 'اخزا0092', 'اخزا9082', 'اخزا1081', 'آلا1', 'صبا14041', 'اخزا1082', 'سیناد1', 'استیل1', 'فاخر1', 'اخزا1044', 'صپترو7051', 'اگ0205551', 'صنهال1', 'بازده1', 'پتروداریوش1', 'نشان1', 'طلوع1', 'صدف1', 'سمان1', 'پتروصبا1', 'هوشیار1', 'بهین رو1', 'خاتم2', 'ترمه2', 'توسکا1', 'اراد1371', 'تیام1', 'فلزفارابی1', 'اراد1071', 'آذرین1', 'متال1', 'کرمان4621', 'اخزا1072', 'اخزا1062', 'اراد992', 'جواهر1', 'خورشید1', 'صاف فیلم521', 'ماهور1', 'تابش1', 'اتوآگاه1', 'خلیج1', 'پیروز1', 'اخزا2021', 'اخزا2022', 'آفرین1', 'صترا5092']
+    df['target'] = df['Symbol'].isin(symbolTarget)
+    df = df[df['target']==True]
+    df['VolumeInPrice'] = df['VolumeInPrice'].apply(int)
+    df = df[df['VolumeInPrice']>=1500000000]
+    df = df.groupby(by='TradeCode').apply(Fnc.grouppotentialNoChild)
+    df = df.sort_values('VolumeInPrice',ascending=False).reset_index().drop(columns=['TradeCode','level_1'])
+    df = df[df['CustomerTitle']!='ETF کد رزرو صندوقهای سرمایه گذاری قابل معامله']
+    df = df[df.index<15]
+    df = df[['CustomerTitle','VolumeInPrice']]
+    df = df.set_index('CustomerTitle')
+    df['Customer'] = df.index
+    df = df.to_dict('dict')
+    return json.dumps({'reply':True,'df':df})
+
+def dashpotantialsymbol(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['assetCoustomerOwnerFix'].find({},{'_id':0,'CustomerTitle':1,'MarketInstrumentTitle':1,'Symbol':1,'Volume':1,'VolumeInPrice':1,'dateInt':1,'TradeCode':1}))
+    df = df.drop_duplicates()
+    df = df[df['Symbol']!=symbol+'1']
+    symbolTarget = ['نهال1', 'زرفام1', 'طلا1', 'سحرخیز1', 'عیار1', 'نفیس1', 'گوهر1', 'مثقال1', 'زر1', 'سکه مرکزی1', 'دارا یکم1', 'خاتم1', 'افران1', 'سپر1', 'کیان1', 'کمند1', 'پارند1', 'تصمیم1', 'اهرم1', 'پالایش1', 'پتروآگاه1', 'دیبا1', 'تمشک1', 'ترمه1', 'امین یکم1', 'ارزش1', 'همای1', 'سرو1', 'هامرز1', 'آرام1', 'مانی1', 'آکورد1', 'کارا1', 'آگاس1', 'ثبات1', 'سپیدما1', 'توان1', 'گام0208151', 'اطلس1', 'هم وزن1', 'اعتماد1', 'کامیاب1', 'پاداش1', 'آوند1', 'ثنا1', 'کاج1', 'الماس1', 'لبخند1', 'آساس1', 'رماس1', 'نخل1', 'کاریس1', 'داریک1', 'کارین1', 'فیروزا1', 'انار1', 'فردا1', 'کهربا1', 'کاردان1', 'سلام1', 'آفاق1', 'دریا1', 'زیتون1', 'اراد501', 'گنج1', 'ویستا1', 'آسامید1', 'سام1', 'یاقوت1', 'ثهام1', 'آوا1', 'آتیمس1', 'داریوش1', 'تدبیر041', 'رشد1', 'فراز1', 'ثمین1', 'فیروزه1', 'وصندوق1', 'اوصتا1', 'اعتبار1', 'ساحل1', 'هیوا1', 'برلیان1', 'اکسیژن1', 'زرین1', 'دارا1', 'آسام1', 'رابین1', 'یارا1', 'آلتون1', 'درسا1', 'وبازار1', 'اخزا1031', 'اخزا1032', 'اخزا0022', 'اخزا0021', 'درین1', 'گام0208132', 'گام0208131', 'گنجینه1', 'پادا1', 'صنم', 'مروارید1', 'صنوین1', 'بذر1', 'صایند1', 'اوج1', 'اخزا0031', 'اخزا0032', 'گام0207132', 'افق ملت1', 'اگ0201551', 'ضمان1', 'پرتو1', 'اخزا9101', 'سپاس1', 'اخزا9091', 'اخزا1011', 'ثروتم1', 'اخزا0051', 'اخزا0071', 'عقیق1', 'سخند1', 'اخزا9081', 'گنجین1', 'تاراز1', 'اخزا0091', 'اراد502', 'اخزا9141', 'اخزا1061', 'اخزا1071', 'اخزا1012', 'اخزا0101', 'اخزا0102', 'پتروما1', 'مهریران1', 'ناب1', 'اخزا9102', 'رایکا1', 'اراد871', 'اخزا8211', 'اخزا0042', 'اخزا0072', 'اخزا0041', 'اخزا1041', 'اخزا0052', 'اراد991', 'اخزا0012', 'اخزا0011', 'اخزا8201', 'نیلی1', 'گام0207561', 'اخزا1042', 'گام0208152', 'گواهی ظرفیت1', 'شتاب1', 'آکام1', 'اخزا0061', 'اخزا0062', 'پایا1', 'گام0206132', 'جهش1', 'اخزا9142', 'اراد1121', 'اخزا1051', 'صنفت13121', 'اخزا0092', 'اخزا9082', 'اخزا1081', 'آلا1', 'صبا14041', 'اخزا1082', 'سیناد1', 'استیل1', 'فاخر1', 'اخزا1044', 'صپترو7051', 'اگ0205551', 'صنهال1', 'بازده1', 'پتروداریوش1', 'نشان1', 'طلوع1', 'صدف1', 'سمان1', 'پتروصبا1', 'هوشیار1', 'بهین رو1', 'خاتم2', 'ترمه2', 'توسکا1', 'اراد1371', 'تیام1', 'فلزفارابی1', 'اراد1071', 'آذرین1', 'متال1', 'کرمان4621', 'اخزا1072', 'اخزا1062', 'اراد992', 'جواهر1', 'خورشید1', 'صاف فیلم521', 'ماهور1', 'تابش1', 'اتوآگاه1', 'خلیج1', 'پیروز1', 'اخزا2021', 'اخزا2022', 'آفرین1', 'صترا5092']
+    df['target'] = df['Symbol'].isin(symbolTarget)
+    df = df[df['target']==True]
+    df['VolumeInPrice'] = df['VolumeInPrice'].apply(int)
+    df = df.groupby(by='Symbol').apply(Fnc.grouppotentialSymbol)
+    df = df.sort_values('VolumeInPrice',ascending=False)
+    df = df.reset_index()
+    df = df[df.index<15]
+    df = df[['VolumeInPrice','Symbol']]
+    df = df.set_index('Symbol')
+    df['Symbol'] = df.index
+    df = df.to_dict('dict')
+    return json.dumps({'reply':True,'df':df})
+
