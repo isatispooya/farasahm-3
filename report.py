@@ -25,6 +25,7 @@ from ApiMethods import GetCustomerMomentaryAssets
 import time
 from bson import Binary
 from moadian import Moadian
+from bson.son import SON
 
 
 farasahmDb = client['farasahm2']
@@ -444,6 +445,8 @@ def getgrouping(data):
                 dic['سهام کل'] = dic['سهام کل'] + int(fullname['سهام کل'])
         dic['درصد مالکیت'] = int((int(dic['سهام کل']) / totalStock)*10000)/100
         df.append(dic)
+    if len(df) == 0:
+        dic = {'stock':0}
     dic = {'stock':max([x['سهام کل'] for x in df])}
     return json.dumps({'replay':True,'df':df,'dic':dic})
 
@@ -2702,3 +2705,55 @@ def dashpotantialsymbol(data):
     df = df.to_dict('dict')
     return json.dumps({'reply':True,'df':df})
 
+def getresidual(data):
+    print(data)
+
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    #dateList = farasahmDb['register'].distinct('تاریخ گزارش')
+    max_date_record = farasahmDb['register'].find_one({'symbol':symbol},sort=[('تاریخ گزارش', pymongo.DESCENDING)])['تاریخ گزارش']
+    df = farasahmDb['register'].find({'symbol':symbol,'تاریخ گزارش':max_date_record},{'_id':0, 'کد ملی':1, 'سهام کل':1, 'تاریخ تولد':1, 'نوع سهامدار':1 ,'تاریخ گزارش':1 ,'کد سهامداری':1, 'نام خانوادگی ':1, 'نام':1,  'محل صدور':1, 'نوع':1, 'جنسیت':1 ,'شناسه ملی':1})
+    df = pd.DataFrame(df)
+    listCode = df['کد سهامداری'].tolist()
+    dfTrade = farasahmDb['traders'].find({"کد": {"$in": listCode}, "symbol": symbol},{'_id':0,'کد':1,'تعداد فروش':1,'تعداد خرید':1,'date':1})
+    dfTrade = pd.DataFrame(dfTrade)
+    if data['type'] == 'sell':
+        dfTrade = dfTrade[dfTrade['تعداد فروش']>0]
+    if data['type'] == 'buy':
+        dfTrade = dfTrade[dfTrade['تعداد خرید']>0]
+
+    dfTrade = dfTrade.sort_values(by='date', ascending=False)
+    dfTrade = dfTrade.drop_duplicates(subset='کد', keep='first')
+
+    df = df.set_index('کد سهامداری')
+    dfTrade = dfTrade.set_index('کد')
+    df = df.join(dfTrade,how='outer')
+    df = df.reset_index()
+    min_date_value = df['date'].min()
+    df['date'] = df['date'].fillna(min_date_value)
+    df['date'] = df['date'].apply(int)
+    df['lastTradeDay'] = df['date'].apply(Fnc.diffJalaliIntToToday)
+    max_last_Trade = df['lastTradeDay'].max()
+    target = int(data['target'])
+
+    for i in range(0,max_last_Trade,target):
+        condition = (df['lastTradeDay'] >= i) & (df['lastTradeDay'] < i+100)
+        df.loc[condition, 'lastTradeDay'] = i
+    df['سهام کل'] = df['سهام کل'].apply(int)
+    df = df.groupby('lastTradeDay').apply(Fnc.groupRosob)
+    df['index'] = ''
+    df['نام خانوادگی '] = ''
+    df['نام'] = ''
+    df['کد ملی'] = ''
+    df['تاریخ تولد'] = ''
+    df['محل صدور'] = ''
+    df = df.reindex()
+    df = df.fillna('')
+    df = df.to_dict('records')
+
+    return json.dumps({'reply':True,'df':df})

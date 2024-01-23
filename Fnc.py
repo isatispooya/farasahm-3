@@ -52,6 +52,7 @@ def JalalistrToGorgia(date):
     return JalaliDate(y,m,d).to_gregorian()
 
 
+
 def JalaliIntToGorgia(date):
     date = str(date)
     y = int(str(date)[:4])
@@ -140,6 +141,20 @@ def element_to_dict(element):
     if element.text:
         result["text"] = element.text
     return result
+
+def diffJalaliIntToToday(date):
+    date = JalaliIntToGorgia(date)
+    today = datetime.datetime.now().date()
+    diff = today - date
+    diff = diff.days
+    return diff
+
+def groupRosob(group):
+    group['lenTarget'] = len(group)
+    group['_children'] = [group[['index','سهام کل','نام خانوادگی ','نام','کد ملی','تاریخ تولد','محل صدور','lastTradeDay']].to_dict('records')]*len(group)
+    group['سهام کل'] = group['سهام کل'].sum()
+    group = group[group.index==group.index.min()]
+    return group
 
 
 def GenerateDatetime(yr,mn,dy,hr,mi):

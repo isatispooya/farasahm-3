@@ -541,6 +541,11 @@ def delprioritytransaction():
     data = request.get_json()
     return dataManagment.delprioritytransaction(data)
 
+@app.route('/getresidual',methods = ['POST', 'GET'])
+def getresidual():
+    data = request.get_json()
+    return report.getresidual(data)
+
 @app.route('/preemptioncard',methods = ['POST', 'GET'])
 def preemptioncard():
     data = request.get_json()

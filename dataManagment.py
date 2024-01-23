@@ -691,12 +691,11 @@ def delprioritytransaction(data):
     newTo['حق تقدم'] = int(newTo['حق تقدم']) - int(doc['count'])
     if newTo['حق تقدم'] < 0 and doc['to'] != 'حق تقدم استفاده نشده':
          return json.dumps({'replay':False,'msg':f'حذف انجام نشد، مانده دریافت کننده منفی میشود'})
-    farasahmDb['PriorityTransaction'].delete_one({'_id':ObjectId(data['id'])})
     newFrm = farasahmDb['Priority'].find_one({"نام و نام خانوادگی":doc['frm']})
     newFrm['حق تقدم'] = int(newFrm['حق تقدم']) + int(doc['count'])
     farasahmDb['Priority'].update_one({"_id":newFrm['_id']},{"$set":{'حق تقدم':newFrm['حق تقدم']}})
-
     farasahmDb['Priority'].update_one({"_id":newTo['_id']},{"$set":{'حق تقدم':newTo['حق تقدم']}})
+    farasahmDb['PriorityTransaction'].delete_one({'_id':ObjectId(data['id'])})
     return json.dumps({'replay':True})
 
 
