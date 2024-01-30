@@ -17,7 +17,7 @@ usrnm = 'isatispooya'
 psswrd ='5246043adeleh'
 
 def SendSms(snd,txt):
-    resp = 0 #requests.get(url=f'http://tsms.ir/url/tsmshttp.php?from={frm}&to={snd}&username={usrnm}&password={psswrd}&message={txt}').json()
+    resp = requests.get(url=f'http://tsms.ir/url/tsmshttp.php?from={frm}&to={snd}&username={usrnm}&password={psswrd}&message={txt}').json()
     print(txt)
     return resp
 

@@ -719,10 +719,20 @@ def dashpotantial():
     data = request.get_json()
     return report.dashpotantial(data)
 
+@app.route('/calculator/fixincom',methods = ['POST', 'GET'])
+def calculator_fixincom():
+    data = request.get_json()
+    return report.calculator_fixincom(data)
+
 @app.route('/desk/sabad/codetrader',methods = ['POST', 'GET'])
 def desk_sabad_codetrader():
     data = request.get_json()
     return report.codetrader(data)
+
+@app.route('/getcomparetop',methods = ['POST', 'GET'])
+def getcomparetop():
+    data = request.get_json()
+    return report.getcomparetop(data)
 
 @app.route('/desk/sabad/delcodetrade',methods = ['POST', 'GET'])
 def desk_sabad_delcodetrade():

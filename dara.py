@@ -83,8 +83,9 @@ def questionauth(data):
     return json.dumps({'replay':True,'qustion':{"boursiCode":boursiCode,"family":family,"fromm":fromm,"serial":serial,"fatherName":fatherName}})
 
 def applycode(data):
-    apply = farasahmDb['dara_otp'].find_one({'phone':data['inputPhone']['phone']},sort=[('date', -1)])['code']
-    if apply == str(data['inputPhone']['code']):
+    apply = farasahmDb['VerificationPhone'].find_one({'phone':data['inputPhone']['phone'],'code':str(data['inputPhone']['code'])})
+    print(apply)
+    if apply != None:
         filter_query = {'nationalCode': data['inputPhone']['nationalCode']}
         update_query = {'$set': {'phone':data['inputPhone']['phone'],'nationalCode':data['inputPhone']['nationalCode'],'dateStart':datetime.datetime.now()}}
         farasahmDb['AuthenticationSession'].update_one(filter_query, update_query, upsert=True)
@@ -163,8 +164,8 @@ def coderegistered(data):
         if daraRegister != None:
             phone = daraRegister['phone']
 
-    cheakcode = farasahmDb['VerificationPhone'].find_one({'phone':phone})
-    if cheakcode['code'] != data['Code']:
+    cheakcode = farasahmDb['VerificationPhone'].find_one({'phone':phone,'code':data['Code']})
+    if cheakcode['code'] == None:
         return json.dumps({'replay':False,'msg':'کد تایید صحیح نیست'})
     dic = str({'phone':phone,'nationalCode':data['nationalCode']})
     dic = encrypt(dic).decode()

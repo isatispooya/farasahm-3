@@ -246,6 +246,12 @@ def GetTradeList(Firm,nationalIdentification,yr,mn,dy):
 def GetCustomerRemain(nationalIdentification, market):
     '''
     market => TSE = 1, IME = 2, IEE = 3, EFP = 4 
+    return ==>
+        AdjustedRemain :
+        BlockedRemain:
+        Credit:
+        CreditDate:
+        CurrentRemain:
     '''
     payload = f"<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n   <soapenv:Header>\n <CustomHeaderMessage xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"TadbirPardaz.TBS/PrincipalHeader\">\n  <AuthenticationType xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <Delegate xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IpAddress xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IsAuthenticated xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">false</IsAuthenticated>\n  <Name xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomHeaderMessage</Name>\n  <NameSpace xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">TadbirPardaz.TBS/PrincipalHeader</NameSpace>\n  <Password xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">123456aA$</Password>\n  <Roles xmlns:d2p1=\"http://schemas.microsoft.com/2003/10/Serialization/Arrays\" xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserId xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserName xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomerClub</UserName>\n </CustomHeaderMessage>\n   </soapenv:Header>\n   <soapenv:Body>\n   <tem:GetCustomerRemain>\n    <tem:nationalIdentification>{nationalIdentification}</tem:nationalIdentification>\n    <tem:market>{market}</tem:market>\n   </tem:GetCustomerRemain>\n   </soapenv:Body>\n</soapenv:Envelope>"
     headers = {
@@ -257,7 +263,8 @@ def GetCustomerRemain(nationalIdentification, market):
     response = response.decode("utf-8")
     root = ET.fromstring(response)
     xml_dict = Fnc.element_to_dict(root)
-    body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetCustomerRemainResponse']['{http://tempuri.org/}GetCustomerRemainResult']
+    body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']
+    body = body['{http://tempuri.org/}GetCustomerRemainResponse']['{http://tempuri.org/}GetCustomerRemainResult']
     dic = {}
     for i in body.keys():
         key = i.split('}')[1]

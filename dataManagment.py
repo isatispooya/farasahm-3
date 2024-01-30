@@ -680,7 +680,7 @@ def delprioritypay(data):
     farasahmDb['PriorityPay'].delete_one({'_id':cheack['_id']})
     CheackBase = farasahmDb['Priority'].find_one({'نام و نام خانوادگی':cheack['frm']})
     if CheackBase == None: return json.dumps({'replay':False,'msg':'یافت نشد'})
-    farasahmDb['Priority'].update_one({'_id':CheackBase['_id']},{'$set':{'حق تقدم استفاده شده':int(CheackBase['حق تقدم استفاده شده'])-int(cheack['count']),'حق تقدم':int(CheackBase['حق تقدم'])+int(cheack['count'])}})
+    farasahmDb['Priority'].update_one({'نام و نام خانوادگی':cheack['frm']},{'$set':{'حق تقدم استفاده شده':int(CheackBase['حق تقدم استفاده شده'])-int(cheack['count']),'حق تقدم':int(CheackBase['حق تقدم'])+int(cheack['count'])}})
     return json.dumps({'replay':True})
 
 def delprioritytransaction(data):

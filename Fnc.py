@@ -151,6 +151,7 @@ def diffJalaliIntToToday(date):
 
 def groupRosob(group):
     group['lenTarget'] = len(group)
+    group = group.sort_values('سهام کل',ascending=False)
     group['_children'] = [group[['index','سهام کل','نام خانوادگی ','نام','کد ملی','تاریخ تولد','محل صدور','lastTradeDay']].to_dict('records')]*len(group)
     group['سهام کل'] = group['سهام کل'].sum()
     group = group[group.index==group.index.min()]
@@ -198,14 +199,11 @@ def is_time_between(start,end):
     else:
         return False
     
-
 def toDayJalaliListYMD(Today = datetime.datetime.now()):
     Today = JalaliDate.to_jalali(Today)
     Today = str(Today).split('-')
     Today = [int(x) for x in Today]
     return Today
-
-
 
 def is_time_divisible(x):
     now = datetime.datetime.now()
@@ -784,3 +782,13 @@ def assetByLastDate(group):
     group = group[group['dateInt'] == group['dateInt'].max()]
     print(group)
     return group
+
+
+def to_percentage(rate):
+    try:
+        num = float(rate)
+        num = num * 100
+        num = round(num,2)
+        return num
+    except:
+        return 0
