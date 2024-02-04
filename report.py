@@ -1756,7 +1756,7 @@ def getassetfund(data):
         dff.append(dic)
     else:
         dff.append({'type':'اوراق', 'value':0, 'rate':0, 'warning':'مجموع کمتر از 40 % است', '_children':[],'min':EqMin,'max':0})
-    # Bank
+
     df_bank = df[df['type']=='سپرده بانکی']
     if len(df_bank)>0:
         value = int(df_bank['value'].sum())
@@ -1774,7 +1774,6 @@ def getassetfund(data):
             warning = ''
             equationMax = Eq((value_i + x) / (df['value'].sum() + x), 0.133)
             eqMax = int(solve(equationMax, x)[0])
-
             if rate_i>0.133:
                 warning = 'سپرده بانکی در این بانک بیش از 13.3 % است'
             df_i = df_bank[df_bank['name']==i]
@@ -1787,8 +1786,6 @@ def getassetfund(data):
         dic = {'type':'سپرده بانکی', 'value':0, 'rate':0, 'warning':'', '_children':[]}
     dff.append(dic)
     return json.dumps({'reply':True,'df':dff})
-
-
 
 def getoraghytm(data):
     access = data['access'][0]
@@ -1825,7 +1822,6 @@ def getoraghytm(data):
     dic = {'YTM':int(df['YTM'].max()),'LastDay':int(df['LastDay'].max()),'count':int(df['count'].max()),'mean':int(df['mean'].max()),'vol':int(df['vol'].max())}
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df, 'dic':dic})
-
 
 def getpriceforward(data):
     access = data['access'][0]
@@ -1883,7 +1879,6 @@ def getpriceforward(data):
     df = df.to_dict('records')
     return json.dumps({'reply':True, 'df':df})
 
-
 def addcompany(access, key, name, idTax, idNum):
     accesss = str(access).split(',')
     access = accesss[0]
@@ -1903,7 +1898,6 @@ def addcompany(access, key, name, idTax, idNum):
         return json.dumps({'reply':False,'msg':'شناسه اقتصادی/ملی تکراری است'})
     farasahmDb['companyMoadian'].insert_one(dic)
     return json.dumps({'reply':True})
-
 
 def getcompanymoadian(data):
     access = data['access'][0]
@@ -1944,8 +1938,6 @@ def getlistcompanymoadian(data):
     if len(df)==0:
         return json.dumps({'reply':False,'msg':'هیچ شرکتی ثبت نشده'})
     return json.dumps({'reply':True,'df':df})
-
-
 
 def saveinvoce(data):
     access = data['access'][0]
@@ -2839,3 +2831,69 @@ def getcomparetop(data):
     bot = bot.to_dict('dict')
 
     return json.dumps({'reply':True,'top':top,'bot':bot}) 
+
+
+
+
+def CustomerRemain(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['CustomerRemain'].find({},{'_id':0}))
+    df['AdjustedRemain'] = df['AdjustedRemain'].apply(float)
+    df = df[df['AdjustedRemain']>0]
+    df = df.groupby('TradeCode').apply(Fnc.GroupDfByLastDate)
+    df['Datetime'] = df['Datetime'].apply(Fnc.gorgianIntToJalali)
+    try:
+        df = df.reset_index()
+    except:
+        pass
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
+
+
+
+def moadian_getinvoice(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = farasahmDb['invoiceMoadian'].find({},{'result':0,'inquiry':0,'_id':0})
+    df = pd.DataFrame(df)
+
+    df['date'] = df['date'].apply(Fnc.gorgianIntToJalali)
+    df['type'] = [x['header']['inty'] for x in df['invoice']]
+    df['pattern'] = [x['header']['inp'] for x in df['invoice']]
+    df['buyerType'] = [x['header']['tob'] for x in df['invoice']]
+    df['price'] = [x['header']['tadis'] for x in df['invoice']]
+    df['taxAdded'] = [x['header']['tvam'] for x in df['invoice']]
+    dflistbody = df['invoice'].to_list()
+    dflistbody = [x['body'] for x in dflistbody]
+    dflistbodyNow = []
+    for i in dflistbody:
+        listRow = []
+        for j in i:
+            dic = {
+                'fee':j['fee'],
+                'taxAdded':j['vam'],
+                'price':j['prdis'],
+                'sstid':j['sstid'],
+                'sstt':j['sstt'],
+            }
+            listRow.append(dic)
+        dflistbodyNow.append(listRow)
+    df['_children'] =dflistbodyNow
+    df['fee'] = ''
+    df['sstid'] = ''
+    df['sstt'] = ''
+    df = df.drop(columns=['invoice'])
+
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})

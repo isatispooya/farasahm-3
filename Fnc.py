@@ -792,3 +792,10 @@ def to_percentage(rate):
         return num
     except:
         return 0
+
+
+
+def GroupDfByLastDate(group):
+    group = group[group['Datetime']==group['Datetime'].max()]
+
+    return group
