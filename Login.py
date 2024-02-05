@@ -55,7 +55,12 @@ def captcha():
 
 def applyPhone(data):
     captchas = GuardPyCaptcha()
-    captchas = captchas.check_response(data['captchaCode'],data['inputPhone']['captcha'])
+    try : 
+    
+        captchas = captchas.check_response(data['captchaCode'],data['inputPhone']['captcha'])
+    except:
+        
+        return json.dumps({'replay':False,'msg':'کد تصویر صحیح نیست'})
     if captchas == False:
         return json.dumps({'replay':False,'msg':'کد تصویر صحیح نیست'})
     if farasahmDb['user'].find_one({'phone':data['inputPhone']['phone']})==None:
