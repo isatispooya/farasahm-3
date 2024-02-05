@@ -757,6 +757,11 @@ def CustomerRemain():
     data = request.get_json()
     return report.CustomerRemain(data)
 
+@app.route('/valuefundinser',methods = ['POST', 'GET'])
+def valuefundinseris():
+    data = request.get_json()
+    return report.valuefundinseris(data)
+
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)
     app.run(host='0.0.0.0', debug=True)
