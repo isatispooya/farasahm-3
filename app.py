@@ -11,12 +11,15 @@ import Login
 import report
 import dara
 
+
+
 def addToReg(): 
     key = reg.OpenKey(reg.HKEY_CURRENT_USER , "Software\Microsoft\Windows\CurrentVersion\Run" ,0 , reg.KEY_ALL_ACCESS) # Open The Key
     reg.SetValueEx(key ,"any_name" , 0 , reg.REG_SZ , __file__) # Appending Script Address
     reg.CloseKey(key)
     
 addToReg()
+
 warnings.filterwarnings("ignore")
 
 client = pymongo.MongoClient()
@@ -256,6 +259,11 @@ def addcompany():
 def getcompanymoadian():
     data = request.get_json()
     return report.getcompanymoadian(data)
+
+@app.route('/moadian/getinvoice',methods = ['POST', 'GET'])
+def moadian_getinvoice():
+    data = request.get_json()
+    return report.moadian_getinvoice(data)
 
 
 @app.route('/delcompanymoadian',methods = ['POST', 'GET'])
@@ -743,6 +751,16 @@ def desk_sabad_delcodetrade():
 def desk_sabad_turnoverpercode():
     data = request.get_json()
     return report.turnoverpercode(data)
+
+@app.route('/customerremain',methods = ['POST', 'GET'])
+def CustomerRemain():
+    data = request.get_json()
+    return report.CustomerRemain(data)
+
+@app.route('/valuefundinser',methods = ['POST', 'GET'])
+def valuefundinseris():
+    data = request.get_json()
+    return report.valuefundinseris(data)
 
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)

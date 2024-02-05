@@ -78,25 +78,45 @@ def Update(access,daily,registerdaily):
 def createTraders(data):
     symbol = data['access'][1]
     for i in data['date']:
+        #در کاکشن traders برای نماد و تاریخی که داریم روش کار میکنم اگر از قبل در موجود بوده حذف میکنم که اطلاعات جدید جایگزین کنیم
         farasahmDb['traders'].delete_many({'symbol':symbol,'date':i})
+        #اطلاعات خام معهاملات رو از کالکشن trade گرفتیم
         dfTrade = pd.DataFrame(farasahmDb['trade'].find({"تاریخ معامله":i,'symbol':symbol},{'_id':0}))
+        #مقدار ارزش معاملات رو محاسبه کردیم
         dfTrade['Value'] = dfTrade['تعداد سهم'] * dfTrade['قیمت هر سهم']
-        dfBuy = dfTrade.groupby('کد خریدار').sum()[['تعداد سهم','Value']].reset_index()
-        dfSell = dfTrade.groupby('کد فروشنده').sum()[['تعداد سهم','Value']].reset_index()
+
+        #دیتا فریم جدید برای خریداران و فروشندگان ایجاد کردیم و مقدار ارزش معاملات و حجمشون رو تجمیع کردیم
+        dfBuy = dfTrade.groupby('کد خریدار').sum()
+        dfBuy = dfBuy[['تعداد سهم','Value']].reset_index()
+
+        dfSell = dfTrade.groupby('کد فروشنده').sum()
+        dfSell = dfSell[['تعداد سهم','Value']].reset_index()
+
         dfBuy.columns = ['کد','تعداد خرید','ارزش خرید']
         dfSell.columns = ['کد','تعداد فروش','ارزش فروش']
-        df = pd.concat([dfBuy,dfSell]).fillna(0).groupby('کد').sum()
+
+
+        df = pd.concat([dfBuy,dfSell])
+        df = df.fillna(0)
+        df = df.groupby('کد').sum()
+
         dfTrade = dfTrade[['کد خریدار','محل صدور خریدار' ,'محل صدور فروشنده', 'نام خانوادگی خریدار','نام خریدار','کد فروشنده', 'نام خانوادگی فروشنده', 'نام فروشنده','نام کارگزار خریدار','نام کارگزار فروشنده', ]]
         dfBuy = dfTrade[['کد خریدار','محل صدور خریدار' ,'نام خانوادگی خریدار','نام خریدار','نام کارگزار خریدار']]
         dfSell = dfTrade[['کد فروشنده','محل صدور فروشنده','نام خانوادگی فروشنده', 'نام فروشنده','نام کارگزار فروشنده']]
         dfBuy.columns = ['کد','صدور' ,'نام خانوادگی','نام','نام کارگزار']
         dfSell.columns = ['کد','صدور' ,'نام خانوادگی','نام','نام کارگزار']
         dff = pd.concat([dfBuy,dfSell]).fillna('').set_index('کد')
+
         dff['fullname'] = dff['نام'] +' ' + dff['نام خانوادگی']
+
         dff = dff.drop(columns=['نام خانوادگی','نام'])
-        df = df.join(dff,how='left').reset_index().drop_duplicates(subset=['کد'])
+        df = df.join(dff,how='left')
+        df = df.reset_index()
+        df = df.drop_duplicates(subset=['کد'])
+
         df['avgBuy'] = df['ارزش خرید'] / df['تعداد خرید']
         df['avgSell'] = df['ارزش فروش'] / df['تعداد فروش']
+
         register = pd.DataFrame(farasahmDb['register'].find({"تاریخ گزارش":i,'symbol':symbol},{'_id':0,'سهام کل':1,'کد سهامداری':1}))
         register.columns = ['کد', 'سهام کل']
         register = register.drop_duplicates(subset=['کد'])
@@ -104,12 +124,13 @@ def createTraders(data):
         df = df.set_index('کد')
         df = df.join(register,how='left')
         df = df.fillna(0).reset_index()
-        df['avgBuy'] = [int(x) for x in df['avgBuy']]
-        df['avgSell'] = [int(x) for x in df['avgSell']]
+        df['avgBuy'] = df['avgBuy'].apply(int)
+        df['avgSell'] = df['avgSell'].apply(int)
         df = df.drop(columns=['ارزش خرید','ارزش فروش'])
         df['date'] = i
         df['symbol'] = symbol
-        farasahmDb['traders'].insert_many(df.to_dict('records'))
+        df = df.to_dict('records')
+        farasahmDb['traders'].insert_many(df)
     return json.dumps({'replay':True})
 
 def createNewTraders(data):
