@@ -61,6 +61,20 @@ def JalaliIntToGorgia(date):
     return JalaliDate(y,m,d).to_gregorian()
 
 
+def days_difference(date_string):
+    # تاریخ و زمان فعلی را بدست می‌آوریم
+    current_date = datetime.datetime.now()
+    
+    # تاریخ و زمان مورد نظر را از رشته ورودی تجزیه و به شی datetime تبدیل می‌کنیم
+    target_date = datetime.datetime.strptime(date_string, '%Y-%m-%dT%H:%M:%S')
+    
+    # محاسبه‌ی اختلاف تاریخ‌ها به صورت تعداد روزها
+    difference = current_date - target_date
+    
+    # بازگرداندن اختلاف به صورت تعداد روزها (بدون در نظر گرفتن عوامل دیگر از مدت زمان)
+    return difference.days
+
+
 def JalaliIntToWeekYearJalali(date):
     date = str(date)
     y = int(str(date)[:4])
@@ -377,11 +391,9 @@ def convert_TradeCode_To_name(code):
 def drop_duplicet_TradeListBroker(jalaliInt = todayIntJalali()):
     df = pd.DataFrame(farasahmDb['TradeListBroker'].find({"dateInt":jalaliInt},{'_id':0}))
     df = df.drop_duplicates(subset=['NetPrice','Price','TotalCommission','TradeCode','dateInt','TradeNumber','TradeSymbol','TradeType','Volume'])
-    #df = df.drop_duplicates(subset=['BranchID','MarketInstrumentISIN','NetPrice','Price','TotalCommission','TradeCode','TradeDate','TradeItemBroker','TradeNumber','TradeSymbol','TradeType','Volume'])
     if len(df)>0:
         farasahmDb['TradeListBroker'].delete_many({"dateInt":jalaliInt})
         farasahmDb['TradeListBroker'].insert_many(df.to_dict('records'))
-        print('drop duplicets')
 
 
 def comma_separate(input_str):
@@ -780,7 +792,6 @@ def separate_string(input_str):
 
 def assetByLastDate(group):
     group = group[group['dateInt'] == group['dateInt'].max()]
-    print(group)
     return group
 
 
@@ -796,6 +807,29 @@ def to_percentage(rate):
 
 
 def GroupDfByLastDate(group):
-    group = group[group['Datetime']==group['Datetime'].max()]
+    group = group[group['datetime']==group['Datetime'].max()]
 
+    return group
+
+
+def groupBankAsset(group):
+    prd = group['return'].min()
+    group['rate'] = group['rate'].apply(float)
+    if prd == 12:
+        group['rate'] = group['rate'] / 12
+        group['rate'] = group['rate'] / 100
+        group['rate'] = group['rate'] + 1
+        group['rate'] = group['rate'] ** 12
+        group['rate'] = group['rate'] - 1
+        group['rate'] = group['rate'] * 100
+
+    group['balance'] = group['balance'].apply(int)
+
+    group['rateInVol'] = group['balance'] * (group['rate']/100)
+    group['rate'] = group['rateInVol'].sum() / group['balance'].sum()
+    group['rate'] =  group['rate'] * 100
+    group['rate'] =  group['rate'].apply(int)
+    group['balance'] = group['balance'].sum()
+    group = group[['rate','balance']]
+    group = group.drop_duplicates()
     return group

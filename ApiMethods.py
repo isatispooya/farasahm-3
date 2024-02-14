@@ -415,12 +415,13 @@ def get_asset_customer(today = Fnc.todayIntJalali()):
             TradeCodes = df['TradeCode'].to_list()
             for TradeCode in TradeCodes:
                 assets = pd.DataFrame(GetCustomerMomentaryAssets(TradeCode))
+                print(assets)
                 if len(assets)>0:
                     assets['TradeCode'] = TradeCode
                     assets['dateInt'] = today
                     assets['update'] = datetime.datetime.now()
                     assets = assets.to_dict('records')
-                    farasahmDb['assetsCoustomerBroker'].delete_many({"TradeCode":TradeCode,"dateInt":today})
+                    farasahmDb['assetsCoustomerBroker'].delete_many({"TradeCode":TradeCode})
                     farasahmDb['assetsCoustomerBroker'].insert_many(assets)
 
 
@@ -500,9 +501,39 @@ def getAssetCoustomerByFixincome():
         dateInt = Fnc.gorgianIntToJalaliInt(today)
         for i in codelist:
             asset = pd.DataFrame(GetCustomerMomentaryAssets(i))
-            asset['datetime'] = today
-            asset['dateInt'] = dateInt
-            asset = asset.to_dict('records')
-            farasahmDb['assetCoustomerOwnerFix'].delete_many({'TradeCode':i, 'dateInt':dateInt})
-            farasahmDb['assetCoustomerOwnerFix'].insert_many(asset)
+            if len(asset)>0:
+                asset['datetime'] = today
+                asset['dateInt'] = dateInt
+                asset = asset.to_dict('records')
+                farasahmDb['assetCoustomerOwnerFix'].delete_many({'TradeCode':i, 'dateInt':dateInt})
+                farasahmDb['assetCoustomerOwnerFix'].insert_many(asset)
+
+
+
+@Fnc.retry_decorator(max_retries=3, sleep_duration=5)
+def handle_CuostomerRemain():
+    listCode_all = farasahmDb['TradeListBroker'].distinct('TradeCode')
+    for i in range(0,len(listCode_all)):
+        code = listCode_all[i]
+        print(code, i/len(listCode_all))
+        try:
+            result = GetCustomerRemainWithTradeCode(str(code),'TSE')
+            result['datetime'] = datetime.datetime.now()
+            result['code'] = code
+            tradelist = farasahmDb['TradeListBroker'].find_one({'TradeCode':str(code)},sort=[('dateInt',-1)])
+            result['lastTradeDateGor'] = tradelist['TradeDate']
+            result['lastTradeDateJal'] = tradelist['dateInt']
+            result['Branch'] = tradelist['BranchTitle']
+            farasahmDb['CustomerRemain'].delete_many({'TradeCode':str(code)})
+            farasahmDb['CustomerRemain'].insert_one(result)
+        except:
+            pass
+
+
+
+
+
+
+
+
 

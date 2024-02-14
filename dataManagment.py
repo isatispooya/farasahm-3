@@ -45,7 +45,6 @@ def Update(access,daily,registerdaily):
     dfDaily['symbol'] = str(access).split(',')[1]
     dfRegister['symbol'] = str(access).split(',')[1]
     farasahmDb['trade'].insert_many(dfDaily.to_dict('records'))
-
     #برای ثبت اخرین ایستگاه های خرید و فروش سهامداران
     dfTradeStation = pd.DataFrame(farasahmDb['trade'].find({'symbol':str(access).split(',')[1]},{'_id':0,'تاریخ معامله':1,'کد خریدار':1,'نام کارگزار خریدار':1,'کد فروشنده':1,'نام کارگزار فروشنده':1}))
     dfTradeStation = dfTradeStation.sort_values('تاریخ معامله',ascending=False)
@@ -53,8 +52,15 @@ def Update(access,daily,registerdaily):
     dfTradeStationSel = dfTradeStation.copy()[['کد فروشنده','نام کارگزار فروشنده']]
     dfTradeStationBy = dfTradeStationBy.drop_duplicates(subset=['کد خریدار'],keep='first')
     dfTradeStationSel = dfTradeStationSel.drop_duplicates(subset=['کد فروشنده'],keep='first')
-    dfTradeStationBy = dfTradeStationBy[dfTradeStationBy['کد خریدار'].isin(dfRegister['کد سهامداری'].to_list())]
-    dfTradeStationSel = dfTradeStationSel[dfTradeStationSel['کد فروشنده'].isin(dfRegister['کد سهامداری'].to_list())]
+
+    list_dfRegister = dfRegister['کد سهامداری'].to_list()
+
+    conditional_by = dfTradeStationBy['کد خریدار'].isin(list_dfRegister)
+    conditional_sl = dfTradeStationSel['کد فروشنده'].isin(list_dfRegister)
+
+    dfTradeStationBy = dfTradeStationBy[conditional_by]
+    dfTradeStationSel = dfTradeStationSel[conditional_sl]
+    
     dfTradeStationBy = dfTradeStationBy.rename(columns={'کد خریدار':'کد سهامداری','نام کارگزار خریدار':'اخرین کارگزاری خرید'})
     dfTradeStationSel = dfTradeStationSel.rename(columns={'کد فروشنده':'کد سهامداری','نام کارگزار فروشنده':'اخرین کارگزاری فروش'})
     dfRegister = dfRegister.set_index('کد سهامداری').join(dfTradeStationBy.set_index('کد سهامداری'),how='left')
@@ -591,8 +597,6 @@ def addcapitalincrease(data):
             return json.dumps({'replay':False,'msg':'در تاریخ ذکر شده سهامداری یافت نشد'})
         if data['data']['methode'] == 'آورده سهامداران':
             total = df['تعداد سهام'].sum()
-            print(total)
-            print(int(data['data']['cuont']))
             grow = (int(data['data']['cuont'])/total)-1
             dff = df[['نام و نام خانوادگی','کد ملی','نام پدر','تعداد سهام','symbol','شماره تماس']]
             dff['حق تقدم'] = dff['تعداد سهام'] * grow
@@ -723,6 +727,52 @@ def delprioritytransaction(data):
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def desk_broker_volumeTrade_cal():
     print('start cal volume trade')
+    listDate = farasahmDb['TradeListBroker'].distinct('dateInt')
+    for date in listDate:
+        print('volume trade', date)
+        df = pd.DataFrame(farasahmDb['TradeListBroker'].find({'dateInt':date},{'صندوق':1,'InstrumentCategory':1,'NetPrice':1,'_id':0}))
+        df['NetPrice'] = df['NetPrice'].apply(int)
+        df['صندوق'] = df['صندوق'].fillna(False)
+        df['InstrumentCategory'] = df['InstrumentCategory'].replace('false',False).replace('true',True)
+        df = df.groupby(['صندوق','InstrumentCategory']).sum().reset_index()
+        dic = {}
+        for i in df.index:
+            if df['InstrumentCategory'][i]:
+                dic['اوراق کارگزاری']  = int(df['NetPrice'][i])
+            if df['صندوق'][i]:
+                dic['صندوق کارگزاری']  = int(df['NetPrice'][i])
+            else:
+                dic['سهام کارگزاری']  = int(df['NetPrice'][i])
+        dic['کل کارگزاری'] = int(df['NetPrice'].sum())
+
+        tse = pd.DataFrame(farasahmDb['tse'].find({'dataInt':date},{'InstrumentCategory':1,'صندوق':1,'ارزش':1,'_id':0}))
+        if len(tse) > 0:
+            tse['ارزش'] = tse['ارزش'].apply(int)
+            tse = tse.groupby(['صندوق','InstrumentCategory']).sum().reset_index()
+            for i in tse.index:
+                if tse['InstrumentCategory'][i]:
+                    dic['اوراق بازار']  = int(tse['ارزش'][i])
+                if tse['صندوق'][i]:
+                    dic['صندوق بازار']  = int(tse['ارزش'][i])
+                else:
+                    dic['سهام بازار']  = int(tse['ارزش'][i])
+            dic['کل بازار'] = int(tse['ارزش'].sum())
+            dic['date'] = date
+            for i in ['اوراق کارگزاری','صندوق کارگزاری','سهام کارگزاری','کل کارگزاری','کل بازار','اوراق بازار','صندوق بازار','سهام بازار']:
+                if i not in dic.keys():
+                    dic[i] = 0
+            dic['نسبت کل'] = round(float(dic['کل کارگزاری'] / dic['کل بازار'])*100,2)
+            dic['نسبت سهام'] = round(float(dic['سهام کارگزاری'] / dic['سهام بازار'])*100, 2)
+            dic['نسبت صندوق'] = round(float(dic['صندوق کارگزاری'] / dic['صندوق بازار'])*100, 2)
+            dic['نسبت اوراق'] = round(float(dic['اوراق کارگزاری'] / dic['اوراق بازار'])*100, 2)
+            farasahmDb['deskBrokerVolumeTrade'].delete_many({'date':date})
+            farasahmDb['deskBrokerVolumeTrade'].insert_one(dic)
+
+
+'''
+@Fnc.retry_decorator(max_retries=3, sleep_duration=5)
+def desk_broker_volumeTrade_cal():
+    print('start cal volume trade')
     pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
     pipelineTse = [{"$match": {"dataInt": {"$gte": 14020101}}},{"$group":{ "_id": {"fund": "$صندوق","date": "$dataInt","InstrumentCategory":"$InstrumentCategory"},"totalNetPrice": {"$sum": "$ارزش"}}}]
     df = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
@@ -753,9 +803,7 @@ def desk_broker_volumeTrade_cal():
     df = df.to_dict('records')
     farasahmDb['deskBrokerVolumeTrade'].delete_many({})
     farasahmDb['deskBrokerVolumeTrade'].insert_many(df)
-
-
-
+'''
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def desk_broker_turnover_cal():

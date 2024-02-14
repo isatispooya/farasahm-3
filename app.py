@@ -58,7 +58,7 @@ def access():
 def update():
     access = request.form['access']
     daily =  request.files['daily']
-    registerdaily =  request.files['registerdaily']
+    registerdaily = request.files['registerdaily']
     return dataManagment.Update(access,daily,registerdaily)
 
 @app.route('/createtraders',methods = ['POST', 'GET'])
@@ -761,6 +761,16 @@ def CustomerRemain():
 def valuefundinseris():
     data = request.get_json()
     return report.valuefundinseris(data)
+
+@app.route('/getassetmixbank',methods = ['POST', 'GET'])
+def getassetmixbank():
+    data = request.get_json()
+    return report.getassetmixbank(data)
+
+@app.route('/getassetmixoraq',methods = ['POST', 'GET'])
+def getassetmixoraq():
+    data = request.get_json()
+    return report.getassetmixoraq(data)
 
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)

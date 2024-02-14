@@ -2261,7 +2261,7 @@ def getonwerfix(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    df = pd.DataFrame(farasahmDb['assetCoustomerOwnerFix'].find({'Symbol':symbol+'1'},{'_id':0,'CustomerTitle':1,'Volume':1,'dateInt':1,'TradeCode':1}))
+    df = pd.DataFrame(farasahmDb['assetsCoustomerBroker'].find({'Symbol':symbol+'1'},{'_id':0,'CustomerTitle':1,'Volume':1,'dateInt':1,'TradeCode':1}))
     df = df.groupby('TradeCode').apply(Fnc.groupTradeCodeinLastDate)
     df['Volume'] = df['Volume'].apply(int)
     df = df.sort_values(by='Volume',ascending=False)
@@ -2632,14 +2632,13 @@ def staticownerincomp(data):
     df['Volume_Buy'] = df['Volume'] * (df['TradeType'] == 'Buy')
     df['Volume_Sel'] = df['Volume'] * (df['TradeType'] != 'Buy')
     df = df.groupby('dateInt').sum()
-    dff = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'dateInt':1,'trade_volume':1,'trade_number':1,'_id':0}))
-    dff = dff.set_index('dateInt')
-    df = df.join(dff)
+
     df = df.dropna()
+    df['balance'] = df['Volume_Buy'] - df['Volume_Sel']
     df = df.sort_index(ascending=False)
     df['dateInt'] = df.index
-    df['trade_volume'] = pd.to_numeric(df['trade_volume'], errors='coerce').fillna(0).astype(int)
-    df = df[['trade_volume', 'Volume_Buy','Volume_Sel','dateInt']]
+
+    df = df[['balance','dateInt']]
     df = df.to_dict('dict')
     return json.dumps({'reply':True, 'df':df})
 
@@ -2785,7 +2784,6 @@ def getcomparetop(data):
 
     access = data['access'][0]
     symbol = data['access'][1]
-    print(data)
     symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
     _id = ObjectId(access)
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
@@ -2823,11 +2821,13 @@ def getcomparetop(data):
     etfs = etfs[['rank','ytm','symbol']]
 
 
-    top = etfs[etfs.index<=4]
+
+    top = etfs[etfs['rank']>etfs['rank'].max()-5]
     top.index = top['symbol']
     top = top.to_dict('dict')
 
-    bot = etfs[etfs.index>=len(etfs)-5]
+    bot = etfs[etfs['rank']<etfs['rank'].min()+5]
+    bot = bot.sort_values('rank')
     bot.index = bot['symbol']
     bot = bot.to_dict('dict')
 
@@ -2847,15 +2847,13 @@ def CustomerRemain(data):
     df = pd.DataFrame(farasahmDb['CustomerRemain'].find({},{'_id':0}))
     df['AdjustedRemain'] = df['AdjustedRemain'].apply(float)
     df = df[df['AdjustedRemain']>0]
-    df = df.groupby('TradeCode').apply(Fnc.GroupDfByLastDate)
-    df['Datetime'] = df['Datetime'].apply(Fnc.gorgianIntToJalali)
-    try:
-        df = df.reset_index()
-    except:
-        pass
+    df['datetime'] = df['datetime'].apply(Fnc.gorgianIntToJalali)
+    df['lastTradeDay'] = df['lastTradeDateGor'].apply(Fnc.days_difference)
+    df = df[df['lastTradeDay']>=60]
+
+
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
-
 
 
 def moadian_getinvoice(data):
@@ -2910,7 +2908,62 @@ def valuefundinseris(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     df = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbolF},{'_id':0,'VolumeInPrice':1,'date':1}))
+    df = df.drop_duplicates()
     df = df.groupby(by='date').sum()
     df['date'] = df.index
     df = df.to_dict('dict')
     return json.dumps({'reply':True,'df':df})
+
+
+def getassetmixbank(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['bankBalance'].find({'symbol':symbolF}))
+    df['return'] = df['return'].replace('yearly',1).replace('monthly',12)
+    df = df.groupby(['name']).apply(Fnc.groupBankAsset)
+    df['rateBalance'] = (df['rate']/100) * df['balance']
+    df['rateBalance'] = df['rateBalance'].apply(int)
+    total_rate = (df['rateBalance'].sum() / df['balance'].sum())
+    total_rate = round(total_rate * 100,2)
+    total_balance = df['balance'].sum()
+    df = df.reset_index()[['name','rate','balance']]
+    label = [x for x in df['name']]
+    lst = [x for x in df['balance']]
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df, 'lab':label, 'lst':lst, 'sum':int(total_balance), 'rate':total_rate})
+
+
+def getassetmixoraq(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbolF},{'Symbol':1,'date':1,'type':1,'VolumeInPrice':1,'Volume':1,'MarketInstrumentTitle':1}))
+    df = df[df['date']==df['date'].max()]
+    df = df[df['type']!='saham']
+    df['rate'] = 0
+    for i in df.index:
+        name = df['MarketInstrumentTitle'][i]
+        rate = farasahmDb['ReturnRateAssetFund'].find_one({'MarketInstrumentTitle':name})
+        if rate != None:
+            df['rate'][i] = round(int(rate['rate']),2)/100
+    df = df[['Symbol','VolumeInPrice','rate']]
+    df['inBal'] = df['VolumeInPrice'] * df['rate']
+    df['rate'] = df['rate'] * 100
+    total_rate = df['inBal'].sum() / df['VolumeInPrice'].sum()
+    total_rate = total_rate * 100
+    total_rate = round(total_rate,2)
+    total_balance = int(df['VolumeInPrice'].sum())
+    label = [x for x in df['Symbol']]
+    lst = [x for x in df['VolumeInPrice']]
+    df['rate'] = [round(x,2) for x in df['rate']]
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df, 'lab':label, 'lst':lst, 'sum':total_balance, 'rate':total_rate})
