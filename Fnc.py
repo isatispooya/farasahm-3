@@ -10,6 +10,8 @@ import time
 import threading
 import Fnc
 import random
+import arabic_reshaper
+from bidi.algorithm import get_display
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
 
@@ -246,6 +248,12 @@ def dateStrToIntJalali(date):
     dateInt = int(dateInt)
     return dateInt
 
+def dateToIntJalali(date):
+    dateInt = JalaliDate(date)
+    dateInt = str(dateInt).replace('-','')
+    dateInt = int(dateInt)
+    return dateInt
+
 def isFund(x):
     if 'صندوق' in x:
         return True
@@ -289,6 +297,29 @@ def getTseDate(date=datetime.datetime.now()):
                 farasahmDb['tse'].delete_many({'dataInt':jalaliInt})
                 farasahmDb['tse'].insert_many(df)
                 
+@retry_decorator(max_retries=3, sleep_duration=5)
+def TseRepir():
+    dateList = farasahmDb['TradeListBroker'].distinct('dateInt')
+    for date in dateList:
+        print(f'repair tse {date}')
+        jalaliStr = str(date)
+        jalaliStr = jalaliStr[:4]+'/'+jalaliStr[4:6]+'/'+jalaliStr[6:]
+        res = requests.get(url=f'http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d={date}')
+        if res.status_code == 200:
+            df = pd.read_excel(res.content,header=2, engine='openpyxl')
+            if len(df)>10:
+                df['نماد'] = df['نماد'].apply(characters.ar_to_fa)
+                df['نام'] = df['نام'].apply(characters.ar_to_fa)
+                df['صندوق'] = df['نام'].apply(isFund)
+                df['InstrumentCategory'] = df['نام'].apply(isOragh)
+                df['data'] = jalaliStr
+                df['dataInt'] = date
+                df['timestump'] = 0
+                df['time'] = str(15) +':'+str('00')+':'+str('00')
+                df = df.to_dict('records')
+                farasahmDb['tse'].delete_many({'dataInt':date})
+                farasahmDb['tse'].insert_many(df)
+
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def getTse30LastDay():
     for d in range(1,30):
@@ -832,4 +863,24 @@ def groupBankAsset(group):
     group['balance'] = group['balance'].sum()
     group = group[['rate','balance']]
     group = group.drop_duplicates()
+    return group
+
+
+def repairPersian(txt):
+    txt = arabic_reshaper.reshape(txt)
+    txt = get_display(txt)
+    return txt
+
+
+
+def SymbolGroupDfNoneHandle(group):
+    group = group.ffill()
+    group = group.bfill()
+    group = group[['Volume','قیمت پایانی - مقدار','date','Symbol']]
+    return group
+
+
+def SumValueDf(group):
+    if group['قیمت پایانی - مقدار'].isnull().sum()>0:
+        return pd.DataFrame()
     return group

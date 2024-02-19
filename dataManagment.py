@@ -730,7 +730,9 @@ def desk_broker_volumeTrade_cal():
     listDate = farasahmDb['TradeListBroker'].distinct('dateInt')
     for date in listDate:
         print('volume trade', date)
-        df = pd.DataFrame(farasahmDb['TradeListBroker'].find({'dateInt':date},{'صندوق':1,'InstrumentCategory':1,'NetPrice':1,'_id':0}))
+        df = pd.DataFrame(farasahmDb['TradeListBroker'].find({'dateInt':date},{'صندوق':1,'InstrumentCategory':1,'NetPrice':1,'_id':0,'TradeCode':1,'TradeDate':1,'TradeNumber':1,'TradeSymbol':1}))
+        df = df.drop_duplicates()
+        df = df[['صندوق','InstrumentCategory','NetPrice']]
         df['NetPrice'] = df['NetPrice'].apply(int)
         df['صندوق'] = df['صندوق'].fillna(False)
         df['InstrumentCategory'] = df['InstrumentCategory'].replace('false',False).replace('true',True)

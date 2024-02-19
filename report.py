@@ -17,8 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 import arabic_reshaper
 from bidi.algorithm import get_display
 from persiantools import characters, digits
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
+
 from bson import ObjectId
 import Fnc
 from ApiMethods import GetCustomerMomentaryAssets
@@ -26,6 +25,15 @@ import time
 from bson import Binary
 from moadian import Moadian
 from bson.son import SON
+
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import landscape, A4
+from reportlab.pdfgen import canvas
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 
 farasahmDb = client['farasahm2']
@@ -1043,7 +1051,7 @@ def desk_broker_volumeTrade(data):
     df = df.replace(np.inf,0)
     df = df.replace(-np.inf,0)
     df = df.fillna(0)
-    tse_mean = {'نسبت اوراق':df['نسبت اوراق'].mean(), 'نسبت صندوق':df['نسبت صندوق'].mean(), 'نسبت سهام':df['نسبت سهام'].mean(), 'نسبت کل':df['نسبت کل'].mean()}
+    meanrate = {'نسبت کل':df['نسبت کل'].mean(), 'نسبت اوراق':df['نسبت اوراق'].mean(), 'نسبت صندوق':df['نسبت صندوق'].mean(), 'نسبت سهام':df['نسبت سهام'].mean()}
     if dateFrom != None and dateTo != None:
         dateFrom = Fnc.timestumpToJalalInt(dateFrom)
         dateTo = Fnc.timestumpToJalalInt(dateTo)
@@ -1061,7 +1069,7 @@ def desk_broker_volumeTrade(data):
     for c in df.columns:
         if c in ['نسبت کل','نسبت اوراق','نسبت صندوق','نسبت سهام']:
             df[c] = df[c].apply(Fnc.floatTo2decimal)
-            df[f'{c} انحراف'] = df[c] - float(Fnc.floatTo2decimal(tse_mean[c]))
+            df[f'{c} انحراف'] = df[c] - float(Fnc.floatTo2decimal(meanrate[c]))
             df[f'{c} انحراف'] = df[f'{c} انحراف'].apply(Fnc.floatTo2decimalNormal)
         else:
             df[c] = df[c].apply(Fnc.toBillionRial)
@@ -1879,7 +1887,7 @@ def getpriceforward(data):
     df = df.to_dict('records')
     return json.dumps({'reply':True, 'df':df})
 
-def addcompany(access, key, name, idTax, idNum):
+def addcompany(access, key, name, idTax, idNum, address, call, postcode):
     accesss = str(access).split(',')
     access = accesss[0]
     symbol = accesss[1]
@@ -1889,7 +1897,7 @@ def addcompany(access, key, name, idTax, idNum):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     key = Binary(key.read()).decode()
-    dic = {'key':key, 'name':name, 'idTax':idTax, 'idNum':idNum,'date':datetime.datetime.now(), 'symbol':symbol}
+    dic = {'key':key, 'name':name, 'idTax':idTax, 'idNum':idNum,'date':datetime.datetime.now(), 'symbol':symbol, 'address':address, 'call':call, 'postcode':postcode}
     if farasahmDb['companyMoadian'].find_one({'name':name}) != None:
         return json.dumps({'reply':False,'msg':'نام شرکت تکراری است'})
     if farasahmDb['companyMoadian'].find_one({'idTax':idTax}) != None:
@@ -1911,6 +1919,7 @@ def getcompanymoadian(data):
     if len(df) == 0:
         df['date'] = df['date'].apply(Fnc.gorgianIntToJalaliInt)
         df['key'] = '*'*10
+    df['date'] = df['date'].apply(Fnc.dateToIntJalali)
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
 
@@ -2057,7 +2066,10 @@ def saveinvoce(data):
         'body' : body,
         'payments' : []
     }
-    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None}
+    buyer = data['buyer']
+    buyer['idcode'] = str(invoceData['buyerId'])
+    buyer['idcode'] = str(invoceData['buyerId'])
+    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None, 'details':{'seler':sellerDic,'buyer':buyer,'text':data['textinv']}}
     farasahmDb['invoiceMoadian'].insert_one(dic)
 
     return json.dumps({'reply':True})
@@ -2399,7 +2411,7 @@ def getinvoce(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    df = pd.DataFrame(farasahmDb['invoiceMoadian'].find({},{'invoice':0}))
+    df = pd.DataFrame(farasahmDb['invoiceMoadian'].find({},{'invoice':0,'details':0}))
     df['date'] = df['date'].apply(Fnc.gorgianIntToJalali)
     df['date'] = df['date'].apply(str)
     df['_id'] = df['_id'].apply(str)
@@ -2407,7 +2419,6 @@ def getinvoce(data):
     df['referenceNumber'] = df['result'].apply(Fnc.resultToReferenceNumber)
     df['status'] = df['inquiry'].apply(Fnc.resultToStatus)
     df['error'] = df['inquiry'].apply(Fnc.resultToError)
-
     df = df.to_dict('records')
     return json.dumps({'reply':True, 'df':df})
 
@@ -2526,10 +2537,13 @@ def getratretasst(data):
         return json.dumps({'reply':True,'df':df})
     dff = dff[dff['date']==dff['date'].max()]
     dff = dff[['MarketInstrumentTitle','rate']]
+    
     df = dff.set_index('MarketInstrumentTitle').join(df.set_index('MarketInstrumentTitle'), how='right')
+    
     df = df.fillna(0)
     df = df.reset_index()
     df = df[['MarketInstrumentTitle', 'type', 'rate']]
+    print(df)
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
 
@@ -2626,13 +2640,13 @@ def staticownerincomp(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     df = farasahmDb['TradeListBroker'].find({'TradeSymbol':symbol+'1'},{'_id':0,'TradeCode':1, 'Volume':1, 'dateInt':1,  "TradeType":1})
     df = pd.DataFrame(df)
+    df = df[df['TradeCode']!="61580186248"]
     df = df[['Volume', 'dateInt','TradeType']]
     df['len'] = 1
     df['Volume'] = pd.to_numeric(df['Volume'], errors='coerce').fillna(0).astype(int)
     df['Volume_Buy'] = df['Volume'] * (df['TradeType'] == 'Buy')
     df['Volume_Sel'] = df['Volume'] * (df['TradeType'] != 'Buy')
     df = df.groupby('dateInt').sum()
-
     df = df.dropna()
     df['balance'] = df['Volume_Buy'] - df['Volume_Sel']
     df = df.sort_index(ascending=False)
@@ -2864,8 +2878,9 @@ def moadian_getinvoice(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    df = farasahmDb['invoiceMoadian'].find({},{'result':0,'inquiry':0,'_id':0})
+    df = farasahmDb['invoiceMoadian'].find({},{'result':0,'inquiry':0})
     df = pd.DataFrame(df)
+    df['_id'] = df['_id'].apply(str)
 
     df['date'] = df['date'].apply(Fnc.gorgianIntToJalali)
     df['type'] = [x['header']['inty'] for x in df['invoice']]
@@ -2893,7 +2908,7 @@ def moadian_getinvoice(data):
     df['sstid'] = ''
     df['sstt'] = ''
     df = df.drop(columns=['invoice'])
-
+    df = df.drop(columns=['details'])
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
 
@@ -2909,6 +2924,7 @@ def valuefundinseris(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     df = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbolF},{'_id':0,'VolumeInPrice':1,'date':1}))
     df = df.drop_duplicates()
+    df['Volume'] = df['VolumeInPrice'].apply(int)
     df = df.groupby(by='date').sum()
     df['date'] = df.index
     df = df.to_dict('dict')
@@ -2938,7 +2954,7 @@ def getassetmixbank(data):
     return json.dumps({'reply':True,'df':df, 'lab':label, 'lst':lst, 'sum':int(total_balance), 'rate':total_rate})
 
 
-def getassetmixoraq(data):
+def getassetmixoraqdol(data):
     access = data['access'][0]
     symbol = data['access'][1]
     symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
@@ -2946,15 +2962,18 @@ def getassetmixoraq(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    df = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbolF},{'Symbol':1,'date':1,'type':1,'VolumeInPrice':1,'Volume':1,'MarketInstrumentTitle':1}))
+    df = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbolF,'type':'gov'},{'Symbol':1,'date':1,'type':1,'VolumeInPrice':1,'Volume':1,'MarketInstrumentTitle':1}))
     df = df[df['date']==df['date'].max()]
     df = df[df['type']!='saham']
     df['rate'] = 0
     for i in df.index:
         name = df['MarketInstrumentTitle'][i]
-        rate = farasahmDb['ReturnRateAssetFund'].find_one({'MarketInstrumentTitle':name})
+        rate = farasahmDb['ReturnRateAssetFund'].find_one({'MarketInstrumentTitle': name}, sort=[('date', -1)])
+        
+
         if rate != None:
             df['rate'][i] = round(int(rate['rate']),2)/100
+        
     df = df[['Symbol','VolumeInPrice','rate']]
     df['inBal'] = df['VolumeInPrice'] * df['rate']
     df['rate'] = df['rate'] * 100
@@ -2967,3 +2986,415 @@ def getassetmixoraq(data):
     df['rate'] = [round(x,2) for x in df['rate']]
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df, 'lab':label, 'lst':lst, 'sum':total_balance, 'rate':total_rate})
+
+def getassetmixoraqnon(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbolF,'type':'non-gov'},{'Symbol':1,'date':1,'type':1,'VolumeInPrice':1,'Volume':1,'MarketInstrumentTitle':1}))
+    df = df[df['date']==df['date'].max()]
+    df = df[df['type']!='saham']
+    df['rate'] = 0
+    for i in df.index:
+        name = df['MarketInstrumentTitle'][i]
+        rate = farasahmDb['ReturnRateAssetFund'].find_one({'MarketInstrumentTitle': name}, sort=[('date', -1)])
+        if rate != None:
+            df['rate'][i] = round(int(rate['rate']),2)/100
+        
+    df = df[['Symbol','VolumeInPrice','rate']]
+    df['inBal'] = df['VolumeInPrice'] * df['rate']
+    df['rate'] = df['rate'] * 100
+    total_rate = df['inBal'].sum() / df['VolumeInPrice'].sum()
+    total_rate = total_rate * 100
+    total_rate = round(total_rate,2)
+    total_balance = int(df['VolumeInPrice'].sum())
+    label = [x for x in df['Symbol']]
+    lst = [x for x in df['VolumeInPrice']]
+    df['rate'] = [round(x,2) for x in df['rate']]
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df, 'lab':label, 'lst':lst, 'sum':total_balance, 'rate':total_rate})
+
+def getassetmixoraqsah(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['assetFunds'].find({'Fund':symbolF,'type':'saham'},{'Symbol':1,'date':1,'type':1,'VolumeInPrice':1,'Volume':1,'MarketInstrumentTitle':1}))
+    df = df[df['date']==df['date'].max()]
+    df = df[df['type']!='non-gov']
+    df = df[df['type']!='gov']
+    df['rate'] = 0
+    for i in df.index:
+        name = df['MarketInstrumentTitle'][i]
+        rate = farasahmDb['ReturnRateAssetFund'].find_one({'MarketInstrumentTitle': name}, sort=[('date', -1)])
+        if rate != None:
+            df['rate'][i] = round(int(rate['rate']),2)/100
+        
+    df = df[['Symbol','VolumeInPrice','rate']]
+    df['inBal'] = df['VolumeInPrice'] * df['rate']
+    df['rate'] = df['rate'] * 100
+    total_rate = df['inBal'].sum() / df['VolumeInPrice'].sum()
+    total_rate = total_rate * 100
+    total_rate = round(total_rate,2)
+    total_balance = int(df['VolumeInPrice'].sum())
+    label = [x for x in df['Symbol']]
+    lst = [x for x in df['VolumeInPrice']]
+    df['rate'] = [round(x,2) for x in df['rate']]
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df, 'lab':label, 'lst':lst, 'sum':total_balance, 'rate':total_rate})
+
+
+def moadian_delinvoice(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    _id = data['id']
+    inv = farasahmDb['invoiceMoadian'].find_one({'_id':ObjectId(_id)})
+    if inv['inquiry'] == None:
+        farasahmDb['invoiceMoadian'].delete_one({'_id':ObjectId(_id)})
+        return json.dumps({'reply':True})
+    if inv['inquiry']['status'] != 'SUCCESS':
+        farasahmDb['invoiceMoadian'].delete_one({'_id':ObjectId(_id)})
+        return json.dumps({'reply':True})
+    return json.dumps({'reply':False,'msg':'این صورت حساب قبلا با موفقیت به کارپوشه ارسال شده'})
+
+
+def moadian_print(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+
+    a4_width_mm = 297
+    a4_height_mm = 210
+
+    # تبدیل میلی‌متر به پیکسل (با فرض DPI = 72)
+    dpi = 72
+    a4_width_px = int(a4_width_mm * dpi / 25.4)
+    a4_height_px = int(a4_height_mm * dpi / 25.4)
+
+    font_path = "public/Peyda-Medium.ttf"
+    height_use = 0
+
+    image = Image.new('RGB', ( a4_width_px, a4_height_px ), color='white')
+    draw = ImageDraw.Draw(image)
+
+    if acc == None:
+        image.save("public/invoice.png")
+        return send_file("public/invoice.png", as_attachment=True, mimetype="image/png")
+    
+    _id = data['id']
+    inv = farasahmDb['invoiceMoadian'].find_one({'_id':ObjectId(_id)})
+    if inv == None:
+        image.save("public/invoice.png")
+        return send_file("public/invoice.png", as_attachment=True, mimetype="image/png")
+    
+    #title
+    font = ImageFont.truetype(font_path, 18)
+    text = Fnc.repairPersian("صورت حساب فروش")
+    width, height = draw.textsize(text, font=font)
+    height_margin = 10
+    position = ((a4_width_px - width) / 2, height_margin)
+    draw.text(position, text, fill="black", font=font)
+
+    #Num&Date
+    font = ImageFont.truetype(font_path, 12)
+    date = str(Fnc.timestumpToJalalInt(inv['invoice']['header']['indatim']))
+    date = date[:4] +'/'+date[4:6]+'/'+date[6:8]
+    text = 'شماره:  ' + inv['invoice']['header']['taxid'] + '\n' + 'تاریخ:'+ (' '*100) + date
+    text = Fnc.repairPersian(text)
+    width, height = draw.textsize(text, font=font)
+    height_margin = 10
+    position = (10, height_margin)
+    draw.text(position, text, fill="black", font=font)
+    height_use = height_use + height_margin + height
+    
+
+    #start seller
+    height_margin = 10
+    height_use = height_use + height_margin
+    box_top = height_use
+
+    #title
+    font = ImageFont.truetype(font_path, 14)
+    text = Fnc.repairPersian("مشخصات فروشنده")
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px - width) / 2, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+    height_use = height_use + height_margin + height
+
+
+    #name
+    font = ImageFont.truetype(font_path, 13)
+    text = Fnc.repairPersian("نام شخص حقوقی: "+inv['details']['seler']['name'])
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px - width)-20, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+
+    #id
+    font = ImageFont.truetype(font_path, 13)
+    text = Fnc.repairPersian("شناسه ملی: "+inv['details']['seler']['idNum'])
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px/4)-width, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+    height_use = height_use + height_margin + height
+
+    #address
+    font = ImageFont.truetype(font_path, 11)
+    text = Fnc.repairPersian("ادرس: "+inv['details']['seler']['address'])
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px - width)-20, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+    height_use = height_use + height_margin + height
+
+    #telephon
+    font = ImageFont.truetype(font_path, 11)
+    text = Fnc.repairPersian("تماس: "+inv['details']['seler']['call'])
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px - width)-20, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+    height_use = height_use + height_margin + height
+    
+    #draw seller
+    height_margin = 8
+    box_bottom = height_use + height_margin
+    box_left = 10
+    box_right  = a4_width_px - 10
+    draw.rectangle([box_left, box_top, box_right, box_bottom], outline='black', width=1)
+    height_use = height_use + height_margin
+
+
+    #start Buyer
+    height_margin = 10
+    height_use = height_use + height_margin
+    box_top = height_use
+
+    #title
+    font = ImageFont.truetype(font_path, 14)
+    text = Fnc.repairPersian("مشخصات خریدار")
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px - width) / 2, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+    height_use = height_use + height_margin + height
+
+    #name
+    font = ImageFont.truetype(font_path, 13)
+    text = Fnc.repairPersian("نام شخص حقوقی: "+inv['details']['buyer']['name'])
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px - width)-20, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+    
+    #id
+    font = ImageFont.truetype(font_path, 13)
+    text = inv['invoice']['header']['tins']
+    text = Fnc.repairPersian("شناسه ملی: "+text)
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px/4)-width, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+    height_use = height_use + height_margin + height
+
+    #address
+    font = ImageFont.truetype(font_path, 11)
+    text = Fnc.repairPersian("ادرس: "+inv['details']['buyer']['address'])
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px - width)-20, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+    height_use = height_use + height_margin + height
+
+    #telephon
+    font = ImageFont.truetype(font_path, 11)
+    text = Fnc.repairPersian("تماس: "+inv['details']['buyer']['call'])
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px - width)-20, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+    height_use = height_use + height_margin + height
+
+    #draw seller
+    height_margin = 8
+    box_bottom = height_use + height_margin
+    box_left = 10
+    box_right  = a4_width_px - 10
+    draw.rectangle([box_left, box_top, box_right, box_bottom], outline='black', width=1)
+    height_use = height_use + height_margin
+
+
+    #start invoice ---------
+    height_margin = 12
+    height_use = height_use + height_margin
+    box_top_invoice = height_use
+
+    #title
+    font = ImageFont.truetype(font_path, 14)
+    text = Fnc.repairPersian("مشخصات کالا یا خدمات مورد معامله")
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px - width) / 2, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+    height_use = height_use + height_margin + height
+
+    #header tabel
+    columns = [
+        {'name':'ردیف','prc':4},
+        {'name':'کد','prc':10},
+        {'name':'شرح','prc':14},
+        {'name':'تعداد','prc':5},
+        {'name':'قیمت واحد','prc':12},
+        {'name':'مبلغ','prc':11},
+        {'name':'تخفیف','prc':10},
+        {'name':'مبلغ پس از تخفیف','prc':11},
+        {'name':'مالیات و عوارض','prc':11},
+        {'name':'جمع','prc':12},
+    ]
+    columns.reverse()
+    height_margin = 5
+    box_top = height_use + height_margin
+    height = 40
+    box_bottom = box_top + height
+    width_avalibale = a4_width_px - 40
+    box_left = 20
+    for c in columns:
+        text = Fnc.repairPersian(c['name'])
+        prc = c['prc'] / 100
+        width = prc * width_avalibale
+        box_right = box_left + width
+        draw.rectangle([box_left, box_top, box_right, box_bottom], outline='black', width=1)
+        font = ImageFont.truetype(font_path, 11)
+        text_width, text_height = draw.textsize(text, font=font)
+        position = (box_left + ((width - text_width ) / 2) , height_use + (height/2) )
+        draw.text(position, text, fill="black", font=font)
+        box_left = box_right
+    height_use = box_bottom
+
+    #row table
+    row = inv['invoice']['body']
+    rowNum = 1
+    for r in row:
+        dic = {'ردیف':rowNum, 'کد':r['sstid'], 'شرح':r['sstt'], 'تعداد':r['am'], 'قیمت واحد':r['fee'],'مبلغ':r['prdis'], 'تخفیف':r['dis'], 'مبلغ پس از تخفیف':r['adis'], 'مالیات و عوارض':r['vam'], 'جمع':r['tsstam']}
+        height_margin = 0
+        height = 30
+        box_top = height_use
+        box_bottom = box_top + height
+        width_avalibale = a4_width_px - 40
+        box_left = 20
+        for c in columns:
+            text = dic[c['name']]
+            text = Fnc.repairPersian(str(text))
+            prc = c['prc'] / 100
+            width = prc * width_avalibale
+            box_right = box_left + width
+            draw.rectangle([box_left, box_top, box_right, box_bottom], outline='black', width=1)
+            font = ImageFont.truetype(font_path, 10)
+            text_width, text_height = draw.textsize(text, font=font)
+            position = (box_left + ((width - text_width ) / 2) , height_use + (height/2) )
+            draw.text(position, text, fill="black", font=font)
+            box_left = box_right
+        height_use = box_bottom
+        rowNum = rowNum + 1
+    
+    #row sum
+    height_margin = 0
+    height = 30
+    box_top = height_use
+    box_bottom = box_top + height
+    width_avalibale = a4_width_px - 40
+    box_left = 20
+    for c in columns:
+        if c['name'] in ['جمع','مالیات و عوارض','مبلغ پس از تخفیف','تخفیف','مبلغ']:
+            text = [int(dic[c['name']]) for x in inv['invoice']['body']]
+            text = sum(text)
+            text = Fnc.repairPersian(str(text))
+            prc = c['prc'] / 100
+            width = prc * width_avalibale
+            box_right = box_left + width
+            draw.rectangle([box_left, box_top, box_right, box_bottom], outline='black', width=1)
+            font = ImageFont.truetype(font_path, 10)
+            text_width, text_height = draw.textsize(text, font=font)
+            position = (box_left + ((width - text_width ) / 2) , height_use + (height/2) )
+            draw.text(position, text, fill="black", font=font)
+            box_left = box_right
+        else:
+            pass
+    height_use = height_use + height
+
+    #draw invoice box
+    height_margin = 15
+    box_top = box_top_invoice
+    box_bottom = height_use + height_margin
+    box_left = 10
+    box_right  = a4_width_px - 10
+    draw.rectangle([box_left, box_top, box_right, box_bottom], outline='black', width=1)
+    height_use = height_use + height_margin
+
+    #discription
+    height_margin = 10
+    height_use = height_use + height_margin
+    box_top = height_use
+
+    font = ImageFont.truetype(font_path, 11)
+    text = Fnc.repairPersian("توضیحات: "+inv['details']['text'])
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px - width)-20, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+    
+    height_box = 25
+    box_bottom = height_use + height_box
+    box_left = 10
+    box_right  = a4_width_px - 10
+    draw.rectangle([box_left, box_top, box_right, box_bottom], outline='black', width=1)
+    height_use = height_use + height_margin + height_box
+
+    #sing
+    height_margin = 10
+    height_use = height_use + height_margin
+    box_top = height_use
+
+    #seller
+    font = ImageFont.truetype(font_path, 11)
+    text = Fnc.repairPersian("مهر و امضای فروشنده: ")
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = ((a4_width_px - width)-20, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+
+    #buyer
+    font = ImageFont.truetype(font_path, 11)
+    text = Fnc.repairPersian("مهر و امضای خریدار: ")
+    width, height = draw.textsize(text, font=font)
+    height_margin = 5
+    position = (((a4_width_px/2) - width)-20, height_use + height_margin)
+    draw.text(position, text, fill="black", font=font)
+
+    height_box = 50
+    box_bottom = height_use + height_box
+    box_left = 10
+    box_right  = a4_width_px - 10
+    draw.rectangle([box_left, box_top, box_right, box_bottom], outline='black', width=1)
+    draw.rectangle([a4_width_px/2, box_top, a4_width_px/2, box_bottom], outline='black', width=1)
+    height_use = height_use + height_margin + height_box
+        
+    image.save("public/invoice.png")
+    return send_file("public/invoice.png", as_attachment=True, mimetype="image/png")
+

@@ -252,7 +252,10 @@ def addcompany():
     idTax = request.form.get('idTax', '')
     idNum = request.form.get('idNum', '')
     access = request.form.get('access', '')
-    return report.addcompany(access, key, name, idTax, idNum)
+    address = request.form.get('address', '')
+    call = request.form.get('call', '')
+    postcode = request.form.get('postcode', '')
+    return report.addcompany(access, key, name, idTax, idNum, address, call, postcode)
 
 
 @app.route('/getcompanymoadian',methods = ['POST', 'GET'])
@@ -265,6 +268,15 @@ def moadian_getinvoice():
     data = request.get_json()
     return report.moadian_getinvoice(data)
 
+@app.route('/moadian/delinvoice',methods = ['POST', 'GET'])
+def moadian_delinvoice():
+    data = request.get_json()
+    return report.moadian_delinvoice(data)
+
+@app.route('/moadian/print',methods = ['POST', 'GET'])
+def moadian_print():
+    data = request.get_json()
+    return report.moadian_print(data)
 
 @app.route('/delcompanymoadian',methods = ['POST', 'GET'])
 def delcompanymoadian():
@@ -664,7 +676,6 @@ def desk_broker_datenow():
     data = request.get_json()
     return report.datenow(data)
 
-
 @app.route('/saveinvoce',methods = ['POST', 'GET'])
 def saveinvoce():
     data = request.get_json()
@@ -767,10 +778,20 @@ def getassetmixbank():
     data = request.get_json()
     return report.getassetmixbank(data)
 
-@app.route('/getassetmixoraq',methods = ['POST', 'GET'])
-def getassetmixoraq():
+@app.route('/getassetmixoraqdol',methods = ['POST', 'GET'])
+def getassetmixoraqdol():
     data = request.get_json()
-    return report.getassetmixoraq(data)
+    return report.getassetmixoraqdol(data)
+
+@app.route('/getassetmixoraqnon',methods = ['POST', 'GET'])
+def getassetmixoraqnon():
+    data = request.get_json()
+    return report.getassetmixoraqnon(data)
+
+@app.route('/getassetmixoraqsah',methods = ['POST', 'GET'])
+def getassetmixoraqsah():
+    data = request.get_json()
+    return report.getassetmixoraqsah(data)
 
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)
