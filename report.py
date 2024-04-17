@@ -1068,11 +1068,12 @@ def desk_broker_volumeTrade(data):
     df = df.set_index('date')
     for c in df.columns:
         if c in ['نسبت کل','نسبت اوراق','نسبت صندوق','نسبت سهام']:
-            df[c] = df[c].apply(Fnc.floatTo2decimal)
-            df[f'{c} انحراف'] = df[c] - float(Fnc.floatTo2decimal(meanrate[c]))
+            #df[c] = df[c].apply(Fnc.floatTo2decimal)
+            df[f'{c} انحراف'] = df[c] - meanrate[c]
             df[f'{c} انحراف'] = df[f'{c} انحراف'].apply(Fnc.floatTo2decimalNormal)
         else:
             df[c] = df[c].apply(Fnc.toBillionRial)
+    df.to_excel('ers.xlsx')
     for c in df.columns:
         dic[c] = float(df[c].max())
     df = df.reset_index()
@@ -1678,6 +1679,9 @@ def getassetfund(data):
         df = pd.concat([asset,bank])
     else:
         df = asset
+    
+    df = df.fillna('')
+    
     df['type'] = df['type'].replace('saham','سهام').replace('non-gov','اوراق شرکتی').replace('gov','اوراق دولتی')
     df['value'] = df['value'].apply(int)
     df['rate'] = df['value'] / df['value'].sum()
@@ -1984,13 +1988,13 @@ def saveinvoce(data):
 
     taxid = Fnc.generate_tax_id(mmrit,dateJalali,inno)
     if bodyDf['cash'].sum() == 0:
-        setm = 3
+        setm = 2
         tvop = 0
     elif bodyDf['cash'].sum() == bodyDf['sumFin'].sum():
         setm = 1
         tvop = bodyDf['sumTax'].sum()
     else:
-        setm = 2
+        setm = 3
         tvop = int((bodyDf['cash'].sum()/bodyDf['sumFin'].sum()) * bodyDf['sumTax'].sum())
 
 
@@ -2953,6 +2957,20 @@ def getassetmixbank(data):
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df, 'lab':label, 'lst':lst, 'sum':int(total_balance), 'rate':total_rate})
 
+def customerphonebook(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['registerNoBours'].find({},{'_id':0,'نام و نام خانوادگی':1,'کد ملی':1,'شماره تماس':1}))
+    df = df.drop_duplicates(subset=['کد ملی'])
+    df['source'] = 'سهامداران'
+    df = df.to_dict('records')
+    return json.dumps({'reply':True, 'df':df})
+
 
 def getassetmixoraqdol(data):
     access = data['access'][0]
@@ -3164,13 +3182,16 @@ def moadian_print(data):
     height_use = height_use + height_margin + height
 
     #telephon
-    font = ImageFont.truetype(font_path, 11)
-    text = Fnc.repairPersian("تماس: "+inv['details']['seler']['call'])
-    width, height = draw.textsize(text, font=font)
-    height_margin = 5
-    position = ((a4_width_px - width)-20, height_use + height_margin)
-    draw.text(position, text, fill="black", font=font)
-    height_use = height_use + height_margin + height
+    try:
+        font = ImageFont.truetype(font_path, 11)
+        text = Fnc.repairPersian("تماس: "+inv['details']['seler']['call'])
+        width, height = draw.textsize(text, font=font)
+        height_margin = 5
+        position = ((a4_width_px - width)-20, height_use + height_margin)
+        draw.text(position, text, fill="black", font=font)
+        height_use = height_use + height_margin + height
+    except:
+        pass
     
     #draw seller
     height_margin = 8
@@ -3290,6 +3311,7 @@ def moadian_print(data):
     #row table
     row = inv['invoice']['body']
     rowNum = 1
+    listDic = []
     for r in row:
         dic = {'ردیف':rowNum, 'کد':r['sstid'], 'شرح':r['sstt'], 'تعداد':r['am'], 'قیمت واحد':r['fee'],'مبلغ':r['prdis'], 'تخفیف':r['dis'], 'مبلغ پس از تخفیف':r['adis'], 'مالیات و عوارض':r['vam'], 'جمع':r['tsstam']}
         height_margin = 0
@@ -3300,6 +3322,8 @@ def moadian_print(data):
         box_left = 20
         for c in columns:
             text = dic[c['name']]
+            if c['name'] not in ['کد','شرح']:
+                text = Fnc.add_commas(str(text))
             text = Fnc.repairPersian(str(text))
             prc = c['prc'] / 100
             width = prc * width_avalibale
@@ -3312,6 +3336,7 @@ def moadian_print(data):
             box_left = box_right
         height_use = box_bottom
         rowNum = rowNum + 1
+        listDic.append(dic)
     
     #row sum
     height_margin = 0
@@ -3322,8 +3347,10 @@ def moadian_print(data):
     box_left = 20
     for c in columns:
         if c['name'] in ['جمع','مالیات و عوارض','مبلغ پس از تخفیف','تخفیف','مبلغ']:
-            text = [int(dic[c['name']]) for x in inv['invoice']['body']]
+            text = [int(x[c['name']]) for x in listDic]
+            print(dic)
             text = sum(text)
+            text = Fnc.add_commas(text)
             text = Fnc.repairPersian(str(text))
             prc = c['prc'] / 100
             width = prc * width_avalibale

@@ -299,33 +299,40 @@ def getTseDate(date=datetime.datetime.now()):
                 
 @retry_decorator(max_retries=3, sleep_duration=5)
 def TseRepir():
-    dateList = farasahmDb['TradeListBroker'].distinct('dateInt')
-    for date in dateList:
-        print(f'repair tse {date}')
-        jalaliStr = str(date)
-        jalaliStr = jalaliStr[:4]+'/'+jalaliStr[4:6]+'/'+jalaliStr[6:]
-        res = requests.get(url=f'http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d={date}')
-        if res.status_code == 200:
-            df = pd.read_excel(res.content,header=2, engine='openpyxl')
-            if len(df)>10:
-                df['نماد'] = df['نماد'].apply(characters.ar_to_fa)
-                df['نام'] = df['نام'].apply(characters.ar_to_fa)
-                df['صندوق'] = df['نام'].apply(isFund)
-                df['InstrumentCategory'] = df['نام'].apply(isOragh)
-                df['data'] = jalaliStr
-                df['dataInt'] = date
-                df['timestump'] = 0
-                df['time'] = str(15) +':'+str('00')+':'+str('00')
-                df = df.to_dict('records')
-                farasahmDb['tse'].delete_many({'dataInt':date})
-                farasahmDb['tse'].insert_many(df)
+    workTime = Fnc.CulcTime(3)
+    if workTime:
+        dateList = farasahmDb['TradeListBroker'].distinct('dateInt')
+        for date in dateList:
+            print(f'repair tse {date}')
+            jalaliStr = str(date)
+            jalaliStr = jalaliStr[:4]+'/'+jalaliStr[4:6]+'/'+jalaliStr[6:]
+            res = requests.get(url=f'http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d={date}')
+            if res.status_code == 200:
+                df = pd.read_excel(res.content,header=2, engine='openpyxl')
+                if len(df)>10:
+                    df['نماد'] = df['نماد'].apply(characters.ar_to_fa)
+                    df['نام'] = df['نام'].apply(characters.ar_to_fa)
+                    df['صندوق'] = df['نام'].apply(isFund)
+                    df['InstrumentCategory'] = df['نام'].apply(isOragh)
+                    df['data'] = jalaliStr
+                    df['dataInt'] = date
+                    df['timestump'] = 0
+                    df['time'] = str(15) +':'+str('00')+':'+str('00')
+                    df = df.to_dict('records')
+                    farasahmDb['tse'].delete_many({'dataInt':date})
+                    farasahmDb['tse'].insert_many(df)
+        time.sleep(60*60*24)
+
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def getTse30LastDay():
-    for d in range(1,30):
-        day = datetime.datetime.now() - datetime.timedelta(days=d)
-        getTseDate(day)
-        
+    workTime = Fnc.CulcTime(1)
+    if workTime:
+        for d in range(1,30):
+            day = datetime.datetime.now() - datetime.timedelta(days=d)
+            getTseDate(day)
+    else:
+        time.sleep(60)
 
 def remove_non_alphanumeric(input_string):
     result = ''.join(character for character in input_string if character.isalpha())
@@ -342,7 +349,7 @@ def floatTo2decimalNormal(x):
     return x
 
 def toBillionRial(x):
-    x = x /1000000000
+    x = x /1000000
     x = int(x)
     return x
 
@@ -807,9 +814,10 @@ def dateSlashToInt(date):
 
 
 def separate_string(input_str):
+    input_str = str(input_str)
     # چک کنید که طول ورودی کافی است یا نه
     if len(input_str) < 3:
-        return "ورودی باید حداقل 3 کاراکتر داشته باشد."
+        return input_str
     
     # جدا کردن هر سه کاراکتر از راست و قرار دادن آنها در یک لیست
     separated_chars = [input_str[i:i+3] for i in range(len(input_str)-1, -1, -3)]
@@ -819,7 +827,18 @@ def separate_string(input_str):
     
     return result_string
 
-
+def add_commas(number):
+    # تبدیل عدد به رشته
+    num_str = str(number)
+    # اندازه عدد
+    length = len(num_str)
+    # اضافه کردن کاماها
+    result = ""
+    for i in range(length):
+        result += num_str[i]
+        if (length - i - 1) % 3 == 0 and i != length - 1:
+            result += ","
+    return result
 
 def assetByLastDate(group):
     group = group[group['dateInt'] == group['dateInt'].max()]
@@ -884,3 +903,15 @@ def SumValueDf(group):
     if group['قیمت پایانی - مقدار'].isnull().sum()>0:
         return pd.DataFrame()
     return group
+
+
+
+
+def CulcTime(part):
+    now = datetime.datetime.now()
+    if part == 1:
+        return now.hour>=8 and now.hour<16
+    if part == 2:
+        return now.hour >=16 and now.hour<22
+    if part == 3:
+        return now.hour >=22 or now.hour<8

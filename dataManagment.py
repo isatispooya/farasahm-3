@@ -10,7 +10,7 @@ from persiantools.jdatetime import JalaliDate
 import datetime
 from Login import adminCheck
 from sklearn.linear_model import LinearRegression
-
+import time
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
 
@@ -652,6 +652,7 @@ def settransactionpriority(data):
     if toBalance == None:
         toBalance = farasahmDb['registerNoBours'].find_one({'symbol':symbol,'نام و نام خانوادگی':transaction['to']})
         if toBalance == None:
+            print(f"'{transaction['to']}'")
             return json.dumps({'replay':False,'msg':'خریدار یافت نشد'})
         PriorityDate = farasahmDb['Priority'].find_one({'symbol':symbol})
         farasahmDb['Priority'].update_one({'symbol':symbol,'نام و نام خانوادگی':transaction['frm'], 'تاریخ':data['datePriority']},{'$set':{'حق تقدم':frmBalance}})
@@ -712,7 +713,8 @@ def delprioritytransaction(data):
     doc = farasahmDb['PriorityTransaction'].find_one({'_id':ObjectId(data['id'])})
     if doc == None:
          return json.dumps({'replay':False,'msg':'یافت نشد'})
-    newTo = farasahmDb['Priority'].find_one({"نام و نام خانوادگی":doc['to']})
+    dateInt = max(farasahmDb['Priority'].distinct('dateInt'))
+    newTo = farasahmDb['Priority'].find_one({"نام و نام خانوادگی":doc['to'],'dateInt':dateInt})
     newTo['حق تقدم'] = int(newTo['حق تقدم']) - int(doc['count'])
     if newTo['حق تقدم'] < 0 and doc['to'] != 'حق تقدم استفاده نشده':
          return json.dumps({'replay':False,'msg':f'حذف انجام نشد، مانده دریافت کننده منفی میشود'})
@@ -726,50 +728,54 @@ def delprioritytransaction(data):
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def desk_broker_volumeTrade_cal():
-    print('start cal volume trade')
-    listDate = farasahmDb['TradeListBroker'].distinct('dateInt')
-    for date in listDate:
-        print('volume trade', date)
-        df = pd.DataFrame(farasahmDb['TradeListBroker'].find({'dateInt':date},{'صندوق':1,'InstrumentCategory':1,'NetPrice':1,'_id':0,'TradeCode':1,'TradeDate':1,'TradeNumber':1,'TradeSymbol':1}))
-        df = df.drop_duplicates()
-        df = df[['صندوق','InstrumentCategory','NetPrice']]
-        df['NetPrice'] = df['NetPrice'].apply(int)
-        df['صندوق'] = df['صندوق'].fillna(False)
-        df['InstrumentCategory'] = df['InstrumentCategory'].replace('false',False).replace('true',True)
-        df = df.groupby(['صندوق','InstrumentCategory']).sum().reset_index()
-        dic = {}
-        for i in df.index:
-            if df['InstrumentCategory'][i]:
-                dic['اوراق کارگزاری']  = int(df['NetPrice'][i])
-            if df['صندوق'][i]:
-                dic['صندوق کارگزاری']  = int(df['NetPrice'][i])
-            else:
-                dic['سهام کارگزاری']  = int(df['NetPrice'][i])
-        dic['کل کارگزاری'] = int(df['NetPrice'].sum())
-
-        tse = pd.DataFrame(farasahmDb['tse'].find({'dataInt':date},{'InstrumentCategory':1,'صندوق':1,'ارزش':1,'_id':0}))
-        if len(tse) > 0:
-            tse['ارزش'] = tse['ارزش'].apply(int)
-            tse = tse.groupby(['صندوق','InstrumentCategory']).sum().reset_index()
-            for i in tse.index:
-                if tse['InstrumentCategory'][i]:
-                    dic['اوراق بازار']  = int(tse['ارزش'][i])
-                if tse['صندوق'][i]:
-                    dic['صندوق بازار']  = int(tse['ارزش'][i])
+    workTime = Fnc.CulcTime(3)
+    if workTime:
+        print('start cal volume trade')
+        listDate = farasahmDb['TradeListBroker'].distinct('dateInt')
+        for date in listDate:
+            print('volume trade', date)
+            df = pd.DataFrame(farasahmDb['TradeListBroker'].find({'dateInt':date},{'صندوق':1,'InstrumentCategory':1,'NetPrice':1,'_id':0,'TradeCode':1,'TradeDate':1,'TradeNumber':1,'TradeSymbol':1}))
+            df = df.drop_duplicates()
+            df = df[['صندوق','InstrumentCategory','NetPrice']]
+            df['NetPrice'] = df['NetPrice'].apply(int)
+            df['صندوق'] = df['صندوق'].fillna(False)
+            df['InstrumentCategory'] = df['InstrumentCategory'].replace('false',False).replace('true',True)
+            df = df.groupby(['صندوق','InstrumentCategory']).sum().reset_index()
+            dic = {}
+            for i in df.index:
+                if df['InstrumentCategory'][i]:
+                    dic['اوراق کارگزاری']  = int(df['NetPrice'][i])
+                if df['صندوق'][i]:
+                    dic['صندوق کارگزاری']  = int(df['NetPrice'][i])
                 else:
-                    dic['سهام بازار']  = int(tse['ارزش'][i])
-            dic['کل بازار'] = int(tse['ارزش'].sum())
-            dic['date'] = date
-            for i in ['اوراق کارگزاری','صندوق کارگزاری','سهام کارگزاری','کل کارگزاری','کل بازار','اوراق بازار','صندوق بازار','سهام بازار']:
-                if i not in dic.keys():
-                    dic[i] = 0
-            dic['نسبت کل'] = round(float(dic['کل کارگزاری'] / dic['کل بازار'])*100,2)
-            dic['نسبت سهام'] = round(float(dic['سهام کارگزاری'] / dic['سهام بازار'])*100, 2)
-            dic['نسبت صندوق'] = round(float(dic['صندوق کارگزاری'] / dic['صندوق بازار'])*100, 2)
-            dic['نسبت اوراق'] = round(float(dic['اوراق کارگزاری'] / dic['اوراق بازار'])*100, 2)
-            farasahmDb['deskBrokerVolumeTrade'].delete_many({'date':date})
-            farasahmDb['deskBrokerVolumeTrade'].insert_one(dic)
+                    dic['سهام کارگزاری']  = int(df['NetPrice'][i])
+            dic['کل کارگزاری'] = int(df['NetPrice'].sum())
 
+            tse = pd.DataFrame(farasahmDb['tse'].find({'dataInt':date},{'InstrumentCategory':1,'صندوق':1,'ارزش':1,'_id':0}))
+            if len(tse) > 0:
+                tse['ارزش'] = tse['ارزش'].apply(int)
+                tse = tse.groupby(['صندوق','InstrumentCategory']).sum().reset_index()
+                for i in tse.index:
+                    if tse['InstrumentCategory'][i]:
+                        dic['اوراق بازار']  = int(tse['ارزش'][i])
+                    if tse['صندوق'][i]:
+                        dic['صندوق بازار']  = int(tse['ارزش'][i])
+                    else:
+                        dic['سهام بازار']  = int(tse['ارزش'][i])
+                dic['کل بازار'] = int(tse['ارزش'].sum())
+                dic['date'] = date
+                for i in ['اوراق کارگزاری','صندوق کارگزاری','سهام کارگزاری','کل کارگزاری','کل بازار','اوراق بازار','صندوق بازار','سهام بازار']:
+                    if i not in dic.keys():
+                        dic[i] = 0
+                dic['نسبت کل'] = round(float(dic['کل کارگزاری'] / dic['کل بازار'])*100,2)
+                dic['نسبت سهام'] = round(float(dic['سهام کارگزاری'] / dic['سهام بازار'])*100, 2)
+                dic['نسبت صندوق'] = round(float(dic['صندوق کارگزاری'] / dic['صندوق بازار'])*100, 2)
+                dic['نسبت اوراق'] = round(float(dic['اوراق کارگزاری'] / dic['اوراق بازار'])*100, 2)
+                farasahmDb['deskBrokerVolumeTrade'].delete_many({'date':date})
+                farasahmDb['deskBrokerVolumeTrade'].insert_one(dic)
+        time.sleep(60*60)
+
+        
 
 '''
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
@@ -809,43 +815,45 @@ def desk_broker_volumeTrade_cal():
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def desk_broker_turnover_cal():
-    print('get turnover in broker')
-    pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
-    df = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
-    df = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in df]
-    df = pd.DataFrame(df).sort_values(by=['date'])
-    if len(df)==0:
-        return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
-    df_oragh = df[df['type']=='true'][['date','value']].rename(columns={'value':'اوراق'}).set_index('date')
-    df = df[df['type']=='false']
-    df_fund = df[df['fund']==True][['date','value']].rename(columns={'value':'صندوق'}).set_index('date')
-    df_stock = df[df['fund']==False][['date','value']].rename(columns={'value':'سهام'}).set_index('date')
-    df = df_stock.join(df_fund,how='outer').join(df_oragh,how='outer').fillna(0)
-    sabadCode = farasahmDb['codeTraderInSabad'].distinct('code')
-    pipeline = [{"$match": {"TradeCode": {"$in": sabadCode}}},{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
-    sabad = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
-    sabad = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in sabad]
-    sabad = pd.DataFrame(sabad).sort_values(by=['date'])
-    if len(sabad)==0:
-        return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
-    sabad_oragh = sabad[sabad['type']=='true'][['date','value']].rename(columns={'value':'اوراق سبد'}).set_index('date')
-    sabad_fund = sabad[sabad['fund']==True][['date','value']].rename(columns={'value':'صندوق سبد'}).set_index('date')
-    sabad = sabad[sabad['type']=='false']
-    sabad_stock = sabad[sabad['fund']==False][['date','value']].rename(columns={'value':'سهام سبد'}).set_index('date')
-    sabad = sabad_stock.join(sabad_fund,how='outer').join(sabad_oragh,how='outer').fillna(0)
-    df = df.join(sabad_oragh).join(sabad_fund).join(sabad_stock)
+    workTime = Fnc.CulcTime(3)
+    if workTime:
+        print('get turnover in broker')
+        pipeline = [{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
+        df = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
+        df = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in df]
+        df = pd.DataFrame(df).sort_values(by=['date'])
+        if len(df)==0:
+            return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
+        df_oragh = df[df['type']=='true'][['date','value']].rename(columns={'value':'اوراق'}).set_index('date')
+        df = df[df['type']=='false']
+        df_fund = df[df['fund']==True][['date','value']].rename(columns={'value':'صندوق'}).set_index('date')
+        df_stock = df[df['fund']==False][['date','value']].rename(columns={'value':'سهام'}).set_index('date')
+        df = df_stock.join(df_fund,how='outer').join(df_oragh,how='outer').fillna(0)
+        sabadCode = farasahmDb['codeTraderInSabad'].distinct('code')
+        pipeline = [{"$match": {"TradeCode": {"$in": sabadCode}}},{"$group":{ "_id": {"date": "$dateInt","type": "$InstrumentCategory","fund":"$صندوق"},"totalNetPrice": {"$sum": "$NetPrice"}}}]
+        sabad = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
+        sabad = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in sabad]
+        sabad = pd.DataFrame(sabad).sort_values(by=['date'])
+        if len(sabad)==0:
+            return json.dumps({'replay':False,'msg':'گزارشی یافت نشد'})
+        sabad_oragh = sabad[sabad['type']=='true'][['date','value']].rename(columns={'value':'اوراق سبد'}).set_index('date')
+        sabad_fund = sabad[sabad['fund']==True][['date','value']].rename(columns={'value':'صندوق سبد'}).set_index('date')
+        sabad = sabad[sabad['type']=='false']
+        sabad_stock = sabad[sabad['fund']==False][['date','value']].rename(columns={'value':'سهام سبد'}).set_index('date')
+        sabad = sabad_stock.join(sabad_fund,how='outer').join(sabad_oragh,how='outer').fillna(0)
+        df = df.join(sabad_oragh).join(sabad_fund).join(sabad_stock)
 
-    df['کل'] = df['سهام'] + df['اوراق'] + df['صندوق']
-    df['سبد'] = df['اوراق سبد'] + df['صندوق سبد'] + df['سهام سبد']
-    df['نسبت کل'] = df['سبد'] / df['کل']
-    df['نسبت اوراق'] = df['اوراق سبد'] / df['اوراق']
-    df['نسبت صندوق'] = df['صندوق سبد'] / df['صندوق']
-    df['نسبت سهام'] = df['سهام سبد'] / df['سهام']
-    df = df.reset_index()
-    df = df.to_dict('records')
-    farasahmDb['deskSabadTurnover'].delete_many({})
-    farasahmDb['deskSabadTurnover'].insert_many(df)
-
+        df['کل'] = df['سهام'] + df['اوراق'] + df['صندوق']
+        df['سبد'] = df['اوراق سبد'] + df['صندوق سبد'] + df['سهام سبد']
+        df['نسبت کل'] = df['سبد'] / df['کل']
+        df['نسبت اوراق'] = df['اوراق سبد'] / df['اوراق']
+        df['نسبت صندوق'] = df['صندوق سبد'] / df['صندوق']
+        df['نسبت سهام'] = df['سهام سبد'] / df['سهام']
+        df = df.reset_index()
+        df = df.to_dict('records')
+        farasahmDb['deskSabadTurnover'].delete_many({})
+        farasahmDb['deskSabadTurnover'].insert_many(df)
+        time.sleep(60*60)
 
 def getdatepriority(data):
     access = data['access'][0]
@@ -893,3 +901,6 @@ def delbankassetfund(data):
         return json.dumps({'reply':False,'msg':'این نوع دارایی قابل حذف نیست'})
     farasahmDb['bankBalance'].delete_many({'name':row['name'],'num':row['num']})
     return json.dumps({'reply':True})
+
+
+

@@ -151,7 +151,12 @@ def GetCustomerMomentaryAssets(tradeCode):
     response = response.decode("utf-8")
     root = ET.fromstring(response)
     xml_dict = Fnc.element_to_dict(root)
-    body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetCustomerMomentaryAssetsResponse']['{http://tempuri.org/}GetCustomerMomentaryAssetsResult']
+    body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']
+    try:
+        body = body['{http://tempuri.org/}GetCustomerMomentaryAssetsResponse']['{http://tempuri.org/}GetCustomerMomentaryAssetsResult']
+    except:
+        return []
+
     if len(body) == 0:
         return []
     body = body['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService.Customer}CustomerMomentaryAsset']
@@ -330,6 +335,7 @@ def GetCustomerRemainWithTradeCode(tradeCode, market):
 
 def GetDailyTradeList(yr,mn,dy,page,pageSize):
     tradeDate = Fnc.GenerateDate(yr,mn,dy)
+
     payload = f"<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:tem=\"http://tempuri.org/\">\n   <soapenv:Header>\n <CustomHeaderMessage xmlns:i=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns=\"TadbirPardaz.TBS/PrincipalHeader\">\n  <AuthenticationType xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <Delegate xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IpAddress xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <IsAuthenticated xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">false</IsAuthenticated>\n  <Name xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomHeaderMessage</Name>\n  <NameSpace xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">TadbirPardaz.TBS/PrincipalHeader</NameSpace>\n  <Password xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">123456aA$</Password>\n  <Roles xmlns:d2p1=\"http://schemas.microsoft.com/2003/10/Serialization/Arrays\" xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserId xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\" i:nil=\"true\"/>\n  <UserName xmlns=\"http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.ServiceHost.Domain\">CustomerClub</UserName>\n </CustomHeaderMessage>\n   </soapenv:Header>\n   <soapenv:Body>\n   <tem:GetDailyTradeList>\n    <tem:tradeDate>{tradeDate}</tem:tradeDate>\n    <tem:page>{page}</tem:page>\n   <tem:pageSize>{pageSize}</tem:pageSize>\n   </tem:GetDailyTradeList>\n   </soapenv:Body>\n</soapenv:Envelope>"
     headers = {
     'Content-Type': 'text/xml; charset=utf-8',
@@ -340,7 +346,9 @@ def GetDailyTradeList(yr,mn,dy,page,pageSize):
     response = response.decode("utf-8")
     root = ET.fromstring(response)
     xml_dict = Fnc.element_to_dict(root)
-    body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetDailyTradeListResponse']['{http://tempuri.org/}GetDailyTradeListResult']['{http://schemas.datacontract.org/2004/07/TadbirPardaz.Infrastructure.DataAccess}Result']
+    body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']
+    print(body)
+    body = body['{http://tempuri.org/}GetDailyTradeListResponse']['{http://tempuri.org/}GetDailyTradeListResult']['{http://schemas.datacontract.org/2004/07/TadbirPardaz.Infrastructure.DataAccess}Result']
     if len(body)==0:
         return []
     body = body['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService}TradeDto']
@@ -415,7 +423,6 @@ def get_asset_customer(today = Fnc.todayIntJalali()):
             TradeCodes = df['TradeCode'].to_list()
             for TradeCode in TradeCodes:
                 assets = pd.DataFrame(GetCustomerMomentaryAssets(TradeCode))
-                print(assets)
                 if len(assets)>0:
                     assets['TradeCode'] = TradeCode
                     assets['dateInt'] = today
@@ -427,113 +434,119 @@ def get_asset_customer(today = Fnc.todayIntJalali()):
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJalali()):
-    page = 1
-    while True:
-        symbolList = farasahmDb['tse'].find({},{'نام':1,'نماد':1,'_id':0,'صندوق':1})
-        symbolList = pd.DataFrame(symbolList)
-        symbolList = symbolList.drop_duplicates()
-        symbolList['نماد'] = symbolList['نماد'].apply(Fnc.remove_non_alphanumeric)
-        df = GetDailyTradeList(doDay[0],doDay[1],doDay[2],page,1000)
-        if len(df) == 0:
-            break
-        df = pd.DataFrame(df)
-        df['DateYrInt'] = doDay[0]
-        df['DateMnInt'] = doDay[1]
-        df['DateDyInt'] = doDay[2]
-        print(doDay[0],doDay[1],doDay[2],page,'broker start')
-        df['dateInt'] = df['TradeDate'].apply(Fnc.dateStrToIntJalali)
-        df['page'] = page
-        for i in ['NetPrice','Price','TotalCommission','Volume']:
-            df[i] = df[i].apply(int)
-        df['Update'] = datetime.datetime.now()
-        df['TradeSymbolAbs'] = df['TradeSymbol'].apply(Fnc.remove_non_alphanumeric)
-        df = df.set_index('TradeSymbolAbs').join(symbolList.set_index('نماد'))
-        df = df.reset_index()
-        print(doDay[0],doDay[1],doDay[2],page,'broker end')
-        df = df.to_dict('records')
-        farasahmDb['TradeListBroker'].insert_many(df)
-        Fnc.drop_duplicet_TradeListBroker(DateInt)
-        page = page + 1
-    get_asset_customer(DateInt)
+    workTime = Fnc.CulcTime(1)
+    if workTime:
+        page = 1
+        while True:
+            symbolList = farasahmDb['tse'].find({},{'نام':1,'نماد':1,'_id':0,'صندوق':1})
+            symbolList = pd.DataFrame(symbolList)
+            symbolList = symbolList.drop_duplicates()
+            symbolList['نماد'] = symbolList['نماد'].apply(Fnc.remove_non_alphanumeric)
+            df = GetDailyTradeList(doDay[0], doDay[1] ,doDay[2],page,1000)
+            if len(df) == 0:
+                break
+            df = pd.DataFrame(df)
+            df['DateYrInt'] = doDay[0]
+            df['DateMnInt'] = doDay[1]
+            df['DateDyInt'] = doDay[2]
+            print(doDay[0],doDay[1],doDay[2],page,'broker start')
+            df['dateInt'] = df['TradeDate'].apply(Fnc.dateStrToIntJalali)
+            df['page'] = page
+            for i in ['NetPrice','Price','TotalCommission','Volume']:
+                df[i] = df[i].apply(int)
+            df['Update'] = datetime.datetime.now()
+            df['TradeSymbolAbs'] = df['TradeSymbol'].apply(Fnc.remove_non_alphanumeric)
+            df = df.set_index('TradeSymbolAbs').join(symbolList.set_index('نماد'))
+            df = df.reset_index()
+            print(doDay[0],doDay[1],doDay[2],page,'broker end')
+            df = df.to_dict('records')
+            farasahmDb['TradeListBroker'].insert_many(df)
+            Fnc.drop_duplicet_TradeListBroker(DateInt)
+            page = page + 1
+        get_asset_customer(DateInt)
+        time.sleep(60*10)
 
 
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def GetAllTradeLastDate():
-    print('GetAllTradeLastDate')
-    today = datetime.datetime.now()
-    for d in range(1,30):
-        date = today - datetime.timedelta(days=d)
-        dateInt = Fnc.gorgianIntToJalaliInt(date)
-        avalibale = farasahmDb['TradeListBroker'].find_one({'dateInt':dateInt})
-        if avalibale == None:
+    workTime = Fnc.CulcTime(2)
+    if workTime:
+        print('GetAllTradeLastDate')
+        today = datetime.datetime.now()
+        for d in range(1,30):
+            date = today - datetime.timedelta(days=d)
+            dateInt = Fnc.gorgianIntToJalaliInt(date)
+            print(dateInt)
+            print(dateInt)
             GetAllTradeInDate(doDay=Fnc.toDayJalaliListYMD(date), DateInt=dateInt)
-
-
+        time.sleep(60*60*24)
 
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def get_asset_funds():
-    lst_code = [{'code':'61580209324','symbol':'خاتم'}]
-    date = Fnc.todayIntJalali()
-    for i in lst_code:
-        print(i, 'get asset')
-        df = pd.DataFrame(GetCustomerMomentaryAssets(i['code']))
-        df['VolumeInPrice'] = df['VolumeInPrice'].apply(int)
-        df['Volume'] = df['Volume'].apply(int)
-        df['Price'] = df['VolumeInPrice'] / df['Volume']
-        df['Fund'] = i['symbol']
-        df['date'] = date
-        df = df.drop(columns=['CustomerTitle','TradeCode','TradeSystemId'])
-        df['type'] = df['Symbol'].apply(Fnc.setTypeInFundBySymbol)
-        df = df.to_dict('records')
-        farasahmDb['assetFunds'].delete_many({'Fund':i['symbol'],'date':date})
-        farasahmDb['assetFunds'].insert_many(df)
+    workTime = Fnc.CulcTime(2)
+    if workTime:
+        lst_code = [{'code':'61580209324','symbol':'خاتم'}]
+        date = Fnc.todayIntJalali()
+        for i in lst_code:
+            print(i, 'get asset')
+            df = pd.DataFrame(GetCustomerMomentaryAssets(i['code']))
+            if len(df)>0:
+                df['VolumeInPrice'] = df['VolumeInPrice'].apply(int)
+                df['Volume'] = df['Volume'].apply(int)
+                df['Price'] = df['VolumeInPrice'] / df['Volume']
+                df['Fund'] = i['symbol']
+                df['date'] = date
+                df = df.drop(columns=['CustomerTitle','TradeCode','TradeSystemId'])
+                df['type'] = df['Symbol'].apply(Fnc.setTypeInFundBySymbol)
+                df = df.to_dict('records')
+                farasahmDb['assetFunds'].delete_many({'Fund':i['symbol'],'date':date})
+                farasahmDb['assetFunds'].insert_many(df)
+        time.sleep(60*60)
+
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def getAssetCoustomerByFixincome():
-    print('get Asset Coustomer By Fixincome')
-    conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
-    codelist = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'dateInt':1,'TradeCode':1}))
-    if len(codelist):
-        codelist = list(set(codelist[codelist['dateInt']==codelist['dateInt'].max()]['TradeCode']))
-        today = datetime.datetime.now()
-        dateInt = Fnc.gorgianIntToJalaliInt(today)
-        for i in codelist:
-            asset = pd.DataFrame(GetCustomerMomentaryAssets(i))
-            if len(asset)>0:
-                asset['datetime'] = today
-                asset['dateInt'] = dateInt
-                asset = asset.to_dict('records')
-                farasahmDb['assetCoustomerOwnerFix'].delete_many({'TradeCode':i, 'dateInt':dateInt})
-                farasahmDb['assetCoustomerOwnerFix'].insert_many(asset)
+    workTime = Fnc.CulcTime(2)
+    if workTime:
+        print('get Asset Coustomer By Fixincome')
+        conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
+        codelist = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'dateInt':1,'TradeCode':1}))
+        if len(codelist):
+            codelist = list(set(codelist[codelist['dateInt']==codelist['dateInt'].max()]['TradeCode']))
+            today = datetime.datetime.now()
+            dateInt = Fnc.gorgianIntToJalaliInt(today)
+            for i in codelist:
+                asset = pd.DataFrame(GetCustomerMomentaryAssets(i))
+                if len(asset)>0:
+                    asset['datetime'] = today
+                    asset['dateInt'] = dateInt
+                    asset = asset.to_dict('records')
+                    farasahmDb['assetCoustomerOwnerFix'].delete_many({'TradeCode':i, 'dateInt':dateInt})
+                    farasahmDb['assetCoustomerOwnerFix'].insert_many(asset)
+        time.sleep(60*60)
 
 
 
 @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
 def handle_CuostomerRemain():
-    listCode_all = farasahmDb['TradeListBroker'].distinct('TradeCode')
-    for i in range(0,len(listCode_all)):
-        code = listCode_all[i]
-        print(code, i/len(listCode_all))
-        try:
-            result = GetCustomerRemainWithTradeCode(str(code),'TSE')
-            result['datetime'] = datetime.datetime.now()
-            result['code'] = code
-            tradelist = farasahmDb['TradeListBroker'].find_one({'TradeCode':str(code)},sort=[('dateInt',-1)])
-            result['lastTradeDateGor'] = tradelist['TradeDate']
-            result['lastTradeDateJal'] = tradelist['dateInt']
-            result['Branch'] = tradelist['BranchTitle']
-            farasahmDb['CustomerRemain'].delete_many({'TradeCode':str(code)})
-            farasahmDb['CustomerRemain'].insert_one(result)
-        except:
-            pass
-
-
-
-
-
-
-
-
-
+    workTime = Fnc.CulcTime(3)
+    if workTime:
+        listCode_all = farasahmDb['TradeListBroker'].distinct('TradeCode')
+        for i in range(0,len(listCode_all)):
+            code = listCode_all[i]
+            print(code, i/len(listCode_all))
+            try:
+                result = GetCustomerRemainWithTradeCode(str(code),'TSE')
+                result['datetime'] = datetime.datetime.now()
+                result['code'] = code
+                tradelist = farasahmDb['TradeListBroker'].find_one({'TradeCode':str(code)},sort=[('dateInt',-1)])
+                result['lastTradeDateGor'] = tradelist['TradeDate']
+                result['lastTradeDateJal'] = tradelist['dateInt']
+                result['Branch'] = tradelist['BranchTitle']
+                farasahmDb['CustomerRemain'].delete_many({'TradeCode':str(code)})
+                farasahmDb['CustomerRemain'].insert_one(result)
+            except:
+                pass
+        time.sleep(60*60*24)

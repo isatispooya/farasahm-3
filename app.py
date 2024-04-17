@@ -778,6 +778,11 @@ def getassetmixbank():
     data = request.get_json()
     return report.getassetmixbank(data)
 
+@app.route('/customerphonebook',methods = ['POST', 'GET'])
+def customerphonebook():
+    data = request.get_json()
+    return report.customerphonebook(data)
+
 @app.route('/getassetmixoraqdol',methods = ['POST', 'GET'])
 def getassetmixoraqdol():
     data = request.get_json()
