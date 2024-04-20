@@ -1966,7 +1966,6 @@ def saveinvoce(data):
     if sellerDic == None:
         return json.dumps({'reply':False,'msg':'فروشنده یافت نشد'})
     bodyDf = pd.DataFrame(invoceData['body'])
-
     bodyDf['sumBeforOff'] = bodyDf['sumBeforOff'].apply(int)
     bodyDf['off'] = bodyDf['off'].apply(int)
     bodyDf['taxRate'] = bodyDf['taxRate'].apply(int)
@@ -1975,7 +1974,6 @@ def saveinvoce(data):
     bodyDf['sumTax'] = bodyDf['sumAfterOff'] * (bodyDf['taxRate'] /100)
     bodyDf['sumTax'] = bodyDf['sumTax'].apply(round,0)
     bodyDf['sumFin'] = bodyDf['sumAfterOff'] + bodyDf['sumTax']
-    
     mmrit = sellerDic['idTax']
     indatim = int(invoceData['createDate'])
     Indati2m = int(invoceData['addDate'])
@@ -1983,9 +1981,7 @@ def saveinvoce(data):
         return json.dumps({'reply':False,'msg':'تاریخ صدور نمیتواند قبل از تاریخ فروش باشد'})
     date = datetime.datetime.fromtimestamp(indatim/1000)
     dateJalali = Fnc.gorgianIntToJalali(date)
-
-    inno = Fnc.generatIdInternal(str(mmrit)+str(indatim))
-
+    inno = Fnc.generatIdInternal()
     taxid = Fnc.generate_tax_id(mmrit,dateJalali,inno)
     if bodyDf['cash'].sum() == 0:
         setm = 2
@@ -2070,10 +2066,9 @@ def saveinvoce(data):
         'body' : body,
         'payments' : []
     }
-    buyer = data['buyer']
-    buyer['idcode'] = str(invoceData['buyerId'])
-    buyer['idcode'] = str(invoceData['buyerId'])
-    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None, 'details':{'seler':sellerDic,'buyer':buyer,'text':data['textinv']}}
+    buyer = ''#data['buyer']
+    #buyer['idcode'] = str(invoceData['buyerId'])
+    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None, 'details':{'seler':sellerDic,'buyer':buyer,}}#'text':data['textinv']}}
     farasahmDb['invoiceMoadian'].insert_one(dic)
 
     return json.dumps({'reply':True})
@@ -2446,6 +2441,33 @@ def sendinvoce(data):
     farasahmDb['invoiceMoadian'].update_one({'_id':_idinv},{'$set':{'result':result,'inquiry':None}})
     return json.dumps({'reply':True})
 
+def ebtalinvoce(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    _idinv = ObjectId(data['id'])
+    ref = farasahmDb['invoiceMoadian'].find_one({'_id':_idinv},{'_id':0})
+    tins = ref['invoice']['header']['tins']
+    sellerDic = farasahmDb['companyMoadian'].find_one({'idNum':tins})
+    if sellerDic == None:
+        return json.dumps({'reply':False,'msg':'فروشنده یافت نشد'})
+    indatim = ref['invoice']['header']['indatim']
+    date = datetime.datetime.fromtimestamp(indatim/1000)
+    dateJalali = Fnc.gorgianIntToJalali(date)
+    inno = Fnc.generatIdInternal()
+    mmrit = sellerDic['idTax']
+    ref['title'] = ref['title'] + '_ابطال'
+    ref['invoice']['header']['ins'] = 3
+    ref['invoice']['header']['irtaxid'] = ref['invoice']['header']['taxid']
+    ref['invoice']['header']['taxid'] = Fnc.generate_tax_id(mmrit,dateJalali,inno)
+    ref['result'] = None
+    ref['inquiry'] = None
+    farasahmDb['invoiceMoadian'].insert_one(ref)
+    return json.dumps({'reply':True})
 
 def inquiryinvoce(data):
     access = data['access'][0]
@@ -2457,8 +2479,11 @@ def inquiryinvoce(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     _idinv = ObjectId(data['id'])
     invoce = farasahmDb['invoiceMoadian'].find_one({'_id':_idinv})
-    if 'referenceNumber' not in invoce['result']:
-        return json.dumps({'reply':False,'msg':'ابتدا باید ارسال شود'})
+    try:
+        if 'referenceNumber' not in invoce['result']:
+            return json.dumps({'reply':False,'msg':'ابتدا باید ارسال شود'})
+    except:
+            return json.dumps({'reply':False,'msg':'ابتدا باید ارسال شود'})
     seller = farasahmDb['companyMoadian'].find_one({'idNum':invoce['invoice']['header']['tins']})
     key = seller['key']
     memoryId = seller['idTax']
@@ -2967,6 +2992,8 @@ def customerphonebook(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     df = pd.DataFrame(farasahmDb['registerNoBours'].find({},{'_id':0,'نام و نام خانوادگی':1,'کد ملی':1,'شماره تماس':1}))
     df = df.drop_duplicates(subset=['کد ملی'])
+    df = df.dropna(subset=['شماره تماس'])
+    df = df.fillna('')
     df['source'] = 'سهامداران'
     df = df.to_dict('records')
     return json.dumps({'reply':True, 'df':df})

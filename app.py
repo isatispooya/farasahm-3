@@ -268,6 +268,11 @@ def moadian_getinvoice():
     data = request.get_json()
     return report.moadian_getinvoice(data)
 
+@app.route('/moadian/cloninvoiceebtal',methods = ['POST', 'GET'])
+def moadian_cloninvoiceebtal():
+    data = request.get_json()
+    return report.ebtalinvoce(data)
+
 @app.route('/moadian/delinvoice',methods = ['POST', 'GET'])
 def moadian_delinvoice():
     data = request.get_json()

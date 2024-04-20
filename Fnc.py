@@ -626,8 +626,8 @@ def calculate_past_holidays(row, df):
     else:
         return 0
     
-def generatIdInternal(idstr):
-    return random.randint(100,999)
+def generatIdInternal():
+    return random.randint(10000,9999999)
     lst = farasahmDb['idintrnalMoadian'].find({"id":idstr})
     lst = [x for x in lst]
     if len(lst) == 0:
