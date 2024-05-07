@@ -12,7 +12,6 @@ def task_GetAllTradeLastDate():
         else:
             time.sleep(60*10)
 
-
 def task_TseRepir():
     while True:
         if Fnc.CulcTime(3):
@@ -51,12 +50,15 @@ def task_GetAllTradeInDate():
         else:
             time.sleep(60*5)
 
+
 def task_get_asset_funds():
     while True:
         if Fnc.CulcTime(2):
             ApiMethods.get_asset_funds()
         else:
             time.sleep(60*10)
+
+
 
 def task_getAssetCoustomerByFixincome():
     while True:

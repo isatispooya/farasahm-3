@@ -907,8 +907,7 @@ def SumValueDf(group):
 
 
 
-def CulcTime(part):
-    now = datetime.datetime.now()
+def CulcTime(part, now):
     if part == 1:
         return now.hour>=8 and now.hour<16
     if part == 2:

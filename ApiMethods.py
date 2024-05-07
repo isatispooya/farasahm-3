@@ -188,8 +188,6 @@ def GetCustomerMomentaryAssets(tradeCode):
                 'VolumeInPrice':i['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService.Customer}VolumeInPrice']['text']
             }
             lst.append(dic)
-
-
     return lst
 
 

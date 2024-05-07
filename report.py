@@ -419,7 +419,7 @@ def getshareholders(data):
     df= df[df['date']==df['date'].max()]
     df = df[['نام و نام خانوادگی','کد ملی','نام پدر','تعداد سهام','شماره تماس','_id']]
     df = df.sort_values(by=['تعداد سهام'], ascending=False)
-    df = df.drop_duplicates(subset=['کد ملی'])
+    df = df.drop_duplicates(subset=['کد ملی','نام و نام خانوادگی'])
     df['شماره تماس'] = df['شماره تماس'].fillna('')
     df['کد ملی'] = df['کد ملی'].fillna('')
     df['نام پدر'] = df['نام پدر'].fillna('')
@@ -1657,6 +1657,34 @@ def desk_todo_deltask(data):
     return json.dumps({'reply':True,'msg':"ok"})
 
 
+def smsgroup(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    symbol = data['access'][1]
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    dic = data['data']
+    dic['send'] = 'در انتظار'
+    dic['count'] = len(data['data']['selectData'])
+    dic['count_send'] = 0
+    dic['count_deliver'] = 0
+    dic['symbol'] = symbol
+    farasahmDb['smsGroup'].insert_one(dic)
+    return json.dumps({'replay':True})
+
+def smsgroupreport(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    symbol = data['access'][1]
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['smsGroup'].find({'symbol':symbol}))
+    df = df.rename(columns={'selectData':'children'})
+    df['_id'] = df['_id'].apply(str)
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
 
 def getassetfund(data):
     access = data['access'][0]
@@ -3451,4 +3479,3 @@ def moadian_print(data):
         
     image.save("public/invoice.png")
     return send_file("public/invoice.png", as_attachment=True, mimetype="image/png")
-
