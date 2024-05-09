@@ -278,3 +278,33 @@ def getAssetCoustomerByFixincome():
                 asset = asset.to_dict('records')
                 farasahmDb['assetCoustomerOwnerFix'].delete_many({'TradeCode':i, 'dateInt':dateInt})
                 farasahmDb['assetCoustomerOwnerFix'].insert_many(asset)
+
+
+def getTseToDay():
+    date=datetime.datetime.now()
+    dt = datetime.datetime(date.year,date.month,date.day,15,0,0)
+    jalali = JalaliDate.to_jalali(date)
+    jalaliStr = str(jalali).replace('-','/')
+    jalaliInt =int(str(jalali).replace('-',''))
+    avalibale = farasahmDb['tse'].find_one({'dataInt':jalaliInt})
+    if (date != datetime.datetime.now() and avalibale!=None) == False:
+        if date != datetime.datetime.now():
+            res = requests.get(url=f'http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d={jalali}')
+        else:
+            res = requests.get(url='http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d=0')
+        if res.status_code == 200:
+            df = pd.read_excel(res.content,header=2, engine='openpyxl')
+            if len(df)>10:
+                df['نماد'] = df['نماد'].apply(characters.ar_to_fa)
+                df['نام'] = df['نام'].apply(characters.ar_to_fa)
+                df['صندوق'] = df['نام'].apply(Fnc.isFund)
+                df['InstrumentCategory'] = df['نام'].apply(Fnc.isOragh)
+                df['data'] = jalaliStr
+                df['dataInt'] = jalaliInt
+                df['timestump'] = dt.timestamp()
+                df['navAmary'] = 0
+                df['countunit'] = 0
+                df['time'] = str(dt.hour) +':'+str(dt.minute)+':'+str(dt.second)
+                df = df.to_dict('records')
+                farasahmDb['tse'].delete_many({'dataInt':jalaliInt})
+                farasahmDb['tse'].insert_many(df)
