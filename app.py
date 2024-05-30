@@ -814,6 +814,23 @@ def getassetmixoraqsah():
     data = request.get_json()
     return report.getassetmixoraqsah(data)
 
+@app.route('/getaccbank',methods = ['POST', 'GET'])
+def getaccbank():
+    data = request.get_json()
+    return report.getaccbank(data)
+
+
+
+@app.route('/setholliday',methods = ['POST', 'GET'])
+def setholliday():
+    data = request.get_json()
+    return report.setholliday(data)
+
+@app.route('/getholliday',methods = ['POST', 'GET'])
+def getholliday():
+    data = request.get_json()
+    return report.getholliday(data)
+
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)
     app.run(host='0.0.0.0',port=8000, debug=True)

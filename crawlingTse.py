@@ -13,8 +13,7 @@ import os
 import Fnc
 warnings.filterwarnings("ignore")
 
-client = pymongo.MongoClient()
-farasahm_db = client['farasahm2']
+from setting import farasahmDb as farasahm_db
 
 class TseCrawling:
     def __init__(self):
@@ -45,6 +44,7 @@ class TseCrawling:
 
 
     def getHistoriPriceByFullName(self,fullName,symbol,type):
+        print(f'start {symbol}')
         self.driver.get('http://tsetmc.com/')
         wait = WebDriverWait(self.driver, 60)
         time.sleep(2)
@@ -83,7 +83,7 @@ class TseCrawling:
         df = df[['highest_price','lowest_price','final_price','close_price','first_price','trade_value','trade_volume','trade_number','date']]
         df['dateInt'] = [Fnc.gorgianIntToJalaliInt(x) for x in df['date']]
         df['date'] = df['dateInt']
-        collection = pd.DataFrame(farasahm_db['sandoq'].find({'fullName':fullName}))
+        collection = pd.DataFrame(farasahm_db['sandoq'].find({'symbol':symbol}))
 
         if len(collection)>0:
             lastUpdateRecord = collection[collection['dateInt']==collection['dateInt'].max()].to_dict('records')[0]
@@ -98,24 +98,19 @@ class TseCrawling:
             df = df.to_dict('records')
             df[0]['nav'] = nav
             farasahm_db['sandoq'].insert_many(df)
+        ln = len(df)
+        print(f'end {symbol} {ln}')
+        
         return True
     
-    @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
     def get_all_fund(self):
         print('get_all_fund')
         list_fund = self.fund_list()
 
         self.getHistoriPriceByFullName("صندوق س خاتم ايساتيس پويا-ثابت","خاتم","sabet")
         for i in list_fund:
-            count_try = 0
-            while count_try < 5:
-                try:
-                    print(i['نماد'])
-                    self.getHistoriPriceByFullName(i['نام'],i['نماد'],i['type'])
-                    count_try = 10
-                except:
-                    count_try += 1
-                    print(f'error {i}')
+            print(i['نماد'])
+            self.getHistoriPriceByFullName(i['نام'],i['نماد'],i['type'])
                     
     @Fnc.retry_decorator(max_retries=3, sleep_duration=5)
     def getOragh(self):

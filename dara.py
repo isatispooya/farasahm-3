@@ -151,6 +151,10 @@ def getcompany(data):
     df = df.sort_values(by=['تعداد سهام'],ascending=False)
     df = df.rename(columns={'تعداد سهام':'amount'})
     df = df.reset_index()
+    df['allStockCompany_alpha'] = df['allStockCompany'].apply(int)
+    df['allStockCompany_alpha'] = df['allStockCompany_alpha'].apply(digits.to_word)
+    df['amount_alpha'] = df['amount'].apply(int)
+    df['amount_alpha'] = df['amount_alpha'].apply(digits.to_word)
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df})
 
@@ -234,15 +238,21 @@ def static(data):
     if user['replay']==False:
         return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
     symbol = data['symbol']
-    df_comp = pd.DataFrame(farasahmDb['registerNoBours'].find({'symbol':symbol})).drop_duplicates(subset=['date','کد ملی'])
+    df_comp = pd.DataFrame(farasahmDb['registerNoBours'].find({'symbol':symbol}))
+    df_comp = df_comp.fillna('')
+    df_comp = df_comp.sort_values(by=['date'])
+    df_comp = df_comp.drop_duplicates(subset=['date','کد ملی'],keep='last')
+    
+    if len(df_comp)==0:
+        return json.dumps({'replay':False, 'msg': 'not found'}) 
     df_comp = df_comp[df_comp['date']==df_comp['date'].max()]
+    
     Shareholders = len(df_comp)
     number_shares = df_comp['تعداد سهام'].sum()
     Shareholder = farasahmDb['registerNoBours'].find_one({'symbol':symbol,'کد ملی':user['کد ملی']})
     amount = Shareholder['تعداد سهام']
     capital = number_shares * 10000
     dic = {'Shareholders':Shareholders,'number_shares':str(number_shares),'amount':amount, 'capital':str(capital)}
-    print(dic)
     return json.dumps({'replay':True, 'dic': dic}) 
 
 

@@ -12,8 +12,10 @@ import Fnc
 import random
 import arabic_reshaper
 from bidi.algorithm import get_display
+import pyodbc
+from setting import ip_sql_server,port_sql_server,password_sql_server,username_sql_server
 client = pymongo.MongoClient()
-farasahmDb = client['farasahm2']
+from setting import farasahmDb
 
 def retry_decorator(max_retries=3, sleep_duration=10):
     def decorator(func):
@@ -303,7 +305,6 @@ def TseRepir():
     if workTime:
         dateList = farasahmDb['TradeListBroker'].distinct('dateInt')
         for date in dateList:
-            print(f'repair tse {date}')
             jalaliStr = str(date)
             jalaliStr = jalaliStr[:4]+'/'+jalaliStr[4:6]+'/'+jalaliStr[6:]
             res = requests.get(url=f'http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d={date}')
@@ -583,12 +584,14 @@ def calnder():
     end_date = datetime.datetime(2026,1,1)
     cruses = datetime.datetime(2023,10,23)
     holiday = ['1402-09-26','1402-11-22','1402-12-06','1403-01-01','1403-01-04','1403-01-12','1403-01-13',
-           '1403-02-16','1403-02-14','1403-02-15','1403-02-28','1403-04-05','1403-04-26','1403-04-27',
+           '1403-02-16','1403-03-14','1403-03-15','1403-02-28','1403-04-05','1403-04-26','1403-04-27',
            '1403-06-04','1403-06-12','1403-06-14','1403-06-31','1403-10-25','1403-11-09','1403-11-22',
            '1403-11-27','1403-12-29','1404-01-02','1404-01-03','1404-01-04','1404-01-11','1404-01-12',
            '1404-01-13','1404-03-14','1404-03-17','1404-03-25','1404-04-14','1404-04-15','1404-06-01',
            '1404-06-02','1404-06-10','1404-06-19','1404-09-04','1404-10-13','1404-10-27',
            ]
+    df = pd.DataFrame(farasahmDb['hillyday'].find({}))
+    holiday = df['jajli'].to_list()
     clnd = []
     while cruses <= end_date:
         ja_date = JalaliDate(cruses.date())
@@ -625,6 +628,15 @@ def calculate_past_holidays(row, df):
         return past_holidays_count
     else:
         return 0
+    
+    
+def sum_previous_n(row, series, n):
+    index = row.name
+    if row['future_holidays'] != 0:
+        start_index = max(0, index - n)
+        return row['future_holidays'] + series[start_index:index].sum()
+    else:
+        return row['future_holidays']
     
 def generatIdInternal():
     return random.randint(10000,9999999)
@@ -908,9 +920,65 @@ def SumValueDf(group):
 
 
 def CulcTime(part, now):
+    if part == 0:
+        return now.hour>=0 and now.hour<9
     if part == 1:
-        return now.hour>=8 and now.hour<16
+        return now.hour>=9 and now.hour<13
     if part == 2:
-        return now.hour >=16 and now.hour<22
+        return now.hour >=13 and now.hour<18
     if part == 3:
-        return now.hour >=22 or now.hour<8
+        return now.hour >=18 and now.hour<24
+
+def get_groups():
+    conn_str_db = f'DRIVER={{SQL Server}};SERVER={ip_sql_server},{port_sql_server};DATABASE=Ace_Config;UID={username_sql_server};PWD={password_sql_server}'
+    conn_db = pyodbc.connect(conn_str_db)
+    query = f"SELECT * FROM Groups"
+    Groups = pd.read_sql(query, conn_db)[['Name','CoName','Code','ProgName']]
+    Groups['db'] = Groups['Code'].apply(str)
+    Groups['db'] = [str('0'+x)[-2:] for x in Groups['db']]
+    Groups['db'] = 'ACE_'+Groups['ProgName'] + Groups['db']
+    return Groups
+
+def database_exists(database_name):
+    conn_str_db = f'DRIVER={{SQL Server}};SERVER={ip_sql_server},{port_sql_server};DATABASE=Ace_Config;UID={username_sql_server};PWD={password_sql_server}'
+    connection = pyodbc.connect(conn_str_db)
+    cursor = connection.cursor()
+        # اجرای کوئری برای بررسی وجود دیتابیس
+    query = f"SELECT name FROM master.sys.databases WHERE name = '{database_name}'"
+    cursor.execute(query)
+    database_exists = cursor.fetchone() is not None
+    # بستن اتصال
+    cursor.close()
+    connection.close()
+
+    if database_exists:
+        return True
+    else:
+        return False
+
+
+
+def clcu_balance_banks(database):
+    # رشته اتصال
+    conn_str_db = f'DRIVER={{SQL Server}};SERVER={ip_sql_server},{port_sql_server};DATABASE={database};UID={username_sql_server};PWD={password_sql_server}'
+    # برقراری اتصال
+    conn = pyodbc.connect(conn_str_db)
+    # خواندن داده‌ها از جدول CHECKINF و ذخیره آن‌ها در یک دیتافریم
+    query = f"SELECT * FROM DOCB"
+    DOCB = pd.read_sql(query, conn)
+    query = f"SELECT * FROM ACC"
+    ACC = pd.read_sql(query, conn)[['Code','Name']]
+    ACC['Kol'] = [str(x).split('-')[0] for x in ACC['Code']]
+    ACC = ACC[ACC['Kol']=='100']
+    DOCB = DOCB.set_index('Acc_Code').join(ACC.set_index('Code'),how='inner').reset_index()
+    
+    try:
+        DOCB = DOCB[['Name','Acc_Code','Bede','Best']]
+    except:
+        DOCB = DOCB.rename(columns={'index':'Acc_Code','Name':'bank'})
+        DOCB = DOCB[['bank','Acc_Code','Bede','Best']]
+    DOCB = DOCB.groupby(by=['bank','Acc_Code']).sum(numeric_only=True)
+    DOCB['balance'] = DOCB['Bede'] - DOCB['Best']
+    DOCB = DOCB.reset_index()
+    conn.close()
+    return DOCB

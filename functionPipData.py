@@ -7,6 +7,22 @@ from persiantools.jdatetime import JalaliDate
 import requests
 from persiantools import characters
 
+def todayIntJalali():
+    today = datetime.datetime.now()
+    jalali = JalaliDate.to_jalali(today)
+    jalali = int(str(jalali).replace('-',''))
+    return jalali
+
+def drop_duplicet_TradeListBroker():
+    jalaliInt = todayIntJalali()
+    df = pd.DataFrame(farasahmDb['TradeListBroker'].find({"dateInt":jalaliInt},{'_id':0}))
+    df = df.drop_duplicates(subset=['NetPrice','Price','TotalCommission','TradeCode','dateInt','TradeNumber','TradeSymbol','TradeType','Volume'])
+    if len(df)>0:
+        farasahmDb['TradeListBroker'].delete_many({"dateInt":jalaliInt})
+        farasahmDb['TradeListBroker'].insert_many(df.to_dict('records'))
+        
+        
+        
 def GetAllTradeToDay():
     '''
     دریافت همه معاملات کارگزاری در روز جاری
@@ -15,6 +31,7 @@ def GetAllTradeToDay():
     doDay = Fnc.toDayJalaliListYMD()
     page = 1
     while True:
+        print(doDay[0],doDay[1],doDay[2],page,'broker start')
         symbolList = farasahmDb['tse'].find({},{'نام':1,'نماد':1,'_id':0,'صندوق':1})
         symbolList = pd.DataFrame(symbolList)
         symbolList = symbolList.drop_duplicates()
@@ -37,7 +54,7 @@ def GetAllTradeToDay():
         print(doDay[0],doDay[1],doDay[2],page,'broker end')
         df = df.to_dict('records')
         farasahmDb['TradeListBroker'].insert_many(df)
-        Fnc.drop_duplicet_TradeListBroker(DateInt)
+        drop_duplicet_TradeListBroker()
         page = page + 1
 
 def get_asset_customer():
@@ -101,7 +118,7 @@ def GetAllTradeLast30Day():
             print(doDay[0],doDay[1],doDay[2],page,'broker end')
             df = df.to_dict('records')
             farasahmDb['TradeListBroker'].insert_many(df)
-            Fnc.drop_duplicet_TradeListBroker(dateInt)
+            drop_duplicet_TradeListBroker()
             page = page + 1
             
 
@@ -159,6 +176,7 @@ def desk_broker_volumeTrade_cal():
     '''
     listDate = farasahmDb['TradeListBroker'].distinct('dateInt')
     for date in listDate:
+        print('desk_broker_volumeTrade_cal' , date)
         df = pd.DataFrame(farasahmDb['TradeListBroker'].find({'dateInt':date},{'صندوق':1,'InstrumentCategory':1,'NetPrice':1,'_id':0,'TradeCode':1,'TradeDate':1,'TradeNumber':1,'TradeSymbol':1}))
         df = df.drop_duplicates()
         df = df[['صندوق','InstrumentCategory','NetPrice']]
@@ -207,7 +225,10 @@ def task_desk_broker_turnover_cal():
     df = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
     df = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in df]
     df = pd.DataFrame(df).sort_values(by=['date'])
+    print('task_desk_broker_turnover_cal',0)
+    
     if len(df)>0:
+        
         df_oragh = df[df['type']=='true'][['date','value']].rename(columns={'value':'اوراق'}).set_index('date')
         df = df[df['type']=='false']
         df_fund = df[df['fund']==True][['date','value']].rename(columns={'value':'صندوق'}).set_index('date')
@@ -218,6 +239,7 @@ def task_desk_broker_turnover_cal():
         sabad = list(farasahmDb['TradeListBroker'].aggregate(pipeline))
         sabad = [{ 'date':x['_id']['date'] , 'type':x['_id']['type'] , 'fund':x['_id']['fund'] , 'value':x['totalNetPrice'] } for x in sabad]
         sabad = pd.DataFrame(sabad).sort_values(by=['date'])
+        print('task_desk_broker_turnover_cal',1)
         if len(sabad)==0:
             sabad_oragh = sabad[sabad['type']=='true'][['date','value']].rename(columns={'value':'اوراق سبد'}).set_index('date')
             sabad_fund = sabad[sabad['fund']==True][['date','value']].rename(columns={'value':'صندوق سبد'}).set_index('date')
@@ -266,6 +288,7 @@ def getAssetCoustomerByFixincome():
     '''
     conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
     codelist = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'dateInt':1,'TradeCode':1}))
+    print('getAssetCoustomerByFixincome')
     if len(codelist):
         codelist = list(set(codelist[codelist['dateInt']==codelist['dateInt'].max()]['TradeCode']))
         today = datetime.datetime.now()
