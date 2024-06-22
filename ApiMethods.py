@@ -347,7 +347,6 @@ def GetDailyTradeList(yr,mn,dy,page,pageSize):
     root = ET.fromstring(response)
     xml_dict = Fnc.element_to_dict(root)
     body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']
-    print(body)
     body = body['{http://tempuri.org/}GetDailyTradeListResponse']['{http://tempuri.org/}GetDailyTradeListResult']['{http://schemas.datacontract.org/2004/07/TadbirPardaz.Infrastructure.DataAccess}Result']
     if len(body)==0:
         return []
@@ -550,3 +549,4 @@ def handle_CuostomerRemain():
             except:
                 pass
         time.sleep(60*60*24)
+

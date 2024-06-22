@@ -290,6 +290,22 @@ def getreturn(data):
     df = df.to_dict(orient='records')
     return json.dumps({'replay':True,'df':df,'dic':dic})
 
+
+
+# SMSGroup
+def sendsmsgroup(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'replay':False})
+    print(data)
+    return json.dumps({'replay':False})
+    
+
+
+
+
 def getcompare(data):
     etfs = pd.DataFrame(farasahmDb['sandoq'].find({'type':'sabet'},{'_id':0}))
     ts = etfs[etfs['symbol']=='خاتم']
