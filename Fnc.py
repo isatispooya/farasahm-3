@@ -138,6 +138,13 @@ def gorgianIntToJalali(date):
     return str(Jalali)
 
 
+def dateIntToSlash(date):
+    y = str(date)[:4]
+    m = str(date)[4:6]
+    d = str(date)[6:8]
+    return y+'/'+m+'/'+d
+
+    
 def todayIntJalali():
     today = datetime.datetime.now()
     jalali = JalaliDate.to_jalali(today)
@@ -974,6 +981,7 @@ def clcu_balance_banks(database):
     
     try:
         DOCB = DOCB[['Name','Acc_Code','Bede','Best']]
+        DOCB = DOCB.rename(columns={'Name':'bank'})
     except:
         DOCB = DOCB.rename(columns={'index':'Acc_Code','Name':'bank'})
         DOCB = DOCB[['bank','Acc_Code','Bede','Best']]
