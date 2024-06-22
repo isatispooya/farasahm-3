@@ -34,9 +34,8 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from setting import farasahmDb
 
-
-farasahmDb = client['farasahm2']
 symbolTarget = ['نهال1', 'زرفام1', 'نفیس1', 'افران1', 'سپر1', 'کیان1', 'کمند1', 'پارند1', 'تصمیم1', 'دیبا1', 'تمشک1', 'امین یکم1', 'ارزش1', 'همای1', 'سرو1', 'هامرز1', 'آرام1', 'مانی1', 'آکورد1', 'کارا1', 'آگاس1', 'ثبات1', 'سپیدما1', 'توان1', 'گام0208151', 'اطلس1', 'هم وزن1', 'اعتماد1', 'کامیاب1', 'پاداش1', 'آوند1', 'ثنا1', 'کاج1', 'الماس1', 'لبخند1', 'آساس1', 'رماس1', 'نخل1', 'کاریس1', 'داریک1', 'کارین1', 'فیروزا1', 'انار1', 'فردا1', 'کهربا1', 'کاردان1', 'سلام1', 'آفاق1', 'دریا1', 'زیتون1', 'اراد501', 'گنج1', 'ویستا1', 'آسامید1', 'سام1', 'یاقوت1', 'ثهام1', 'آوا1', 'آتیمس1', 'داریوش1', 'تدبیر041', 'رشد1', 'فراز1', 'ثمین1', 'فیروزه1', 'وصندوق1', 'اوصتا1', 'اعتبار1', 'ساحل1', 'هیوا1', 'برلیان1', 'اکسیژن1', 'زرین1', 'دارا1', 'آسام1', 'رابین1', 'یارا1', 'آلتون1', 'درسا1', 'وبازار1', 'اخزا1031', 'اخزا1032', 'اخزا0022', 'اخزا0021', 'درین1', 'گام0208132', 'گام0208131', 'گنجینه1', 'پادا1', 'صنم', 'مروارید1', 'صنوین1', 'بذر1', 'صایند1', 'اوج1', 'اخزا0031', 'اخزا0032', 'گام0207132', 'افق ملت1', 'اگ0201551', 'پرتو1', 'اخزا9101', 'سپاس1', 'اخزا9091', 'اخزا1011', 'ثروتم1', 'اخزا0051', 'اخزا0071', 'عقیق1', 'سخند1', 'اخزا9081', 'گنجین1', 'تاراز1', 'اخزا0091', 'اراد502', 'اخزا9141', 'اخزا1061', 'اخزا1071', 'اخزا1012', 'اخزا0101', 'اخزا0102', 'پتروما1', 'مهریران1', 'ناب1', 'اخزا9102', 'رایکا1', 'اراد871', 'اخزا8211', 'اخزا0042', 'اخزا0072', 'اخزا0041', 'اخزا1041', 'اخزا0052', 'اراد991', 'اخزا0012', 'اخزا0011', 'اخزا8201', 'نیلی1', 'گام0207561', 'اخزا1042', 'گام0208152', 'شتاب1', 'آکام1', 'اخزا0061', 'اخزا0062', 'پایا1', 'گام0206132', 'جهش1', 'اخزا9142', 'اراد1121', 'اخزا1051', 'صنفت13121', 'اخزا0092', 'اخزا9082', 'اخزا1081', 'آلا1', 'صبا14041', 'اخزا1082', 'سیناد1', 'استیل1', 'فاخر1', 'اخزا1044', 'صپترو7051', 'اگ0205551', 'صنهال1', 'بازده1', 'پتروداریوش1', 'نشان1', 'طلوع1', 'صدف1', 'سمان1', 'پتروصبا1', 'هوشیار1', 'بهین رو1', 'ترمه2', 'توسکا1', 'اراد1371', 'تیام1', 'فلزفارابی1', 'اراد1071', 'آذرین1', 'متال1', 'کرمان4621', 'اخزا1072', 'اخزا1062', 'اراد992', 'جواهر1', 'خورشید1', 'صاف فیلم521', 'ماهور1', 'تابش1', 'اتوآگاه1', 'خلیج1', 'پیروز1', 'اخزا2021', 'اخزا2022', 'آفرین1', 'صترا5092']
 
 def Day_list():  
@@ -435,7 +434,7 @@ def getshareholders(data):
     df= df[df['date']==df['date'].max()]
     df = df[['نام و نام خانوادگی','کد ملی','نام پدر','تعداد سهام','شماره تماس','_id']]
     df = df.sort_values(by=['تعداد سهام'], ascending=False)
-    df = df.drop_duplicates(subset=['کد ملی'])
+    df = df.drop_duplicates(subset=['کد ملی','نام و نام خانوادگی'])
     df['شماره تماس'] = df['شماره تماس'].fillna('')
     df['کد ملی'] = df['کد ملی'].fillna('')
     df['نام پدر'] = df['نام پدر'].fillna('')
@@ -1673,6 +1672,34 @@ def desk_todo_deltask(data):
     return json.dumps({'reply':True,'msg':"ok"})
 
 
+def smsgroup(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    symbol = data['access'][1]
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    dic = data['data']
+    dic['send'] = 'در انتظار'
+    dic['count'] = len(data['data']['selectData'])
+    dic['count_send'] = 0
+    dic['count_deliver'] = 0
+    dic['symbol'] = symbol
+    farasahmDb['smsGroup'].insert_one(dic)
+    return json.dumps({'replay':True})
+
+def smsgroupreport(data):
+    access = data['access'][0]
+    _id= ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    symbol = data['access'][1]
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['smsGroup'].find({'symbol':symbol}))
+    df = df.rename(columns={'selectData':'children'})
+    df['_id'] = df['_id'].apply(str)
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
 
 def getassetfund(data):
     access = data['access'][0]
@@ -1871,18 +1898,37 @@ def getpriceforward(data):
     dateDf = dateDf.set_index('dateInt')
     df = df.join(dateDf,how='outer').sort_index().reset_index()
     df['final_price'] = df['final_price'].fillna(method='ffill')
+    afterday = int(data['afterDay'])
+    beforDay = int(data['beforDay'])
     df['future_holidays'] = df.apply(lambda row: Fnc.calculate_future_holidays(row, df), axis=1)
     df['past_holidays'] = df.apply(lambda row: Fnc.calculate_past_holidays(row, df), axis=1)
     df['real'] = df['dateInt']<=lastUpdate
     grow_rate = ((int(data['target'])/100)+1) ** (1/365)
-    befor_grow_rate = ((int(data['befor'])/100) * (grow_rate - 1)) + 1
-    after_grow_rate = ((int(data['after'])/100) * (grow_rate - 1)) + 1
+    befor_grow_rate = (((int(data['befor'])/100)/afterday) * (grow_rate - 1)) + 1
+    after_grow_rate = (((int(data['after'])/100)/afterday) * (grow_rate - 1)) + 1
+    print(afterday,befor_grow_rate)
+    print(beforDay,befor_grow_rate)
+    print(grow_rate)
+    
     df['real'] = df['final_price'] * df['real']
     df['final_price'] = df[df['dateInt']==df['dateInt'].min()].to_dict('records')[0]['final_price']
     dfZero = df[df.index==0]
     dfZero = dfZero[['ja_date','week','workday','real']]
     df = df[df.index>0]
     df['grow_rate'] = grow_rate #** df.index
+    
+    dff = df[df['workday']==True]
+    df = df.drop(columns=['future_holidays','past_holidays']).set_index('dateInt')
+    dff = dff[['future_holidays','past_holidays','dateInt']]
+    
+    
+    dff = dff.sort_values(by=['dateInt'], ascending=False)
+    dff['future_holidays'] =dff['future_holidays'].rolling(beforDay,min_periods=1).sum()
+    dff = dff.sort_values(by=['dateInt'], ascending=True)
+    dff['past_holidays'] =dff['past_holidays'].rolling(afterday,min_periods=1).sum()
+    dff = dff.set_index('dateInt')
+    df = df.join(dff)
+    df = df.fillna(0).reset_index()
     df['grow_holiday_fut'] =  befor_grow_rate ** df['future_holidays']
     df['grow_holiday_pas'] =  after_grow_rate ** df['past_holidays']
     df['grow_Fin'] = (df['grow_rate'] * df['workday']) * df['grow_holiday_fut'] * df['grow_holiday_pas']
@@ -1982,7 +2028,6 @@ def saveinvoce(data):
     if sellerDic == None:
         return json.dumps({'reply':False,'msg':'فروشنده یافت نشد'})
     bodyDf = pd.DataFrame(invoceData['body'])
-
     bodyDf['sumBeforOff'] = bodyDf['sumBeforOff'].apply(int)
     bodyDf['off'] = bodyDf['off'].apply(int)
     bodyDf['taxRate'] = bodyDf['taxRate'].apply(int)
@@ -1991,7 +2036,6 @@ def saveinvoce(data):
     bodyDf['sumTax'] = bodyDf['sumAfterOff'] * (bodyDf['taxRate'] /100)
     bodyDf['sumTax'] = bodyDf['sumTax'].apply(round,0)
     bodyDf['sumFin'] = bodyDf['sumAfterOff'] + bodyDf['sumTax']
-    
     mmrit = sellerDic['idTax']
     indatim = int(invoceData['createDate'])
     Indati2m = int(invoceData['addDate'])
@@ -1999,19 +2043,17 @@ def saveinvoce(data):
         return json.dumps({'reply':False,'msg':'تاریخ صدور نمیتواند قبل از تاریخ فروش باشد'})
     date = datetime.datetime.fromtimestamp(indatim/1000)
     dateJalali = Fnc.gorgianIntToJalali(date)
-
-    inno = Fnc.generatIdInternal(str(mmrit)+str(indatim))
-
+    inno = Fnc.generatIdInternal()
     taxid = Fnc.generate_tax_id(mmrit,dateJalali,inno)
     if bodyDf['cash'].sum() == 0:
         setm = 2
         tvop = 0
-    elif bodyDf['cash'].sum() == bodyDf['sumFin'].sum():
+    elif (bodyDf['cash'].sum() + bodyDf['sumTax'].sum()) == bodyDf['sumFin'].sum():
         setm = 1
         tvop = bodyDf['sumTax'].sum()
     else:
         setm = 3
-        tvop = int((bodyDf['cash'].sum()/bodyDf['sumFin'].sum()) * bodyDf['sumTax'].sum())
+        tvop = bodyDf['sumTax'].sum()
 
 
     header = {
@@ -2044,7 +2086,7 @@ def saveinvoce(data):
             "tbill" : bodyDf['sumFin'].sum(),
             "setm" : setm,
             "cap" : int(bodyDf['cash'].sum()),
-            "insp" : int(bodyDf['sumFin'].sum() - bodyDf['cash'].sum()),
+            "insp" : int(bodyDf['sumFin'].sum() - bodyDf['cash'].sum()) - tvop,
             "tvop" : tvop,
             "tax17" : None, 
         }
@@ -2076,7 +2118,7 @@ def saveinvoce(data):
             "bros" : None,
             "tcpbs" : None,
             "cop" : i['cash'],
-            "vop" : round(i['cash'] * (i['sumTax']/100),0),
+            "vop" : round(i['cash'] * (i['taxRate']/100),0),
             "bsrn" : None,
             "tsstam" : i['sumFin'],
         }
@@ -2086,10 +2128,9 @@ def saveinvoce(data):
         'body' : body,
         'payments' : []
     }
-    buyer = data['buyer']
-    buyer['idcode'] = str(invoceData['buyerId'])
-    buyer['idcode'] = str(invoceData['buyerId'])
-    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None, 'details':{'seler':sellerDic,'buyer':buyer,'text':data['textinv']}}
+    buyer = ''#data['buyer']
+    #buyer['idcode'] = str(invoceData['buyerId'])
+    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None, 'details':{'seler':sellerDic,'buyer':buyer,}}#'text':data['textinv']}}
     farasahmDb['invoiceMoadian'].insert_one(dic)
 
     return json.dumps({'reply':True})
@@ -2124,7 +2165,6 @@ def getdiffnavprc(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-
     condition = {'dateInt': {'$exists': True},'symbol':symbol}  # شرط لازم برای وجود فیلد dateInt
     period = data['period']
     if period == 'ماه':
@@ -2462,6 +2502,35 @@ def sendinvoce(data):
     farasahmDb['invoiceMoadian'].update_one({'_id':_idinv},{'$set':{'result':result,'inquiry':None}})
     return json.dumps({'reply':True})
 
+def ebtalinvoce(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    _idinv = ObjectId(data['id'])
+    ref = farasahmDb['invoiceMoadian'].find_one({'_id':_idinv},{'_id':0})
+    tins = ref['invoice']['header']['tins']
+    sellerDic = farasahmDb['companyMoadian'].find_one({'idNum':tins})
+    if sellerDic == None:
+        return json.dumps({'reply':False,'msg':'فروشنده یافت نشد'})
+    indatim = int(datetime.datetime.now().timestamp() *1000)
+    date = datetime.datetime.fromtimestamp(indatim/1000)
+    dateJalali = Fnc.gorgianIntToJalali(date)
+    inno = Fnc.generatIdInternal()
+    mmrit = sellerDic['idTax']
+    ref['title'] = ref['title'] + '_ابطال'
+    ref['invoice']['header']['ins'] = 3
+    ref['invoice']['header']['indatim'] = indatim
+    ref['invoice']['header']['indati2m'] = indatim + 1000
+    ref['invoice']['header']['irtaxid'] = ref['invoice']['header']['taxid']
+    ref['invoice']['header']['taxid'] = Fnc.generate_tax_id(mmrit,dateJalali,inno)
+    ref['result'] = None
+    ref['inquiry'] = None
+    farasahmDb['invoiceMoadian'].insert_one(ref)
+    return json.dumps({'reply':True})
 
 def inquiryinvoce(data):
     access = data['access'][0]
@@ -2473,8 +2542,11 @@ def inquiryinvoce(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     _idinv = ObjectId(data['id'])
     invoce = farasahmDb['invoiceMoadian'].find_one({'_id':_idinv})
-    if 'referenceNumber' not in invoce['result']:
-        return json.dumps({'reply':False,'msg':'ابتدا باید ارسال شود'})
+    try:
+        if 'referenceNumber' not in invoce['result']:
+            return json.dumps({'reply':False,'msg':'ابتدا باید ارسال شود'})
+    except:
+            return json.dumps({'reply':False,'msg':'ابتدا باید ارسال شود'})
     seller = farasahmDb['companyMoadian'].find_one({'idNum':invoce['invoice']['header']['tins']})
     key = seller['key']
     memoryId = seller['idTax']
@@ -2983,6 +3055,8 @@ def customerphonebook(data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     df = pd.DataFrame(farasahmDb['registerNoBours'].find({},{'_id':0,'نام و نام خانوادگی':1,'کد ملی':1,'شماره تماس':1}))
     df = df.drop_duplicates(subset=['کد ملی'])
+    df = df.dropna(subset=['شماره تماس'])
+    df = df.fillna('')
     df['source'] = 'سهامداران'
     df = df.to_dict('records')
     return json.dumps({'reply':True, 'df':df})
@@ -3441,3 +3515,82 @@ def moadian_print(data):
     image.save("public/invoice.png")
     return send_file("public/invoice.png", as_attachment=True, mimetype="image/png")
 
+
+def getaccbank(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    try:
+        date = datetime.datetime.fromtimestamp(int(data['toDay'])/1000)
+    except:
+        date = datetime.datetime.strptime(data['toDay'], "%Y-%m-%dT%H:%M:%S.%fZ")
+    date = JalaliDate(date)
+    year = date.year
+    group = Fnc.get_groups()
+    group['need'] = ['Acc' in x for x in group['db']]
+    group = group[group['need']==True]
+    group['db'] = group['db'] + str(year)
+    group['exists'] = group['db'].apply(Fnc.database_exists)
+    group = group[group['exists']==True]
+    dff = []
+    for i in group.index:
+        name_group = group['Name'][i]
+        db_group = group['db'][i]
+        df = Fnc.clcu_balance_banks(db_group)
+        if len(df)>0:
+            balance = df['balance'].sum()
+            children = df[['bank','Acc_Code','balance']].to_dict('records')
+            
+        else:
+            balance = 0
+            children = []
+            
+        dic = {'Name':name_group,'balance':balance, '_children':children}
+        dff.append(dic)
+
+    return json.dumps({'reply':True, 'df':dff})
+
+
+def setholliday(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    dates = data['dates']
+    dates_jalali = []
+    for i in dates:
+        di = Fnc.timestumpToJalalInt(i)
+        di = str(di)
+        y = str(di)[:4]
+        m = str(di)[4:6]
+        d = str(di)[6:8]
+        di = y+'-'+m+'-'+d
+        dates_jalali.append({'jajli':di,'timestump':i})
+    farasahmDb['hillyday'].delete_many({})
+    farasahmDb['hillyday'].insert_many(dates_jalali)
+    return json.dumps({'reply':True, 'df':0})
+
+
+
+
+def getholliday(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    
+    df = pd.DataFrame(farasahmDb['hillyday'].find({}))
+    df = df['timestump'].to_list()
+    
+    return json.dumps({'reply':True, 'df':df})
+    

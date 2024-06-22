@@ -188,8 +188,6 @@ def GetCustomerMomentaryAssets(tradeCode):
                 'VolumeInPrice':i['{http://schemas.datacontract.org/2004/07/TadbirPardaz.TBS.Domain.Entities.ExternalService.Customer}VolumeInPrice']['text']
             }
             lst.append(dic)
-
-
     return lst
 
 
@@ -412,7 +410,6 @@ def GetMarketInstrumentMomentaryPrice(isin):
 def get_asset_customer(today = Fnc.todayIntJalali()):
     symbols = ['ویسا','بازرگام','خاتم']
     for symbol in symbols:
-        print('get assets customer', symbol)
         today = farasahmDb['TradeListBroker'].distinct('dateInt')
         today = max(today)
         df = farasahmDb['TradeListBroker'].find({"dateInt":today,"TradeSymbol":symbol+'1'})
@@ -448,7 +445,6 @@ def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJal
             df['DateYrInt'] = doDay[0]
             df['DateMnInt'] = doDay[1]
             df['DateDyInt'] = doDay[2]
-            print(doDay[0],doDay[1],doDay[2],page,'broker start')
             df['dateInt'] = df['TradeDate'].apply(Fnc.dateStrToIntJalali)
             df['page'] = page
             for i in ['NetPrice','Price','TotalCommission','Volume']:
@@ -457,7 +453,6 @@ def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJal
             df['TradeSymbolAbs'] = df['TradeSymbol'].apply(Fnc.remove_non_alphanumeric)
             df = df.set_index('TradeSymbolAbs').join(symbolList.set_index('نماد'))
             df = df.reset_index()
-            print(doDay[0],doDay[1],doDay[2],page,'broker end')
             df = df.to_dict('records')
             farasahmDb['TradeListBroker'].insert_many(df)
             Fnc.drop_duplicet_TradeListBroker(DateInt)
@@ -471,13 +466,10 @@ def GetAllTradeInDate(doDay = Fnc.toDayJalaliListYMD(),DateInt = Fnc.todayIntJal
 def GetAllTradeLastDate():
     workTime = Fnc.CulcTime(2)
     if workTime:
-        print('GetAllTradeLastDate')
         today = datetime.datetime.now()
         for d in range(1,30):
             date = today - datetime.timedelta(days=d)
             dateInt = Fnc.gorgianIntToJalaliInt(date)
-            print(dateInt)
-            print(dateInt)
             GetAllTradeInDate(doDay=Fnc.toDayJalaliListYMD(date), DateInt=dateInt)
         time.sleep(60*60*24)
 
@@ -489,7 +481,6 @@ def get_asset_funds():
         lst_code = [{'code':'61580209324','symbol':'خاتم'}]
         date = Fnc.todayIntJalali()
         for i in lst_code:
-            print(i, 'get asset')
             df = pd.DataFrame(GetCustomerMomentaryAssets(i['code']))
             if len(df)>0:
                 df['VolumeInPrice'] = df['VolumeInPrice'].apply(int)
@@ -509,7 +500,6 @@ def get_asset_funds():
 def getAssetCoustomerByFixincome():
     workTime = Fnc.CulcTime(2)
     if workTime:
-        print('get Asset Coustomer By Fixincome')
         conditions = {'$or': [{'صندوق': True}, {'InstrumentCategory': 'true'}]}
         codelist = pd.DataFrame(farasahmDb['TradeListBroker'].find(conditions,{'_id':0,'dateInt':1,'TradeCode':1}))
         if len(codelist):
@@ -535,7 +525,6 @@ def handle_CuostomerRemain():
         listCode_all = farasahmDb['TradeListBroker'].distinct('TradeCode')
         for i in range(0,len(listCode_all)):
             code = listCode_all[i]
-            print(code, i/len(listCode_all))
             try:
                 result = GetCustomerRemainWithTradeCode(str(code),'TSE')
                 result['datetime'] = datetime.datetime.now()

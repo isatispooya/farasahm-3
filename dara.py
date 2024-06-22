@@ -21,7 +21,7 @@ from bidi.algorithm import get_display
 import Fnc
 from bson import ObjectId
 from GuardPyCaptcha.Captch import GuardPyCaptcha
-
+import numpy as np
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
 
@@ -36,55 +36,12 @@ def applynationalcode(data):
         phonPrivet = registerNoBours['شماره تماس']
         phonPrivet = phonPrivet[:3]+'xxxxx'+phonPrivet[-3:]
         return json.dumps({'replay':True,'status':'Registered','phonPrivet':phonPrivet})
-    register = farasahmDb['register'].find_one({'کد ملی':int(data['UserInput']['nationalCode']),'symbol':'visa'})
-    if register != None:
-        daraRegister = farasahmDb['daraRegister'].find_one({'nationalCode':data['UserInput']['nationalCode']})
-        if daraRegister == None:
-            return json.dumps({'replay':True,'status':'RegisterDara'})
-        else:
-            phonPrivet = registerNoBours['شماره تماس']
-            phonPrivet = phonPrivet[:3]+'xxxxx'+phonPrivet[-3:]
-            VerificationPhone(daraRegister['phone'])
-            return json.dumps({'replay':True,'status':'Registered','phonPrivet':phonPrivet})
     return json.dumps({'replay':True,'status':'NotFund'})
 
-def questionauth(data):
-    nationalCode = data['nationalCode']
-    register = pd.DataFrame(farasahmDb['register'].find({'کد ملی':{'$gt':int(nationalCode)},'symbol':'visa'}).limit(150))
-    if len(register)<30:
-        register = pd.DataFrame(farasahmDb['register'].find({'کد ملی':{'$lt':int(nationalCode)},'symbol':'visa'}).limit(150))
-    register = register[['کد سهامداری','نام خانوادگی ','محل صدور','سری','نام پدر']]
-    register = register.fillna('-')
-    basic = farasahmDb['register'].find_one({'کد ملی':int(nationalCode),'symbol':'visa'},{'_id':0})
-
-    boursiCode = list(set(register['کد سهامداری'].to_list()))[:4]
-    
-    boursiCode.append(basic['کد سهامداری'])
-    random.shuffle(boursiCode)
-
-    family = list(set(register['نام خانوادگی '].to_list()))[:4]
-    family.append(basic['نام خانوادگی '])
-    random.shuffle(family)
-
-
-    fromm = list(set(register['محل صدور'].to_list()))[:4]
-    fromm.append(basic['محل صدور'])
-    random.shuffle(fromm)
-
-    serial = list(set(register['سری'].to_list()))[:4]
-    serial.append(basic['سری'])
-    random.shuffle(serial)
-
-    fatherName = list(set(register['نام پدر'].to_list()))[:4]
-    fatherName.append(basic['نام پدر'])
-    random.shuffle(fatherName)
-
-
-    return json.dumps({'replay':True,'qustion':{"boursiCode":boursiCode,"family":family,"fromm":fromm,"serial":serial,"fatherName":fatherName}})
 
 def applycode(data):
     apply = farasahmDb['VerificationPhone'].find_one({'phone':data['inputPhone']['phone'],'code':str(data['inputPhone']['code'])})
-    print(apply)
+
     if apply != None:
         filter_query = {'nationalCode': data['inputPhone']['nationalCode']}
         update_query = {'$set': {'phone':data['inputPhone']['phone'],'nationalCode':data['inputPhone']['nationalCode'],'dateStart':datetime.datetime.now()}}
@@ -95,116 +52,51 @@ def applycode(data):
         return json.dumps({'replay':False,'msg':'کد تایید صحیح نیست'})
 
 
-def access(data):
-    try:
-        idcode = decrypt(data['id'].encode())
-        acc = farasahmDb['AuthenticationSession'].find_one({'nationalCode':idcode})
-        if acc == None:
-            return json.dumps({'replay':False})
-        else:
-            return json.dumps({'replay':True})
-    except:
-        return json.dumps({'replay':False})
 
 
 
-def authenticationsession(data):
-    idcode = decrypt(data['id'].encode())
-    acc = farasahmDb['AuthenticationSession'].find_one({'nationalCode':idcode},{'_id':0})
-    if acc == None:
-        return json.dumps({'replay':False})
-    NoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':int(idcode)})
-    register = farasahmDb['register'].find_one({'کد ملی':int(idcode)})
-    if NoBours==None and register==None: return json.dumps({'replay':True,'auth':'rejected'})
-    if NoBours!=None: return json.dumps({'replay':True,'auth':'approve'})
-    else: return json.dumps({'replay':True,'auth':'check'})
-
-
-def answerauth(data):
-
-
-    dic = farasahmDb['register'].find_one({'کد ملی':int(data['nationalcod'])})
-
-    if data['answer']['family'] != dic['نام خانوادگی ']:
-        return json.dumps({'reply': False , 'msg': 'پاسخ شما درست نبود.'})
-
-    if data['answer']['boursiCode'] != dic['کد سهامداری']:
-        return json.dumps({'reply': False , 'msg': 'پاسخ شما درست نبود.'})
-     
-    if data['answer']['fromm'] != dic['محل صدور']:
-        return json.dumps({'reply': False , 'msg': 'پاسخ شما درست نبود.'})
-    if data['answer']['serial'] != dic['سری']:
-        return json.dumps({'reply': False , 'msg': 'پاسخ شما درست نبود.'}) 
-    if data['answer']['fatherName'] != dic['نام پدر']:
-        return json.dumps({'reply': False , 'msg': 'پاسخ شما درست نبود.'})
-    return json.dumps({'reply':True})
-
-
-def register(data):
-    VerificationPhone(data['phone'])
-    return json.dumps({'replay':True})
-
-
-def codeRegister(data):
-    phone = data['phone']
-    cheakcode = farasahmDb['VerificationPhone'].find_one({'phone':phone})
-    if cheakcode['code'] != data['code']:
-        return json.dumps({'replay':False,'msg':'کد تایید صحیح نیست'})
-    farasahmDb['daraRegister'].insert_one({'phone':phone,'nationalCode':data['nationalCode'],'date':datetime.datetime.now()})
-    dic = str({'phone':phone,'nationalCode':data['nationalCode']})
-    dic = encrypt(dic).decode()
-    return json.dumps({'replay':True,'cookie':dic})
 
 def coderegistered(data):
     registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['nationalCode']},sort=[('date', -1)], limit=1)
-    if registerNoBours != None:
-        phone = registerNoBours['شماره تماس']
-    else:
-        daraRegister = farasahmDb['daraRegister'].find_one({'nationalCode':data['nationalCode']})
-        if daraRegister != None:
-            phone = daraRegister['phone']
-
+    if registerNoBours == None:
+        return json.dumps({'replay':False,'msg':'کاربر یافت نشد'})
+    phone = registerNoBours['شماره تماس']
     cheakcode = farasahmDb['VerificationPhone'].find_one({'phone':phone,'code':data['Code']})
     if cheakcode['code'] == None:
         return json.dumps({'replay':False,'msg':'کد تایید صحیح نیست'})
-    dic = str({'phone':phone,'nationalCode':data['nationalCode']})
-    dic = encrypt(dic).decode()
-    return json.dumps({'replay':True,'cookie':dic})
+    id = str(registerNoBours['_id'])
+    return json.dumps({'replay':True,'cookie':id})
 
 
 def checkcookie(data):
     try:
         cookie = data['cookie']
-        cookie = literal_eval(decrypt(str(cookie).encode()))
-        phone = cookie['phone']
-        nationalCode = cookie['nationalCode']
-        registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':nationalCode},sort=[('date', -1)], limit=1)
-        if registerNoBours != None:
-            if registerNoBours['شماره تماس'] == phone:
-                return json.dumps({'replay':True,'name':registerNoBours['نام و نام خانوادگی']})
-        else:
-            daraRegister = farasahmDb['daraRegister'].find_one({'nationalCode':nationalCode})
-            if daraRegister['phone'] == phone:
-                return json.dumps({'replay':True,'name':''})
-        return json.dumps({'replay':False})
+        registerNoBours = farasahmDb['registerNoBours'].find_one({'_id':ObjectId(cookie)},{'_id':0})
+
+        if registerNoBours == None:
+            return json.dumps({'replay':False})
+        registerNoBours['replay'] = True
+
+        for key, value in registerNoBours.items():
+            if isinstance(value, float) and np.isnan(value):
+                registerNoBours[key] = ''
+        return json.dumps(registerNoBours)
     except:
         return json.dumps({'replay':False})
     
-def CookieToUser(cookie):
+def CookieToUser(data):
     try:
-        cookie = cookie
-        user = literal_eval(decrypt(str(cookie).encode()))
-        phone = user['phone']
-        nationalCode = user['nationalCode']
-        registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':nationalCode},sort=[('date', -1)], limit=1)
-        if registerNoBours != None:
-            if registerNoBours['شماره تماس'] == phone:
-                return {'replay':True, 'user':user}
-        else:
-            daraRegister = farasahmDb['daraRegister'].find_one({'nationalCode':nationalCode})
-            if daraRegister['phone'] == phone:
-                return {'replay':True,'user':user}
-        return {'replay':False}
+        cookie = data['cookie']
+        registerNoBours = farasahmDb['registerNoBours'].find_one({'_id':ObjectId(cookie)},{'_id':0})
+
+        if registerNoBours == None:
+            return {'replay':False}
+        registerNoBours['replay'] = True
+
+        for key, value in registerNoBours.items():
+            if isinstance(value, float) and np.isnan(value):
+                registerNoBours[key] = ''
+        return registerNoBours
     except:
         return {'replay':False}
 
@@ -213,14 +105,13 @@ def groupGetCompy(group):
     return group
 
 def getcompany(data):
-    user = CookieToUser(data['cookie'])
-    print(user)
-    if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
-    user = user['user']
+    user = CookieToUser(data)
+    if user['replay']==False:
+        return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
     
     lastupDate = farasahmDb['register'].distinct('تاریخ گزارش')
     lastupDate = max(lastupDate)
-    stockBourse = pd.DataFrame(farasahmDb['register'].find({"کد ملی": int(user['nationalCode']),'symbol':'visa','تاریخ گزارش':lastupDate},{'_id':0,'symbol':1,'سهام کل':1,'تاریخ گزارش':1}))
+    stockBourse = pd.DataFrame(farasahmDb['register'].find({"کد ملی": int(user['کد ملی']),'symbol':'visa','تاریخ گزارش':lastupDate},{'_id':0,'symbol':1,'سهام کل':1,'تاریخ گزارش':1}))
 
     if len(stockBourse)>0:
         stockBourse = stockBourse[stockBourse['تاریخ گزارش'] == stockBourse['تاریخ گزارش'].max()]
@@ -232,7 +123,7 @@ def getcompany(data):
     else:
         listStock = []
 
-    stockNoBourse = pd.DataFrame(farasahmDb['registerNoBours'].find({"کد ملی": str(user['nationalCode'])},{'تعداد سهام':1,'_id':0,'date':1,'symbol':1}))
+    stockNoBourse = pd.DataFrame(farasahmDb['registerNoBours'].find({"کد ملی": str(user['کد ملی'])},{'تعداد سهام':1,'_id':0,'date':1,'symbol':1}))
     if len(stockNoBourse)>0:
         stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='hevisa']
         stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='yazdan']
@@ -258,7 +149,12 @@ def getcompany(data):
     df = df.drop(columns='date')
     df = df.fillna(0)
     df = df.sort_values(by=['تعداد سهام'],ascending=False)
+    df = df.rename(columns={'تعداد سهام':'amount'})
     df = df.reset_index()
+    df['allStockCompany_alpha'] = df['allStockCompany'].apply(int)
+    df['allStockCompany_alpha'] = df['allStockCompany_alpha'].apply(digits.to_word)
+    df['amount_alpha'] = df['amount'].apply(int)
+    df['amount_alpha'] = df['amount_alpha'].apply(digits.to_word)
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df})
 
@@ -294,23 +190,25 @@ def gettrade(data):
 
 
 def getsheet(data):
-    user = CookieToUser(data['cookie'])
-    if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
-    user = user['user']  
+    user = CookieToUser(data)
+    if user['replay']==False:
+        return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
+
     symbol = data['symbol']
-    company = farasahmDb['companyList'].find_one(symbol)
+    company = farasahmDb['companyList'].find_one({'symbol':symbol})
     typeCompany = company['type']
     if typeCompany == 'Bourse':
         lastTrade = farasahmDb['trade'].find({'symbol':symbol['symbol']},{"تاریخ معامله":1})
         lastTrade =[x['تاریخ معامله'] for x in lastTrade]
         lastTrade = max(lastTrade)
-        BourseUser = farasahmDb['register'].find_one({'کد ملی': int(user['nationalCode']), 'symbol': symbol['symbol'],'تاریخ گزارش': lastTrade},{'_id':0, 'fullName':1, 'نام پدر':1, 'کد ملی':1,'سهام کل':1})
+        BourseUser = farasahmDb['register'].find_one({'کد ملی': int(user['کد ملی']), 'symbol': symbol['symbol'],'تاریخ گزارش': lastTrade},{'_id':0, 'fullName':1, 'نام پدر':1, 'کد ملی':1,'سهام کل':1})
         if BourseUser == None:
             return json.dumps({'replay': False, 'msg':'سهامی ندارید'})
         BourseUser['stockword'] = digits.to_word(BourseUser['سهام کل'])
         BourseUser['company'] = company['fullname']
         return json.dumps({'replay': True, 'sheet': BourseUser})
-    userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': user['nationalCode'], 'symbol':symbol['symbol']},sort=[('date',-1)])
+    
+    userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': user['کد ملی'], 'symbol':symbol},sort=[('date',-1)])
     userNoBourse['stockword'] = digits.to_word(userNoBourse['تعداد سهام']) 
     userNoBourse['company'] = company['fullname']
     userNoBourse['fullName'] = userNoBourse['نام و نام خانوادگی']
@@ -321,9 +219,9 @@ def getsheet(data):
     return json.dumps({'replay': True, 'sheet': userNoBourse})
 
 def getassembly(data):
-    user = CookieToUser(data['cookie'])
+    user = CookieToUser(data)
     if user['replay']==False: return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
-    user = user['user']  
+    user = user
     symbol = data['symbol']
     assembly = farasahmDb['assembly'].find_one({'symbol':symbol['symbol']}, sort = [('data', -1)])
     if assembly == None:
@@ -335,11 +233,35 @@ def getassembly(data):
     assembly['date'] = str(assembly['date'])
     return json.dumps({'replay':True, 'assembly': assembly})
 
+def static(data):
+    user = CookieToUser(data)
+    if user['replay']==False:
+        return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
+    symbol = data['symbol']
+    df_comp = pd.DataFrame(farasahmDb['registerNoBours'].find({'symbol':symbol}))
+    df_comp = df_comp.fillna('')
+    df_comp = df_comp.sort_values(by=['date'])
+    df_comp = df_comp.drop_duplicates(subset=['date','کد ملی'],keep='last')
+    
+    if len(df_comp)==0:
+        return json.dumps({'replay':False, 'msg': 'not found'}) 
+    df_comp = df_comp[df_comp['date']==df_comp['date'].max()]
+    
+    Shareholders = len(df_comp)
+    number_shares = df_comp['تعداد سهام'].sum()
+    Shareholder = farasahmDb['registerNoBours'].find_one({'symbol':symbol,'کد ملی':user['کد ملی']})
+    amount = Shareholder['تعداد سهام']
+    capital = number_shares * 10000
+    dic = {'Shareholders':Shareholders,'number_shares':str(number_shares),'amount':amount, 'capital':str(capital)}
+    return json.dumps({'replay':True, 'dic': dic}) 
+
 
 def getSheetpng(data):
     resulte = json.loads(getsheet(data))
+
     if resulte['replay'] == False:
         return getsheet(data)
+    
     resulte = resulte['sheet']
     companyInfo = farasahmDb['companyBasicInformation'].find_one({'symbol':resulte['symbol']})
     image = Image.open('public/sheet1.png')
@@ -352,7 +274,7 @@ def getSheetpng(data):
 
     # اسم شرکت
     text = arabic_reshaper.reshape('شرکت ' + resulte['company'])
-    text_width, text_height = draw.textsize(text, font=font120)
+    text_width = draw.textlength(text, font=font120)
     x = (image_width - text_width) // 2
     y = 350
     text = get_display(text)
@@ -360,7 +282,7 @@ def getSheetpng(data):
     # سهامی خاص
 
     text = arabic_reshaper.reshape('('+companyInfo['نوع شرکت']+')')
-    text_width, text_height = draw.textsize(text, font=font60)
+    text_width = draw.textlength(text, font=font60)
     x = (image_width - text_width) // 2
     y = 500
     text = get_display(text)
@@ -368,7 +290,7 @@ def getSheetpng(data):
 
     # شماره و تاریخ ثبت
     text = arabic_reshaper.reshape('شماره ثبت:'+digits.en_to_fa(companyInfo['شماره ثبت'])+ '       ' +'تاریخ تاسیس:' + digits.en_to_fa(companyInfo['تاریخ تاسیس']))
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = (image_width - text_width) // 2
     y = 650
     text = get_display(text)
@@ -376,7 +298,7 @@ def getSheetpng(data):
     #سرمایه ثبتی
 
     text = arabic_reshaper.reshape('سرمایه ثبت شده '+Fnc.comma_separate(digits.en_to_fa(companyInfo['سرمایه ثبتی']))+ ' ريال منقسم به '+ Fnc.comma_separate(digits.en_to_fa(companyInfo['تعداد سهام'])) + ' سهم ' + digits.to_word(int((int(companyInfo['سرمایه ثبتی']) / int(companyInfo['تعداد سهام'])))) + ' ريالی  که صد در دصد آن پرداخت شده میباشد')
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = (image_width - text_width) // 2
     y = 740
     text = get_display(text)
@@ -384,7 +306,7 @@ def getSheetpng(data):
 
     #فیلد ها دارنده این ورقه
     text = arabic_reshaper.reshape('دارنده این ورقه' + '      ' + resulte['نام و نام خانوادگی'])
-    text_width, text_height = draw.textsize(text, font=font50)
+    text_width = draw.textlength(text, font=font50)
     x = image_width - text_width - 280 
     y = 1100
     text = get_display(text)
@@ -392,7 +314,7 @@ def getSheetpng(data):
 
     #فیلد ها فرزند
     text = arabic_reshaper.reshape('فرزند' + '      ' + resulte['نام پدر'])
-    text_width, text_height = draw.textsize(text, font=font50)
+    text_width = draw.textlength(text, font=font50)
     x = image_width - text_width - 1400 
     y = 1100
     text = get_display(text)
@@ -400,7 +322,7 @@ def getSheetpng(data):
 
     #فیلد ها کد ملی
     text = arabic_reshaper.reshape('شماره/شناسه ملی' + '      ' + digits.en_to_fa(resulte['کد ملی']))
-    text_width, text_height = draw.textsize(text, font=font50)
+    text_width = draw.textlength(text, font=font50)
     x = image_width - text_width - 2100 
     y = 1100
     text = get_display(text)
@@ -408,7 +330,7 @@ def getSheetpng(data):
 
     #فیلد ها تعداد سهام
     text = arabic_reshaper.reshape('مالک تعداد' + '      ' + Fnc.comma_separate(digits.en_to_fa(str(resulte['تعداد سهام']))) + '      (' + digits.to_word(int(resulte['تعداد سهام']))+')' + '       سهم ' + digits.to_word(int((int(companyInfo['سرمایه ثبتی']) / int(companyInfo['تعداد سهام'])))) + '    ريالی با نام')
-    text_width, text_height = draw.textsize(text, font=font50)
+    text_width = draw.textlength(text, font=font50)
     x = image_width - text_width - 280 
     y = 1200
     text = get_display(text)
@@ -416,7 +338,7 @@ def getSheetpng(data):
 
     #فیلد ها تعداد سهام
     text = arabic_reshaper.reshape('از شرکت    ' + resulte['company'] + ' میباشد.')
-    text_width, text_height = draw.textsize(text, font=font50)
+    text_width = draw.textlength(text, font=font50)
     x = image_width - text_width - 280 
     y = 1300
     text = get_display(text)
@@ -424,7 +346,7 @@ def getSheetpng(data):
 
     #حقوق مشخصه
     text = arabic_reshaper.reshape('مالک سهام دارای حقوق مشخصه در اساسنامه شرکت میباشد.')
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = (image_width - text_width) // 2
     y = 1450
     text = get_display(text)
@@ -432,14 +354,14 @@ def getSheetpng(data):
 
     #مدیرعامل
     text = arabic_reshaper.reshape('مدیرعامل')
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = ((image_width - text_width) // 4)*3
     y = 1800
     text = get_display(text)
     draw.text((x, y), text, fill=(0,0,0), font=font40)
     #اسم مدیرعامل
     text = arabic_reshaper.reshape(companyInfo['مدیر عامل'])
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = ((image_width - text_width) // 4)*3
     y = 1900
     text = get_display(text)
@@ -447,14 +369,14 @@ def getSheetpng(data):
 
     #هیئت مدیره
     text = arabic_reshaper.reshape('رئیس هیئت مدیره')
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = ((image_width - text_width) // 4)*1
     y = 1800
     text = get_display(text)
     draw.text((x, y), text, fill=(0,0,0), font=font40)
     #اسم هیئت مدیره
     text = arabic_reshaper.reshape(companyInfo['رئیس هیئت مدیره'])
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = ((image_width - text_width) // 4)*1
     y = 1900
     text = get_display(text)
@@ -462,7 +384,7 @@ def getSheetpng(data):
 
     #مهر شرکت
     text = arabic_reshaper.reshape('مهر شرکت')
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = ((image_width - text_width) // 4)*2
     y = 1800
     text = get_display(text)
@@ -480,8 +402,6 @@ def getSheetpngAdmin(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     resulte = farasahmDb['registerNoBours'].find_one({'کد ملی': data['inp'], 'symbol':symbol},sort=[('date',-1)])
-    print(company)
-    print(resulte)
     companyInfo = farasahmDb['companyBasicInformation'].find_one({'symbol':symbol})
     image = Image.open('public/sheet1.png')
     image_width, image_height = image.size
@@ -493,7 +413,7 @@ def getSheetpngAdmin(data):
 
     # اسم شرکت
     text = arabic_reshaper.reshape('شرکت ' + company['fullname'])
-    text_width, text_height = draw.textsize(text, font=font120)
+    text_width = draw.textlength(text, font=font120)
     x = (image_width - text_width) // 2
     y = 350
     text = get_display(text)
@@ -501,7 +421,7 @@ def getSheetpngAdmin(data):
     # سهامی خاص
 
     text = arabic_reshaper.reshape('('+companyInfo['نوع شرکت']+')')
-    text_width, text_height = draw.textsize(text, font=font60)
+    text_width = draw.textlength(text, font=font60)
     x = (image_width - text_width) // 2
     y = 500
     text = get_display(text)
@@ -509,7 +429,7 @@ def getSheetpngAdmin(data):
 
     # شماره و تاریخ ثبت
     text = arabic_reshaper.reshape('شماره ثبت:'+digits.en_to_fa(companyInfo['شماره ثبت'])+ '       ' +'تاریخ تاسیس:' + digits.en_to_fa(companyInfo['تاریخ تاسیس']))
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = (image_width - text_width) // 2
     y = 650
     text = get_display(text)
@@ -517,7 +437,7 @@ def getSheetpngAdmin(data):
     #سرمایه ثبتی
 
     text = arabic_reshaper.reshape('سرمایه ثبت شده '+Fnc.comma_separate(digits.en_to_fa(companyInfo['سرمایه ثبتی']))+ ' ريال منقسم به '+ Fnc.comma_separate(digits.en_to_fa(companyInfo['تعداد سهام'])) + ' سهم ' + digits.to_word(int((int(companyInfo['سرمایه ثبتی']) / int(companyInfo['تعداد سهام'])))) + ' ريالی  که صد در دصد آن پرداخت شده میباشد')
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = (image_width - text_width) // 2
     y = 740
     text = get_display(text)
@@ -525,7 +445,7 @@ def getSheetpngAdmin(data):
 
     #فیلد ها دارنده این ورقه
     text = arabic_reshaper.reshape('دارنده این ورقه' + '      ' + resulte['نام و نام خانوادگی'])
-    text_width, text_height = draw.textsize(text, font=font50)
+    text_width = draw.textlength(text, font=font50)
     x = image_width - text_width - 280 
     y = 1100
     text = get_display(text)
@@ -533,7 +453,7 @@ def getSheetpngAdmin(data):
 
     #فیلد ها فرزند
     text = arabic_reshaper.reshape('فرزند' + '      ' + resulte['نام پدر'])
-    text_width, text_height = draw.textsize(text, font=font50)
+    text_width = draw.textlength(text, font=font50)
     x = image_width - text_width - 1400 
     y = 1100
     text = get_display(text)
@@ -541,7 +461,7 @@ def getSheetpngAdmin(data):
 
     #فیلد ها کد ملی
     text = arabic_reshaper.reshape('شماره/شناسه ملی' + '      ' + digits.en_to_fa(resulte['کد ملی']))
-    text_width, text_height = draw.textsize(text, font=font50)
+    text_width = draw.textlength(text, font=font50)
     x = image_width - text_width - 2100 
     y = 1100
     text = get_display(text)
@@ -553,7 +473,7 @@ def getSheetpngAdmin(data):
     text = text + digits.to_word(int((int(companyInfo['سرمایه ثبتی']) / int(companyInfo['تعداد سهام'])))) + '    ريالی با نام از شرکت    '
     text = text + company['fullname'] + ' میباشد.'
     text = arabic_reshaper.reshape(text)
-    text_width, text_height = draw.textsize(text, font=font50)
+    text_width = draw.textlength(text, font=font50)
     x = image_width - text_width - 280 
     y = 1200
     text = get_display(text)
@@ -561,7 +481,7 @@ def getSheetpngAdmin(data):
 
     #حقوق مشخصه
     text = arabic_reshaper.reshape('مالک سهام دارای حقوق مشخصه در اساسنامه شرکت میباشد.')
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = (image_width - text_width) // 2
     y = 1400
     text = get_display(text)
@@ -569,14 +489,14 @@ def getSheetpngAdmin(data):
 
     #مدیرعامل
     text = arabic_reshaper.reshape('مدیرعامل')
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = ((image_width - text_width) // 4)*3
     y = 1800
     text = get_display(text)
     draw.text((x, y), text, fill=(0,0,0), font=font40)
     #اسم مدیرعامل
     text = arabic_reshaper.reshape(companyInfo['مدیر عامل'])
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = ((image_width - text_width) // 4)*3
     y = 1900
     text = get_display(text)
@@ -584,14 +504,14 @@ def getSheetpngAdmin(data):
 
     #هیئت مدیره
     text = arabic_reshaper.reshape('رئیس هیئت مدیره')
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = ((image_width - text_width) // 4)*1
     y = 1800
     text = get_display(text)
     draw.text((x, y), text, fill=(0,0,0), font=font40)
     #اسم هیئت مدیره
     text = arabic_reshaper.reshape(companyInfo['رئیس هیئت مدیره'])
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = ((image_width - text_width) // 4)*1
     y = 1900
     text = get_display(text)
@@ -599,7 +519,7 @@ def getSheetpngAdmin(data):
 
     #مهر شرکت
     text = arabic_reshaper.reshape('مهر شرکت')
-    text_width, text_height = draw.textsize(text, font=font40)
+    text_width = draw.textlength(text, font=font40)
     x = ((image_width - text_width) // 4)*2
     y = 1800
     text = get_display(text)

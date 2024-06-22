@@ -111,6 +111,16 @@ def getrateassetfixincom():
     data = request.get_json()
     return report.getrateassetfixincom(data)
 
+@app.route('/sendsmsgroup',methods = ['POST', 'GET'])
+def smsgroup():
+    data = request.get_json()
+    return report.smsgroup(data)
+
+@app.route('/smsgroupreport',methods = ['POST', 'GET'])
+def smsgroupreport():
+    data = request.get_json()
+    return report.smsgroupreport(data)
+
 @app.route('/getretrnprice',methods = ['POST', 'GET'])
 def getretrnprice():
     data = request.get_json()
@@ -267,6 +277,11 @@ def getcompanymoadian():
 def moadian_getinvoice():
     data = request.get_json()
     return report.moadian_getinvoice(data)
+
+@app.route('/moadian/cloninvoiceebtal',methods = ['POST', 'GET'])
+def moadian_cloninvoiceebtal():
+    data = request.get_json()
+    return report.ebtalinvoce(data)
 
 @app.route('/moadian/delinvoice',methods = ['POST', 'GET'])
 def moadian_delinvoice():
@@ -611,10 +626,6 @@ def dara_gettrade():
     data = request.get_json()
     return dara.gettrade(data)
 
-@app.route('/dara/coderegister',methods = ['POST', 'GET'])
-def dara_coderegister():
-    data = request.get_json()
-    return dara.codeRegister(data)
 
 @app.route('/dara/coderegistered',methods = ['POST', 'GET'])
 def dara_coderegistered():
@@ -634,7 +645,7 @@ def dara_applycode():
 @app.route('/dara/access',methods = ['POST', 'GET'])
 def dara_access():
     data = request.get_json()
-    return dara.access(data)
+    return dara.checkcookie(data)
 
 @app.route('/dara/authenticationsession',methods = ['POST', 'GET'])
 def dara_authenticationsession():
@@ -655,6 +666,11 @@ def dara_getSheetpng():
 def getassembly():
     data = request.get_json()
     return dara.getassembly(data)
+
+@app.route('/dara/static',methods = ['POST', 'GET'])
+def darastatic():
+    data = request.get_json()
+    return dara.static(data)
 
 @app.route('/dara/getsheet',methods = ['POST', 'GET'])
 def dara_getsheet():
@@ -798,6 +814,23 @@ def getassetmixoraqsah():
     data = request.get_json()
     return report.getassetmixoraqsah(data)
 
+@app.route('/getaccbank',methods = ['POST', 'GET'])
+def getaccbank():
+    data = request.get_json()
+    return report.getaccbank(data)
+
+
+
+@app.route('/setholliday',methods = ['POST', 'GET'])
+def setholliday():
+    data = request.get_json()
+    return report.setholliday(data)
+
+@app.route('/getholliday',methods = ['POST', 'GET'])
+def getholliday():
+    data = request.get_json()
+    return report.getholliday(data)
+
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)
-    app.run(host='0.0.0.0', debug=True)
+    app.run(host='0.0.0.0',port=8000, debug=True)
