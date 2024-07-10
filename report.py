@@ -3807,7 +3807,7 @@ def getholliday(data):
     
     return json.dumps({'reply':True, 'df':df})
     
-<<<<<<< HEAD
+
 
 
 def service_data_customer (data) :
@@ -3840,7 +3840,6 @@ def service_data_customer (data) :
     
 
 
-=======
     
 def fixincom_compareprice(data):
     access = data['access'][0]
@@ -3863,4 +3862,3 @@ def fixincom_compareprice(data):
     dic = {'price':price, 'ebtal':ebtal, 'amary':amary, 'dif_ebtal':dif_ebtal, 'rate_ebtal':rate_ebtal, 'dif_amary':dif_amary, 'rate_amary':rate_amary}
     return json.dumps({'reply':True, 'dic':dic})
     
->>>>>>> 0f66053bd40f6641096d61e84e8dc81b34a87fd2
