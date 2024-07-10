@@ -15,9 +15,7 @@ client = MongoClient(host, port)
 farasahmDb = client['farasahm2']
 
 
-
-
-
+rest_api_token = 'ZtqX2dtvjxyYwnjInl8xGhGiynj5uKiO'
 
 
 
