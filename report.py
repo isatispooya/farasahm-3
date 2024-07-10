@@ -1887,72 +1887,271 @@ def getpriceforward(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    date = Fnc.timestumpToJalalInt(data['date'])
-    df = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'dateInt':1,'final_price':1}))
-    lastUpdate = df['dateInt'].max()
-    df = df[df['dateInt']>=date]
-    df['dateInt'] = [int(x) for x in df['dateInt']]
-    df = df.set_index('dateInt')
-    dateDf = pd.DataFrame(Fnc.calnder())
-    dateDf['dateInt'] = [int(x.replace('-','')) for x in dateDf['ja_date']]
-    dateDf = dateDf[dateDf['dateInt']>=date]
-    dateDf = dateDf.set_index('dateInt')
-    df = df.join(dateDf,how='outer').sort_index().reset_index()
-    df['final_price'] = df['final_price'].fillna(method='ffill')
     afterday = int(data['afterDay'])
     beforDay = int(data['beforDay'])
-    df['future_holidays'] = df.apply(lambda row: Fnc.calculate_future_holidays(row, df), axis=1)
-    df['past_holidays'] = df.apply(lambda row: Fnc.calculate_past_holidays(row, df), axis=1)
-    df['real'] = df['dateInt']<=lastUpdate
-    grow_rate = ((int(data['target'])/100)+1) ** (1/365)
-    befor_grow_rate = (((int(data['befor'])/100)/afterday) * (grow_rate - 1)) + 1
-    after_grow_rate = (((int(data['after'])/100)/afterday) * (grow_rate - 1)) + 1
-    print(afterday,befor_grow_rate)
-    print(beforDay,befor_grow_rate)
-    print(grow_rate)
+    date_start = Fnc.timestumpToJalalInt(data['date'])
+    target_rate = int(data['target'])/100
+    effect_befor = int(data['befor'])/100
+    effect_after = int(data['after'])/100
+    df = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'dateInt':1,'final_price':1}))
+    df = df[df['dateInt']>=date_start]
+    last_update = df['dateInt'].max()
+    df = df.set_index('dateInt')
     
+    df['real'] = True
+    dateDf = pd.DataFrame(Fnc.calnder())
+    dateDf['dateInt'] = [int(x.replace('-','')) for x in dateDf['ja_date']]
+    dateDf = dateDf[dateDf['dateInt']>=date_start].reset_index()
+    dateDf = dateDf[dateDf.index<365]
+    dateDf = dateDf.set_index('dateInt')
+    df = df.join(dateDf,how='outer').sort_index().reset_index()[['dateInt','final_price','week','workday','real']]
+    df['real'] = df['real'].fillna(False)
     df['real'] = df['final_price'] * df['real']
-    df['final_price'] = df[df['dateInt']==df['dateInt'].min()].to_dict('records')[0]['final_price']
-    dfZero = df[df.index==0]
-    dfZero = dfZero[['ja_date','week','workday','real']]
-    df = df[df.index>0]
-    df['grow_rate'] = grow_rate #** df.index
-    
-    dff = df[df['workday']==True]
-    df = df.drop(columns=['future_holidays','past_holidays']).set_index('dateInt')
-    dff = dff[['future_holidays','past_holidays','dateInt']]
+    df['real'] = df['real'].fillna(method='ffill') 
+
+    start_price = df[df['dateInt']==df['dateInt'].min()].to_dict('records')[0]['final_price']
+    df['final_price'] = start_price
+    normal_grow = (1 + target_rate) ** (1/365)
+    df['normal_grow'] = normal_grow
     
     
-    dff = dff.sort_values(by=['dateInt'], ascending=False)
-    dff['future_holidays'] =dff['future_holidays'].rolling(beforDay,min_periods=1).sum()
-    dff = dff.sort_values(by=['dateInt'], ascending=True)
-    dff['past_holidays'] =dff['past_holidays'].rolling(afterday,min_periods=1).sum()
-    dff = dff.set_index('dateInt')
-    df = df.join(dff)
-    df = df.fillna(0).reset_index()
-    df['grow_holiday_fut'] =  befor_grow_rate ** df['future_holidays']
-    df['grow_holiday_pas'] =  after_grow_rate ** df['past_holidays']
-    df['grow_Fin'] = (df['grow_rate'] * df['workday']) * df['grow_holiday_fut'] * df['grow_holiday_pas']
-    df['grow_Fin'] = df['grow_Fin'].replace(0,np.NaN)
+
+
+    df['befor_diff'] = 1
+    df['after_diff'] = 1
+    
+    df = df.set_index('dateInt')
+
+    for i in df.index:
+        normal_grow = df['normal_grow'][i]
+        workday = df['workday'][i]
+        if workday:
+            continue
+        df['normal_grow'][i] = 0
+
+        befor_diff = (normal_grow ** effect_befor) ** (1/beforDay)
+        after_diff = (normal_grow ** effect_after) ** (1/afterday)
+        
+        #befor
+        dff = df[df['workday'] == True]
+        dff = dff[dff.index<i].reset_index()
+        if len(dff)>0:
+            dff = dff[dff.index>dff.index.max()-beforDay]
+            if len(dff)>0:
+                dff = dff.reset_index()
+                dff['befor_diff'] = befor_diff
+                dff = dff[['dateInt','befor_diff']].to_dict('records')
+                for b in dff:
+                    df['befor_diff'][b['dateInt']] = max(1,df['befor_diff'][b['dateInt']]) * b['befor_diff']
+        #after
+        dff = df[df['workday'] == True]
+        dff = dff[dff.index>i].reset_index()
+        if len(dff)>0:
+            dff = dff[dff.index<dff.index.min()+afterday]
+            if len(dff)>0:
+                dff = dff.reset_index()
+                dff['after_diff'] = after_diff
+                dff = dff[['dateInt','after_diff']].to_dict('records')
+                for b in dff:
+                    df['after_diff'][b['dateInt']] = max(1,df['after_diff'][b['dateInt']]) * b['after_diff']
+            
+    
+    df['befor_diff'] = df['befor_diff'].replace(0,1)
+    df['after_diff'] = df['after_diff'].replace(0,1)
+    df['normal_grow'] = df['normal_grow'].replace(0,1)
+
+    df['diff_addon'] = df['befor_diff'] * df['after_diff'] * df['normal_grow']
+    df['diff_addon_cum'] = df['diff_addon'].cumprod()
+    df['final_price'] = df['diff_addon_cum'] * start_price
+    df['final_price'] = df['final_price'] * df['workday']
+    df['final_price'] = df['final_price'].replace(0,np.nan)
     df['final_price'] = df['final_price'].fillna(method='ffill')
-    df['grow_Fin'] = df['grow_Fin'].fillna(1)
-    df['grow_Fin'] = df['grow_Fin'].cumprod()
-    df['fut_price'] = df['final_price'] * df['grow_Fin']
-    df['fut_price'] = df['fut_price'].apply(round)
-    df = df[df.index<=365]
-    df = df[['ja_date','week','workday','fut_price','real']]
-    dfZero['fut_price'] = dfZero['real']
-    df = pd.concat([dfZero,df])
-    df['diff'] = df['fut_price'] - df['real']
-    df['diff'] = df['diff'] * ((df['real']>0)*1)
-    df['diff'] = df['diff'].cumsum()
-    df['week'] = df['week'].replace(0,'شنبه').replace(1,'یکشنبه').replace(2,'دوشنبه').replace(3,'سه شنبه').replace(4,'چهارشنبه').replace(5,'پنج شنبه').replace(6,'جمعه')
-    df['workday'] = df['workday'].replace(True,'کاری').replace(False,'تعطیل')
-    df['Chng_price'] = ((df['fut_price'] / df['fut_price'].shift(1)) - 1) * 100000
-    df['Chng_price'] = df['Chng_price'].fillna(0)
-    df['Chng_price'] = df['Chng_price'].apply(int)/1000
+    df['final_price'] = df['final_price'].apply(round,0)
+    df['rate'] = df['final_price'] / df['final_price'].shift(1)
+    df['rate'] = df['rate'].fillna(1)
+    df['rate'] = (df['rate'] - 1) *1000000000
+    df['rate'] = df['rate'].apply(int)/10000000
+    df = df.reset_index()
+    df['real_'] = df['dateInt'].apply(lambda x: x<last_update)
+    df['real'] = df['real'] * df['real_']
+    df = df.drop(columns=['real_'])
+    df['dateInt'] = df['dateInt'].apply(Fnc.dateIntToSlash)
+    df['diff_real'] = df['final_price'] - df['real']
+    df['normal_grow'] = (df['normal_grow'] - 1)*100
+    df['befor_diff'] = (df['befor_diff'] - 1)*100
+    df['after_diff'] = (df['after_diff'] - 1)*100
+    df['diff_addon'] = (df['diff_addon'] - 1)*100
+    df['diff_addon_cum'] = (df['diff_addon_cum'] - 1)*100
+    df['week'] = df['week'].replace(0,'شنبه').replace(1,'یکشنبه').replace(2,'دوشنبه').replace(3,'سه شنبه').replace(6,'جمعه').replace(4,'چهارشنبه').replace(5,'پنج شنبه')
+    # df= df.fillna('')
+    # print(df)
+
     df = df.to_dict('records')
     return json.dumps({'reply':True, 'df':df})
+
+
+# def getpriceforward(data):
+#     access = data['access'][0]
+#     symbol = data['access'][1]
+#     symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+#     _id = ObjectId(access)
+#     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    
+#     afterday = int(data['afterDay'])
+#     beforDay = int(data['beforDay'])
+
+
+#     if acc == None:
+#         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+#     date = Fnc.timestumpToJalalInt(data['date'])
+#     df = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'dateInt':1,'final_price':1}))
+#     df = df[df['dateInt']>=date]
+#     df = df.set_index('dateInt')
+#     df['real'] = True
+#     dateDf = pd.DataFrame(Fnc.calnder())
+#     dateDf['dateInt'] = [int(x.replace('-','')) for x in dateDf['ja_date']]
+#     dateDf = dateDf[dateDf['dateInt']>=date].reset_index()
+#     dateDf = dateDf[dateDf.index<365]
+    
+#     dateDf = dateDf.set_index('dateInt')
+#     df = df.join(dateDf,how='outer').sort_index().reset_index()[['dateInt','final_price','week','workday','real']]
+    
+#     df['real'] = df['real'].fillna(False)
+#     df['real'] = df['final_price'] * df['real']
+    
+
+    
+#     df['final_price'] = df['final_price'].fillna(method='ffill')
+#     df['workday'] = df['workday'].fillna(False)
+    
+    
+#     df['count_after_holli'] = df.apply(lambda row: Fnc.calculate_future_holidays(row, df), axis=1)
+#     df['count_befor_holli'] = df.apply(lambda row: Fnc.calculate_past_holidays(row, df), axis=1)
+#     print(df)
+    
+    
+#     dff = df[df['workday']==True]
+#     dff = dff.sort_values(by=['dateInt'], ascending=False)
+#     dff['count_after_holli'] =dff['count_after_holli'].rolling(beforDay,min_periods=1).sum()
+#     dff = dff.sort_values(by=['dateInt'], ascending=True)
+#     dff['count_befor_holli'] =dff['count_befor_holli'].rolling(afterday,min_periods=1).sum()
+#     dff = dff.set_index('dateInt')
+    
+    
+#     cournt_price = df[df['dateInt']==df['dateInt'].min()].to_dict('records')[0]['final_price']
+#     effect = 0
+#     grow_rate = ((int(data['target'])/100)+1) ** (1/365)
+#     rate_befor = int(data['befor'])/100
+#     rate_after = int(data['after'])/100
+
+
+#     befor_grow_rate = (grow_rate ** rate_befor) ** (1/beforDay)
+#     after_grow_rate = (grow_rate ** rate_after) ** (1/afterday)
+#     final_price_list = []
+#     effect_list = []
+    
+#     for i in dff.index:
+#         final_price_list.append(cournt_price)
+#         effect_list.append(effect)
+#         count_after_holli_i = dff['count_after_holli'][i]
+#         count_befor_holli_i = dff['count_befor_holli'][i]
+#         effect_befor = befor_grow_rate ** count_befor_holli_i
+#         effect_after = after_grow_rate ** count_after_holli_i
+#         effect = (grow_rate ** effect_befor)# ** effect_after
+#         cournt_price = cournt_price * effect
+#         cournt_price = round(cournt_price,0)
+        
+#     dff['effect'] = effect_list
+#     dff['final_price'] = final_price_list
+
+#     df = df[['dateInt','workday','week']].set_index('dateInt')
+#     dff = dff.drop(columns=['workday','week'])
+#     df = df.join(dff,how='outer')
+#     df.to_excel('df.xlsx')
+#     df = df.fillna(method='ffill')
+#     df['diff'] = df['final_price'] - df['real']
+#     df['rate'] = df['final_price'] / df['final_price'].shift(1)
+#     df['rate'] = df['rate'].fillna(1)
+#     df['rate'] = [int((x-1)*1000000)/10000 for x in df['rate']]
+#     df['week'] = df['week'].apply(int).apply(str)
+#     df['week'] = df['week'].replace('0','شنبه').replace('1','یکشنبه').replace('2','دوشنبه').replace('3','سه شنبه').replace('6','جمعه').replace('4','چهارشنبه').replace('5','پنج شنبه')
+#     df = df.reset_index()
+#     df['dateInt'] = df['dateInt'].apply(Fnc.dateIntToSlash)
+#     df = df.to_dict('records')
+#     return json.dumps({'reply':True, 'df':df})
+
+
+# def getpriceforward(data):
+#     access = data['access'][0]
+#     symbol = data['access'][1]
+#     symbol = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+#     _id = ObjectId(access)
+#     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+#     if acc == None:
+#         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+#     date = Fnc.timestumpToJalalInt(data['date'])
+#     df = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbol},{'_id':0,'dateInt':1,'final_price':1}))
+#     lastUpdate = df['dateInt'].max()
+#     df = df[df['dateInt']>=date]
+#     df['dateInt'] = [int(x) for x in df['dateInt']]
+#     df = df.set_index('dateInt')
+#     dateDf = pd.DataFrame(Fnc.calnder())
+#     dateDf['dateInt'] = [int(x.replace('-','')) for x in dateDf['ja_date']]
+#     dateDf = dateDf[dateDf['dateInt']>=date]
+#     dateDf = dateDf.set_index('dateInt')
+#     df = df.join(dateDf,how='outer').sort_index().reset_index()
+#     df['final_price'] = df['final_price'].fillna(method='ffill')
+#     afterday = int(data['afterDay'])
+#     beforDay = int(data['beforDay'])
+#     df['future_holidays'] = df.apply(lambda row: Fnc.calculate_future_holidays(row, df), axis=1)
+#     df['past_holidays'] = df.apply(lambda row: Fnc.calculate_past_holidays(row, df), axis=1)
+#     df['real'] = df['dateInt']<=lastUpdate
+#     grow_rate = ((int(data['target'])/100)+1) ** (1/365)
+#     befor_grow_rate = (((int(data['befor'])/100)/afterday) * (grow_rate - 1)) + 1
+#     after_grow_rate = (((int(data['after'])/100)/afterday) * (grow_rate - 1)) + 1
+
+#     df['real'] = df['final_price'] * df['real']
+#     df['final_price'] = df[df['dateInt']==df['dateInt'].min()].to_dict('records')[0]['final_price']
+#     dfZero = df[df.index==0]
+#     dfZero = dfZero[['ja_date','week','workday','real']]
+#     df = df[df.index>0]
+#     df['grow_rate'] = grow_rate #** df.index
+    
+#     dff = df[df['workday']==True]
+#     df = df.drop(columns=['future_holidays','past_holidays']).set_index('dateInt')
+#     dff = dff[['future_holidays','past_holidays','dateInt']]
+    
+    
+#     dff = dff.sort_values(by=['dateInt'], ascending=False)
+#     dff['future_holidays'] =dff['future_holidays'].rolling(beforDay,min_periods=1).sum()
+#     dff = dff.sort_values(by=['dateInt'], ascending=True)
+#     dff['past_holidays'] =dff['past_holidays'].rolling(afterday,min_periods=1).sum()
+#     dff = dff.set_index('dateInt')
+#     df = df.join(dff)
+#     df = df.fillna(0).reset_index()
+#     df['grow_holiday_fut'] =  befor_grow_rate ** df['future_holidays']
+#     df['grow_holiday_pas'] =  after_grow_rate ** df['past_holidays']
+#     df['grow_Fin'] = (df['grow_rate'] * df['workday']) * df['grow_holiday_fut'] * df['grow_holiday_pas']
+#     df['grow_Fin'] = df['grow_Fin'].replace(0,np.NaN)
+#     df['final_price'] = df['final_price'].fillna(method='ffill')
+#     df['grow_Fin'] = df['grow_Fin'].fillna(1)
+#     df['grow_Fin'] = df['grow_Fin'].cumprod()
+#     df['fut_price'] = df['final_price'] * df['grow_Fin']
+#     df['fut_price'] = df['fut_price'].apply(round)
+#     df = df[df.index<=365]
+#     df = df[['ja_date','week','workday','fut_price','real']]
+#     dfZero['fut_price'] = dfZero['real']
+#     df = pd.concat([dfZero,df])
+#     df['diff'] = df['fut_price'] - df['real']
+#     df['diff'] = df['diff'] * ((df['real']>0)*1)
+#     df['diff'] = df['diff'].cumsum()
+#     df['week'] = df['week'].replace(0,'شنبه').replace(1,'یکشنبه').replace(2,'دوشنبه').replace(3,'سه شنبه').replace(4,'چهارشنبه').replace(5,'پنج شنبه').replace(6,'جمعه')
+#     df['workday'] = df['workday'].replace(True,'کاری').replace(False,'تعطیل')
+#     df['Chng_price'] = ((df['fut_price'] / df['fut_price'].shift(1)) - 1) * 100000
+#     df['Chng_price'] = df['Chng_price'].fillna(0)
+#     df['Chng_price'] = df['Chng_price'].apply(int)/1000
+#     df = df.to_dict('records')
+#     return json.dumps({'reply':True, 'df':df})
 
 def addcompany(access, key, name, idTax, idNum, address, call, postcode):
     accesss = str(access).split(',')
@@ -2035,7 +2234,7 @@ def saveinvoce(data):
     bodyDf['cash'] = bodyDf['cash'].apply(int)
     bodyDf['sumAfterOff'] = bodyDf['sumBeforOff'] - bodyDf['off']
     bodyDf['sumTax'] = bodyDf['sumAfterOff'] * (bodyDf['taxRate'] /100)
-    bodyDf['sumTax'] = bodyDf['sumTax'].apply(round,0)
+    bodyDf['sumTax'] = bodyDf['sumTax'].apply(int)
     bodyDf['sumFin'] = bodyDf['sumAfterOff'] + bodyDf['sumTax']
     mmrit = sellerDic['idTax']
     indatim = int(invoceData['createDate'])
@@ -2051,10 +2250,10 @@ def saveinvoce(data):
         tvop = 0
     elif (bodyDf['cash'].sum() + bodyDf['sumTax'].sum()) == bodyDf['sumFin'].sum():
         setm = 1
-        tvop = bodyDf['sumTax'].sum()
+        tvop = int(bodyDf['sumTax'].sum())
     else:
         setm = 3
-        tvop = bodyDf['sumTax'].sum()
+        tvop = int(bodyDf['sumTax'].sum())
 
 
     header = {
@@ -2082,9 +2281,9 @@ def saveinvoce(data):
             "tprdis" : int(bodyDf['sumBeforOff'].sum()),
             "tdis" : int(bodyDf['off'].sum()),
             "tadis" : int(bodyDf['sumAfterOff'].sum()),
-            "tvam" : bodyDf['sumTax'].sum(),
+            "tvam" : int(bodyDf['sumTax'].sum()),
             "todam" : 0,
-            "tbill" : bodyDf['sumFin'].sum(),
+            "tbill" : int(bodyDf['sumFin'].sum()),
             "setm" : setm,
             "cap" : int(bodyDf['cash'].sum()),
             "insp" : int(bodyDf['sumFin'].sum() - bodyDf['cash'].sum()) - tvop,
@@ -2103,11 +2302,11 @@ def saveinvoce(data):
             "cfee" : None,
             "cut" : None,
             "exr" : None,
-            "prdis" : i['sumBeforOff'],
-            "dis" : i['off'],
-            "adis" : i['sumAfterOff'],
-            "vra" : i['taxRate'],
-            "vam" : i['sumTax'],
+            "prdis" : int(i['sumBeforOff']),
+            "dis" : int(i['off']),
+            "adis" : int(i['sumAfterOff']),
+            "vra" : int(i['taxRate']),
+            "vam" : int(i['sumTax']),
             "odt" : None,
             "odr" : None,
             "odam" : None,
@@ -2118,10 +2317,10 @@ def saveinvoce(data):
             "spro" : None,
             "bros" : None,
             "tcpbs" : None,
-            "cop" : i['cash'],
-            "vop" : round(i['cash'] * (i['taxRate']/100),0),
+            "cop" : int(i['cash']),
+            "vop" : int(i['cash'] * (i['taxRate']/100)),
             "bsrn" : None,
-            "tsstam" : i['sumFin'],
+            "tsstam" : int(i['sumFin']),
         }
         body.append(row)
     invoice = {
@@ -3518,6 +3717,8 @@ def moadian_print(data):
 
 
 def getaccbank(data):
+    effective_Acc_Code = [x['Acc_Code'] for x in data['effective']]
+    effective_bank = [x['bank'] for x in data['effective']]
     access = data['access'][0]
     symbol = data['access'][1]
     symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
@@ -3542,15 +3743,26 @@ def getaccbank(data):
         name_group = group['Name'][i]
         db_group = group['db'][i]
         df = Fnc.clcu_balance_banks(db_group)
+        df['eff'] = [(df['Acc_Code'][x] not in effective_Acc_Code) or (df['bank'][x] not in effective_bank)  for x in df.index]
+        df['Bede'] = df['Bede'].apply(int)
+        df['Best'] = df['Best'].apply(int)
+        df['balance'] = df['balance'].apply(int)
+        df = df.fillna('')
+        
         if len(df)>0:
-            balance = df['balance'].sum()
-            children = df[['bank','Acc_Code','balance']].to_dict('records')
+            balance = df[df['eff']==True]['balance'].sum()
+            children = df[['bank','Acc_Code','balance','eff']]
+            children['Name'] = name_group
+            eff = children['eff'].sum()>0
+            children = children.to_dict('records')
             
         else:
             balance = 0
             children = []
+            eff = False
+        
             
-        dic = {'Name':name_group,'balance':balance, '_children':children}
+        dic = {'Name':name_group,'balance':int(balance), '_children':children,'eff':str(eff)}
         dff.append(dic)
 
     return json.dumps({'reply':True, 'df':dff})
@@ -3595,6 +3807,7 @@ def getholliday(data):
     
     return json.dumps({'reply':True, 'df':df})
     
+<<<<<<< HEAD
 
 
 def service_data_customer (data) :
@@ -3627,3 +3840,27 @@ def service_data_customer (data) :
     
 
 
+=======
+    
+def fixincom_compareprice(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['sandoq'].find({'symbol':symbolF}))
+    df = df.dropna()
+    df = df[df['dateInt']==df['dateInt'].max()].to_dict('records')[0]
+    price = df['final_price']
+    ebtal = df['nav']
+    amary = df['navAmary']
+    dif_ebtal = ebtal - price 
+    rate_ebtal = int(((ebtal / price )-1)*10000)/100
+    dif_amary = amary - price 
+    rate_amary = int(((amary / price) - 1)*10000)/100
+    dic = {'price':price, 'ebtal':ebtal, 'amary':amary, 'dif_ebtal':dif_ebtal, 'rate_ebtal':rate_ebtal, 'dif_amary':dif_amary, 'rate_amary':rate_amary}
+    return json.dumps({'reply':True, 'dic':dic})
+    
+>>>>>>> 0f66053bd40f6641096d61e84e8dc81b34a87fd2
