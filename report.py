@@ -20,11 +20,12 @@ from persiantools import characters, digits
 
 from bson import ObjectId
 import Fnc
-from ApiMethods import GetCustomerMomentaryAssets
+from ApiMethods import GetCustomerMomentaryAssets , GetCustomerByNationalCode
 import time
 from bson import Binary
 from moadian import Moadian
 from bson.son import SON
+from setting import rest_api_token 
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.pagesizes import landscape, A4
@@ -3883,6 +3884,39 @@ def getholliday(data):
     
     return json.dumps({'reply':True, 'df':df})
     
+
+
+
+def service_data_customer (data) :
+    token = data['token']
+    nc = data['nc']
+    if not token == rest_api_token :
+        return json.dumps ({'reply':False , 'msg' :' کاربر در فراسهم ثبت نام نشده است'}),400
+
+    customer = GetCustomerByNationalCode(nc) 
+    if customer.get('Mobile') :
+        filltered_customer = {
+            'name' : customer.get('FirstName'),
+            'last_name' :  customer.get('LastName') ,
+            'date_birth' :customer.get ('BirthDate') ,
+            'email' : customer.get('Email') ,
+            'mobile' : customer.get('Mobile') ,
+        }
+   
+        return json.dumps({'reply': True, 'customer':filltered_customer}), 200
+    else:
+        customer = farasahmDb ['registerNoBours'].find_one({'کد ملی' : nc} , {'_id':0 , 'شماره تماس' :1 , 'نام و نام خانوادگی' :1 , 'تاریخ تولد' :1 })
+        if  customer :
+            return json.dumps ({'reply':True , 'customer' :customer}), 200
+    return json.dumps({'reply' : False , 'message' : 'کاربر یافت نشد'}) , 404
+    
+
+
+
+
+    
+
+
     
 def fixincom_compareprice(data):
     access = data['access'][0]

@@ -842,6 +842,20 @@ def getholliday():
     data = request.get_json()
     return report.getholliday(data)
 
+
+# اطلاعات کاربر چک کنه
+
+@app.route ('/service/datacustomer' , methods = ['POST'])
+def service_data_customer () :
+    data = request.get_json()
+    return report.service_data_customer (data)
+# دارایی کاربر در کارگزاری
+
+ 
+
+
+
+
 @app.route('/fixincom/compareprice',methods = ['POST', 'GET'])
 def fixincom_compareprice():
     data = request.get_json()
@@ -850,3 +864,4 @@ def fixincom_compareprice():
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)
     app.run(host='0.0.0.0',port=8000, debug=True)
+
