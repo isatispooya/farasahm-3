@@ -2327,9 +2327,9 @@ def saveinvoce(data):
         'body' : body,
         'payments' : []
     }
-    buyer = ''#data['buyer']
-    #buyer['idcode'] = str(invoceData['buyerId'])
-    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None, 'details':{'seler':sellerDic,'buyer':buyer,}}#'text':data['textinv']}}
+    buyer = {'name':data['buyerName'],'postcode':data['buyerPost'],'postcode':data['buyerPost'],'address':data['buyerAddress'],'call':data['buyerTel']}
+    buyer['idcode'] = str(invoceData['buyerId'])
+    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None, 'details':{'seler':sellerDic,'buyer':buyer,'text':data['textinv']}}
     farasahmDb['invoiceMoadian'].insert_one(dic)
 
     return json.dumps({'reply':True})
@@ -3169,41 +3169,118 @@ def moadian_getinvoice(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    df = farasahmDb['invoiceMoadian'].find({},{'result':0,'inquiry':0})
-    df = pd.DataFrame(df)
-    df['_id'] = df['_id'].apply(str)
-
-    df['date'] = df['date'].apply(Fnc.gorgianIntToJalali)
-    df['type'] = [x['header']['inty'] for x in df['invoice']]
-    df['pattern'] = [x['header']['inp'] for x in df['invoice']]
-    df['buyerType'] = [x['header']['tob'] for x in df['invoice']]
-    df['price'] = [x['header']['tadis'] for x in df['invoice']]
-    df['taxAdded'] = [x['header']['tvam'] for x in df['invoice']]
-    dflistbody = df['invoice'].to_list()
-    dflistbody = [x['body'] for x in dflistbody]
-    dflistbodyNow = []
-    for i in dflistbody:
-        listRow = []
-        for j in i:
+    seller = data['seller']
+    dff = farasahmDb['invoiceMoadian'].find({})
+    df = []
+    for i in dff:
+        tins = i['invoice']['header']['tins']
+        if tins == seller:
             dic = {
-                'fee':j['fee'],
-                'taxAdded':j['vam'],
-                'price':j['prdis'],
-                'sstid':j['sstid'],
-                'sstt':j['sstt'],
-            }
-            listRow.append(dic)
-        dflistbodyNow.append(listRow)
-    df['_children'] =dflistbodyNow
-    df['fee'] = ''
-    df['sstid'] = ''
-    df['sstt'] = ''
-    df = df.drop(columns=['invoice'])
-    df = df.drop(columns=['details'])
+                '_id':str(i['_id']),
+                'name':i['title'],
+                'indatim':i['invoice']['header']['indatim'],
+                'indati2m':i['invoice']['header']['indati2m'],
+                'taxid':i['invoice']['header']['taxid'],
+                'tinb':i['invoice']['header']['tinb'],
+                'tprdis':i['invoice']['header']['tprdis'],
+                'tvam':i['invoice']['header']['tvam'],
+                'tbill':i['invoice']['header']['tbill'],
+                'lenBody':len(i['invoice']['body']),
+                }
+            if i['result'] == None:
+                dic['result'] = 'ارسال نشده'
+            else:
+                dic['result'] = i['inquiry']['status']
+            
+            df.append(dic)
+    df = pd.DataFrame(df)
+    df = df.sort_values('indatim',ascending=False)
+    df['result'] = df['result'].replace('SUCCESS','موفق').replace('FAILED','شکست').replace('NOT_FOUND','یافت نشد')
+    df['indatim'] = df['indatim'].apply(Fnc.timestumpToJalalInt)
+    df['indati2m'] = df['indati2m'].apply(Fnc.timestumpToJalalInt)
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
 
+def getSellerMoadian(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = pd.DataFrame(farasahmDb['companyMoadian'].find({},{'name':1,'idNum':1,'_id':0}))
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
 
+def Moadiandetail(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    dic = farasahmDb['invoiceMoadian'].find_one({'_id':ObjectId(data['id'])})
+    del dic['_id']
+    del dic['invoice']['payments']
+    del dic['details']['seler']
+    dic['indatim'] = Fnc.timestumpToJalalInt(dic['invoice']['header']['indatim'])
+    dic['indati2m'] = Fnc.timestumpToJalalInt(dic['invoice']['header']['indati2m'])
+    dic['taxid'] = dic['invoice']['header']['taxid']
+    dic['taxid'] = dic['invoice']['header']['taxid']
+    dic['typeInvoce'] = dic['invoice']['header']['inty']
+    dic['typeInvoce'] = dic['invoice']['header']['inty']
+    dic['irtaxid'] = dic['invoice']['header']['irtaxid']
+    dic['paternInvoice'] = dic['invoice']['header']['inp']
+    dic['buerType'] = dic['invoice']['header']['tob']
+    dic['tprdis'] = dic['invoice']['header']['tprdis']
+    dic['tdis'] = dic['invoice']['header']['tdis']
+    dic['tadis'] = dic['invoice']['header']['tadis']
+    dic['tvam'] = dic['invoice']['header']['tvam']
+    dic['todam'] = dic['invoice']['header']['todam']
+    dic['tbill'] = dic['invoice']['header']['tbill']
+    dic['todam'] = dic['invoice']['header']['todam']
+    dic['todam'] = dic['invoice']['header']['todam']
+    dic['todam'] = dic['invoice']['header']['todam']
+    dic['todam'] = dic['invoice']['header']['todam']
+    dic['todam'] = dic['invoice']['header']['todam']
+    del dic['invoice']['header']
+    del dic['result']
+    try:
+        del dic['inquiry']['referenceNumber']
+        del dic['inquiry']['uid']
+        del dic['inquiry']['packetType']
+        del dic['inquiry']['fiscalId']
+        del dic['inquiry']['sign']
+    except:
+        pass
+    body = []
+    for i in dic['invoice']['body']:
+        dicBody = {
+            'sstid':i['sstid'],
+            'sstt':i['sstt'],
+            'am':i['am'],
+            'fee':i['fee'],
+            'prdis':i['prdis'],
+            'adis':i['adis'],
+            'vra':i['vra'],
+            'fee':i['fee'],
+            'prdis':i['prdis'],
+            'dis':i['dis'],
+            'adis':i['adis'],
+            'vra':i['vra'],
+            'cop':i['cop'],
+            'vop':i['vop'],
+            'tsstam':i['tsstam'],
+        }
+
+    del dic['invoice']
+    dic['body'] = body
+    del dic['date']
+    
+    return json.dumps({'reply':True,'df':dic})
+    
 
 def valuefundinseris(data):
     access = data['access'][0]

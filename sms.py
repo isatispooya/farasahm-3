@@ -16,4 +16,3 @@ for i in df:
     
 
     SendSms(mobile,text)
-

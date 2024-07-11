@@ -278,6 +278,17 @@ def moadian_getinvoice():
     data = request.get_json()
     return report.moadian_getinvoice(data)
 
+@app.route('/moadian/getSellerMoadian',methods = ['POST', 'GET'])
+def moadian_getSellerMoadian():
+    data = request.get_json()
+    return report.getSellerMoadian(data)
+
+@app.route('/moadian/detail',methods = ['POST', 'GET'])
+def moadian_detail():
+    data = request.get_json()
+    return report.Moadiandetail(data)
+
+
 @app.route('/moadian/cloninvoiceebtal',methods = ['POST', 'GET'])
 def moadian_cloninvoiceebtal():
     data = request.get_json()

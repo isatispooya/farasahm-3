@@ -935,6 +935,8 @@ def CulcTime(part, now):
         return now.hour >=13 and now.hour<18
     if part == 3:
         return now.hour >=18 and now.hour<24
+    if part == 4:
+        return True
 
 def get_groups():
     conn_str_db = f'DRIVER={{SQL Server}};SERVER={ip_sql_server},{port_sql_server};DATABASE=Ace_Config;UID={username_sql_server};PWD={password_sql_server}'

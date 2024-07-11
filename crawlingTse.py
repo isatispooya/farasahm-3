@@ -12,6 +12,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 import os
 import Fnc
 warnings.filterwarnings("ignore")
+from selenium.webdriver.edge.service import Service
 
 from setting import farasahmDb as farasahm_db
 
@@ -27,7 +28,9 @@ class TseCrawling:
             "safebrowsing.enabled": True
         }
         self.options.add_experimental_option('prefs', prefs)
-        self.driver = webdriver.Edge(executable_path='msedgedriver.exe',options=self.options)
+        service = Service(executable_path='msedgedriver.exe')
+
+        self.driver = webdriver.Edge(service=service,options=self.options)
 
     def fund_list(self):
         df = requests.get('http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d=0').content
@@ -41,7 +44,6 @@ class TseCrawling:
         df = df.drop(columns=['basic'])
         df = df.to_dict('records')
         return df
-
 
     def getHistoriPriceByFullName(self,fullName,symbol,type):
         print(f'start {symbol}')
@@ -179,4 +181,36 @@ class TseCrawling:
         farasahm_db['oraghYTM'].insert_many(df.to_dict('records'))
 
 
+
+from Fnc import CulcTime
+import datetime
+from time import sleep
+from setting import farasahmDb
+
+sleep_no_time = 60
+Tse = TseCrawling()
+while True:
+    now = datetime.datetime.now()
     
+    try:
+        if CulcTime(4, now):
+            Tse.get_all_fund()
+            sleep(60*60*12)
+        else:
+            sleep(sleep_no_time)
+    except:
+        farasahmDb['log'].insert_one({'func':7, 'act':'except', 'date':now})
+        sleep(5)
+
+
+    try:
+        if CulcTime(4, now):
+            Tse.getOragh()
+            Tse.getOraghBoursi()    
+            Tse.getAmariNav()
+            sleep(60*60*12)
+        else:
+            sleep(sleep_no_time)
+    except:
+        farasahmDb['log'].insert_one({'func':6, 'act':'except', 'date':now})
+        sleep(5)
