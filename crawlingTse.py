@@ -140,14 +140,16 @@ class TseCrawling:
     def getAmariNav(self):
         print('get Nav Amari')
         lst = [
-            {'symbol':'خاتم','url':'http://etf.isatispm.com/','elementAmari':'/html/body/div[4]/div[3]/div[4]/div/span[2]','emelentDate':'/html/body/div[4]/div[3]/div[1]/div/span[2]','countunit':'/html/body/div[4]/div[3]/div[6]/div/span[2]'},
+            {'symbol':'خاتم','url':'http://etf.isatispm.com/','elementAmari':'body > div.FullRow > div.row.fund-info-boxes > div:nth-child(4) > div > span.value','emelentDate':'body > div.FullRow > div.row.fund-info-boxes > div:nth-child(1) > div > span.value','countunit':'body > div.FullRow > div.row.fund-info-boxes > div:nth-child(6) > div > span.value'},
         ]
         for i in lst:
             self.driver.get(i['url'])
-            time.sleep(5)
-            amari = self.driver.find_element(By.XPATH,i['elementAmari']).text
-            dateAmary = self.driver.find_element(By.XPATH,i['emelentDate']).text
-            countunit = self.driver.find_element(By.XPATH,i['countunit']).text
+            time.sleep(10)
+            amari = self.driver.find_element(By.CSS_SELECTOR,i['elementAmari'])
+            amari = amari.text
+            dateAmary = self.driver.find_element(By.CSS_SELECTOR,i['emelentDate']).text
+            countunit = self.driver.find_element(By.CSS_SELECTOR,i['countunit']).text
+
             amari = amari.replace('ریال','')
             dateAmary = dateAmary.replace('/','')
             countunit = int(countunit.replace(',',''))
@@ -168,7 +170,6 @@ class TseCrawling:
         for file_name in dir:
             file_path = os.path.join(self.download_path, file_name)
             os.remove(file_path)
-        print(df.columns)
         df = df[['Unnamed: 0','مقدار.2','تاریخ','YTM(%).1']]
         df = df.rename(columns={'Unnamed: 0':'نماد','مقدار.2':'قیمت معامله شده هر ورقه','تاریخ':'تاریخ آخرین روز معاملاتی','YTM(%).1':'YTM'})
         df['YTM'] = df['YTM'].apply(float)
@@ -191,7 +192,6 @@ sleep_no_time = 60
 Tse = TseCrawling()
 while True:
     now = datetime.datetime.now()
-    
     try:
         if CulcTime(4, now):
             Tse.get_all_fund()
@@ -201,8 +201,6 @@ while True:
     except:
         farasahmDb['log'].insert_one({'func':7, 'act':'except', 'date':now})
         sleep(5)
-
-
     try:
         if CulcTime(4, now):
             Tse.getOragh()
@@ -214,3 +212,4 @@ while True:
     except:
         farasahmDb['log'].insert_one({'func':6, 'act':'except', 'date':now})
         sleep(5)
+        

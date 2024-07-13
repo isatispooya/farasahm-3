@@ -3275,7 +3275,8 @@ def Moadiandetail(data):
             'vop':i['vop'],
             'tsstam':i['tsstam'],
         }
-
+        body.append(dicBody)
+        
     del dic['invoice']
     dic['body'] = body
     del dic['date']
