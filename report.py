@@ -835,6 +835,8 @@ def personalinassembly(data):
         df['opt'] = df['opt'].fillna('')
     else:
         df['opt'] = ''
+    df = df.fillna('')
+    print(df)
     df = df.sort_values(by=['rate'],ascending=False)
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df})
@@ -3940,3 +3942,32 @@ def fixincom_compareprice(data):
     dic = {'price':price, 'ebtal':ebtal, 'amary':amary, 'dif_ebtal':dif_ebtal, 'rate_ebtal':rate_ebtal, 'dif_amary':dif_amary, 'rate_amary':rate_amary}
     return json.dumps({'reply':True, 'dic':dic})
     
+
+def service_data_assetcustomer (data) :
+    token = data['token']
+    nc = data['nc']
+    if not token == rest_api_token :
+        return json.dumps ({'reply':False , 'msg' :' کاربر در فراسهم ثبت نام نشده است'}),400
+    
+    customer = GetCustomerByNationalCode(nc) 
+    print(len(customer))
+    if len(customer)<=1 :
+        dic = {'broker':False,'asset':[{'Symbol': 'بتیس1', 'VolumeInPrice': '0'}, {'Symbol': 'خاتم1', 'VolumeInPrice': 0}, {'Symbol': 'ترمه1', 'VolumeInPrice': 0}, {'Symbol': 'ویسا1', 'VolumeInPrice': 0}]}
+        return json.dumps (dic)
+    asset = GetCustomerMomentaryAssets(customer['PAMCode'])
+    symbol_isatis = ['خاتم1','ترمه1', 'ویسا1', 'بتیس1']
+    
+    df = pd.DataFrame(asset)
+    df = df[['Symbol', 'VolumeInPrice']]
+    df = df[df['Symbol'].isin(symbol_isatis)]
+    for a in symbol_isatis :
+        if not a in df['Symbol'].to_list() :
+            dff = pd.DataFrame([{'Symbol' : a , 'VolumeInPrice' : 0}])
+            df = pd.concat([df , dff])
+    df =df.to_dict('records')
+    dic = {'broker':True,'asset':df}
+    return json.dumps (dic),200
+
+
+
+

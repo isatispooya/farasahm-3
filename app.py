@@ -22,6 +22,7 @@ addToReg()
 
 warnings.filterwarnings("ignore")
 
+
 client = pymongo.MongoClient()
 farasahmDb = client['farasahm2']
 userCl = farasahmDb['user']
@@ -849,7 +850,17 @@ def getholliday():
 def service_data_customer () :
     data = request.get_json()
     return report.service_data_customer (data)
-# دارایی کاربر در کارگزاری
+
+
+
+# دارایی کاربر در کارگزاری و وجود کاربر در کارگزاری
+@app.route ('/service/assetcustomer' , methods = ['POST'])
+def service_data_assetcustomer () :
+    data = request.get_json()
+    return report.service_data_assetcustomer (data)
+
+
+
 
  
 

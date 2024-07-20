@@ -12,7 +12,7 @@ from Login import adminCheck
 from sklearn.linear_model import LinearRegression
 import time
 client = pymongo.MongoClient()
-farasahmDb = client['farasahm2']
+from setting import farasahmDb
 
 def zipToDf(zip):
     df = dfDaily = zipfile.ZipFile(zip, 'r')
@@ -544,16 +544,19 @@ def createassembly(data):
     symbol = data['access'][1]
     date = data['date']/1000
     date = datetime.datetime.fromtimestamp(date)
-    if date<= datetime.datetime.now():
-        return json.dumps({'replay':False, 'msg': 'تاریخ نمیتواند ماقبل اکنون باشد'})
+    # if date<= datetime.datetime.now():
+    #     return json.dumps({'replay':False, 'msg': 'تاریخ نمیتواند ماقبل اکنون باشد'})
     dic = data['dict'].copy()
     dic['symbol'] = symbol
     dic['date'] = date
     dic['controller'] = data['controller']
+    dic['managers'] = data['managers']
+    print(data['dict'].keys())
     if '_id' in data['dict'].keys():
         del dic['_id']
         farasahmDb['assembly'].update_one({'_id':ObjectId(data['dict']['_id'])},{'$set':dic})
     else:
+        print('-'*25)
         farasahmDb['assembly'].insert_one(dic)
     return json.dumps({'replay':True})
 

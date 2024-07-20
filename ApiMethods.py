@@ -131,7 +131,6 @@ def GetCustomerByNationalCode(nationalIdentification):
                 dic[key] = value['{http://www.w3.org/2001/XMLSchema-instance}nil']
             except:
                 if len(value)>0:
-                    print(value)
                     if value != 'true':
                         try:
                             dic[key] = value['text']
