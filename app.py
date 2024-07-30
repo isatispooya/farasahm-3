@@ -10,7 +10,7 @@ import dataManagment
 import Login
 import report
 import dara
-
+import marketing
 
 
 def addToReg(): 
@@ -860,9 +860,22 @@ def service_data_assetcustomer () :
     return report.service_data_assetcustomer (data)
 
 
+@app.route('/marketing/cityregisternobours', methods = ['POST'])
+def city_nobourse () :
+    data = request.get_json()
+    return marketing.city_nobourse (data)
 
 
- 
+@app.route('/marketing/symbolregisternobours', methods = ['POST'])
+def symbol_nobours () :
+    data = request.get_json()
+    return marketing.symbol_nobours (data)
+
+
+@app.route('/marketing/fillter', methods = ['POST'])
+def fillter () :
+    data = request.get_json()
+    return marketing.fillter (data)
 
 
 
