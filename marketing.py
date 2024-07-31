@@ -61,9 +61,9 @@ def city_nobourse(data):
     cleaned_city_list = clean_list(cleaned_city_list)
 
 
-    print(cleaned_city_list)
-
     return cleaned_city_list
+
+
 
 def bank_broker(data) :
     access = data['access'][0]
@@ -176,10 +176,14 @@ def fillter_registernobours (config) :
         df = df[df['تعداد سهام'] <= to_amount]
 
     print(df)
-    return []
+    return df
 
 
 
+
+# def fillter_costomerofbroker (config) :
+#     print (config)
+#     return[]
 
 
 
@@ -193,6 +197,21 @@ def fillter (data) :
     
 
     config = data['config']
+    title = data['title']
+    avalibale = farasahmDb['marketing_config'].find_one({"user" :access,"title":title})
+    if avalibale:
+        return json.dumps({"reply" : False , "msg" : 'تنظیمات با این عنوان موجود است'})
+    avalibale = farasahmDb['marketing_config'].find_one({"user" :access,"config":config})
+    if avalibale:
+        return json.dumps({"reply" : False , "msg" : 'تنظیمات تکراری است'} )
     df_registernobours = fillter_registernobours(config['nobours'])
+    len_registernobours  = len(df_registernobours)
+    df_registernobours=df_registernobours.to_dict('records')
+    date = datetime.now()
+    farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date})
+    # df_costomerofbroker = fillter_costomerofbroker(config['costomerbroker'])
 
-    return json.dumps([])
+    return json.dumps({"reply" : True , "df" : df_registernobours , "len" : len_registernobours} )
+
+
+
