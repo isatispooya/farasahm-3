@@ -904,6 +904,10 @@ def column_marketing () :
     data = request.get_json()
     return marketing.column_marketing (data)
 
+@app.route('/marketing/perviewcontext', methods = ['POST'])
+def perviewcontext () :
+    data = request.get_json()
+    return marketing.perViewContent (data)
 
 
 @app.route('/fixincom/compareprice',methods = ['POST', 'GET'])

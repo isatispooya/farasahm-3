@@ -204,7 +204,7 @@ def column_marketing (data) :
             registernobours = registernobours.drop(columns=i)
 
 
-    registernobours_column = list(registernobours.columns)
+    registernobours_column = ["{{" + str(x) + "}}" for x in registernobours.columns]
 
     df = pd.DataFrame(registernobours)
     len_df = len(df)
@@ -213,19 +213,32 @@ def column_marketing (data) :
     return json.dumps({'reply' : True , 'columns' : registernobours_column , 'dic' : dict_df , 'len' :len_df })
 
 
+def replace_placeholders(row , context):
+    return context.replace("{{", "{").replace("}}", "}").format_map(row)
+
+def perViewContent(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    _id = ObjectId(data['_id'])
+    column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1})
+    if column is None:
+        return json.dumps({'reply': False, 'msg': 'یافت نشد'})
+    config  = column['config']
+    registernobours = fillter_registernobours(config['nobours'])
+    registernobours = registernobours.head(n=2)
+    context = data['context']
+    registernobours['result'] = registernobours.apply(replace_placeholders, args=(context,), axis=1)
+    if '_id' in registernobours.columns:
+        registernobours['_id'] = registernobours['_id'].astype(str)
+
+    dict_registernobours = registernobours.to_dict('records')
+    return json.dumps({'dict': dict_registernobours})
 
 
-
-
-
-
-
-
-
-
-# def fillter_costomerofbroker (config) :
-#     print (config)
-#     return[]
 
 
 def marketing_list (data):
@@ -264,7 +277,6 @@ def fillter (data) :
     date = datetime.now()
     farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date})
 
-    # df_costomerofbroker = fillter_costomerofbroker(config['costomerbroker'])
 
     return json.dumps({"reply" : True , "df" : df_registernobours , "len" : len_registernobours} )
 
