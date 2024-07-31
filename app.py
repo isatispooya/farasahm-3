@@ -891,6 +891,21 @@ def broker_branch () :
 
 
 
+@app.route('/marketing/marketinglist', methods = ['POST'])
+def marketing_list () :
+    data = request.get_json()
+    return marketing.marketing_list (data)
+
+
+
+
+@app.route('/marketing/columnmarketing', methods = ['POST'])
+def column_marketing () :
+    data = request.get_json()
+    return marketing.column_marketing (data)
+
+
+
 @app.route('/fixincom/compareprice',methods = ['POST', 'GET'])
 def fixincom_compareprice():
     data = request.get_json()
