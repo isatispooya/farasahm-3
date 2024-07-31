@@ -878,6 +878,17 @@ def fillter () :
     return marketing.fillter (data)
 
 
+@app.route('/marketing/bank', methods = ['POST'])
+def bank_broker () :
+    data = request.get_json()
+    return marketing.bank_broker (data)
+
+
+@app.route('/marketing/brokerbranch', methods = ['POST'])
+def broker_branch () :
+    data = request.get_json()
+    return marketing.broker_branch (data)
+
 
 
 @app.route('/fixincom/compareprice',methods = ['POST', 'GET'])

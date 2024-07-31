@@ -1,11 +1,12 @@
 import pandas as pd
 from setting import farasahmDb
 import Fnc
-from ApiMethods import GetDailyTradeList, GetCustomerMomentaryAssets, GetCustomerRemainWithTradeCode
+from ApiMethods import GetDailyTradeList, GetCustomerMomentaryAssets, GetCustomerRemainWithTradeCode, GetCustomerByNationalCode,GetFirmByNationalIdentification
 import datetime
 from persiantools.jdatetime import JalaliDate
 import requests
 from persiantools import characters
+
 
 def todayIntJalali():
     today = datetime.datetime.now()
@@ -331,3 +332,23 @@ def getTseToDay():
                 df = df.to_dict('records')
                 farasahmDb['tse'].delete_many({'dataInt':jalaliInt})
                 farasahmDb['tse'].insert_many(df)
+
+
+def get_trade_code () :
+    date_trader_list = farasahmDb ['TradeListBroker'].distinct('dateInt')
+    for i in date_trader_list :
+        trade_list = farasahmDb['TradeListBroker'].find({'dateInt': i} ,{'_id' :0 , 'TradeCode' :1})
+        trade_list = [x['TradeCode'] for x in trade_list]
+        trade_list = set(trade_list)
+        customer_list = set(farasahmDb['customerofbroker'].distinct('TradeCode'))
+
+        need_update = list(trade_list-customer_list)
+        for j in need_update:
+            nc = str(j)[4:]
+            customer = GetCustomerByNationalCode(nc)
+            if len(customer)>0:
+                farasahmDb['customerofbroker'].insert_one(customer)
+
+
+
+

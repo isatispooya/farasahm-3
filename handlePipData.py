@@ -34,6 +34,7 @@ def CirTwo():
             if CulcTime(0, now):
                 functionPipData.GetAllTradeLast30Day()
                 functionPipData.TseRepir()
+                functionPipData.get_trade_code()
                 sleep(60*60*12)
             else:
                 sleep(sleep_no_time)
@@ -85,6 +86,7 @@ def CirFive():
         except:
             farasahmDb['log'].insert_one({'func':func, 'act':'except', 'date':now})
             sleep(5)
+
 
 # def CirSix():
 #     func = 6

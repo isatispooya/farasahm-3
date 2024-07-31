@@ -207,7 +207,10 @@ def GetFirmByNationalIdentification(nationalIdentification):
     response = response.decode("utf-8")
     root = ET.fromstring(response)
     xml_dict = Fnc.element_to_dict(root)
-    body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetFirmByNationalIdentificationResponse']['{http://tempuri.org/}GetFirmByNationalIdentificationResult']
+    try:
+        body = xml_dict['{http://schemas.xmlsoap.org/soap/envelope/}Body']['{http://tempuri.org/}GetFirmByNationalIdentificationResponse']['{http://tempuri.org/}GetFirmByNationalIdentificationResult']
+    except:
+        return {}
     dic = {}
     for i in body:
         key = i.split('}')[1]
