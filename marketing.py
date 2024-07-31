@@ -74,7 +74,6 @@ def bank_broker(data) :
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     
     bank = farasahmDb['customerofbroker'].distinct('BankName')
-    print (bank)
     return bank
 
 
@@ -87,7 +86,6 @@ def broker_branch(data) :
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     
     branch = farasahmDb['customerofbroker'].distinct('BrokerBranch')
-    print (branch)
     return branch
 
 
@@ -108,8 +106,7 @@ def symbol_nobours (data) :
 
 
 
-def fillter_registernobours (config) :
-    print(config)
+def fillter_registernobours (config ) :
     if not config['enabled'] : 
         return pd.DataFrame()
     if len(config ['symbol']) >0 :
@@ -175,16 +172,86 @@ def fillter_registernobours (config) :
         to_amount = int(config['amount']['to'])
         df = df[df['تعداد سهام'] <= to_amount]
 
-    print(df)
+
+        
+    symbol_list = farasahmDb ['companyList'].find({'type' :'NoBourse'},{'_id':0 ,'symbol' : 1 , 'fullname' :1})
+    symbol_list = [x for x in symbol_list]
+    for i in symbol_list :
+        df['symbol'] = df['symbol'].replace(i['symbol'], i['fullname'])
+    df = df.rename(columns = {'symbol' :'نام شرکت', 'rate' :'درصد'})
+    df = df.fillna('')
+
     return df
 
 
 
 
-# def fillter_costomerofbroker (config) :
-#     print (config)
-#     return[]
+def column_marketing (data) :
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1})
+    if column is None:
+        return json.dumps({'reply': False, 'msg': 'یافت نشد'})
+    config  = column['config']
+    registernobours = fillter_registernobours(config['nobours'])
 
+    for i in registernobours.columns : 
+        if i in ['index', '_id' , 'date'] :
+            registernobours = registernobours.drop(columns=i)
+
+
+    registernobours_column = ["{{" + str(x) + "}}" for x in registernobours.columns]
+
+    df = pd.DataFrame(registernobours)
+    len_df = len(df)
+    dict_df = df.to_dict('records')
+
+    return json.dumps({'reply' : True , 'columns' : registernobours_column , 'dic' : dict_df , 'len' :len_df })
+
+
+def replace_placeholders(row , context):
+    return context.replace("{{", "{").replace("}}", "}").format_map(row)
+
+def perViewContent(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    _id = ObjectId(data['_id'])
+    column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1})
+    if column is None:
+        return json.dumps({'reply': False, 'msg': 'یافت نشد'})
+    config  = column['config']
+    registernobours = fillter_registernobours(config['nobours'])
+    registernobours = registernobours.head(n=2)
+    context = data['context']
+    registernobours['result'] = registernobours.apply(replace_placeholders, args=(context,), axis=1)
+    if '_id' in registernobours.columns:
+        registernobours['_id'] = registernobours['_id'].astype(str)
+
+    dict_registernobours = registernobours.to_dict('records')
+    return json.dumps({'dict': dict_registernobours})
+
+
+
+
+def marketing_list (data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+
+    marketing_list = farasahmDb ['marketing_config'].find({'user':access} , {'_id':1 ,'title' : 1})
+    marketing_list = [{'_id' : str(x['_id']),'title' : x['title'] } for x in marketing_list]
+    return json.dumps (marketing_list)
 
 
 def fillter (data) :
@@ -209,9 +276,8 @@ def fillter (data) :
     df_registernobours=df_registernobours.to_dict('records')
     date = datetime.now()
     farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date})
-    # df_costomerofbroker = fillter_costomerofbroker(config['costomerbroker'])
+
 
     return json.dumps({"reply" : True , "df" : df_registernobours , "len" : len_registernobours} )
-
 
 
