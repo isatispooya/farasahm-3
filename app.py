@@ -909,6 +909,11 @@ def perviewcontext () :
     data = request.get_json()
     return marketing.perViewContent (data)
 
+@app.route('/marketing/sendsms', methods = ['POST'])
+def send_message () :
+    data = request.get_json()
+    return marketing.send_message (data)
+
 
 @app.route('/fixincom/compareprice',methods = ['POST', 'GET'])
 def fixincom_compareprice():

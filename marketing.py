@@ -119,6 +119,8 @@ def fillter_registernobours (config ) :
 
     df = df.reset_index(drop=True)
     df['درصد'] = df.groupby('symbol')['تعداد سهام'].transform(lambda x: x / x.sum() * 100)   
+    df['درصد']=  df['درصد'].apply(int) 
+    df['درصد']=  df['درصد'].apply(str) 
 
     if config['rate']['max']:
         df['درصد'] = df['درصد'].fillna(0)
@@ -251,18 +253,22 @@ def send_message(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    config  = data['config']
+    _id = ObjectId(data['_id'])
+    column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1})
+    if column is None:
+        return json.dumps({'reply': False, 'msg': 'یافت نشد'})
+    config  = column['config']
+    registernobours = fillter_registernobours(config['nobours'])
     context = data['context']
-    phone_number = "  "
-    message_text = context
-
-    response = SendSms(phone_number, message_text)
-
-    if response.get('status') == 'OK':
-        return json.dumps({'reply': True, 'msg': 'پیام با موفقیت ارسال شد'})
-    else:
-        return json.dumps({'reply': False, 'msg': 'مشکلی در ارسال پیام به وجود آمد'})
-
+    registernobours['result'] = registernobours.apply(replace_placeholders, args=(context,), axis=1)
+    for i in registernobours.index :
+        text = registernobours['result'][i]
+        mobile = registernobours['شماره تماس'][i]
+        # SendSms(mobile,text)
+        SendSms('09011010959',text)
+        SendSms('09037976393',text)
+        break
+    return json.dumps({'reply' : True})
 
 
 
