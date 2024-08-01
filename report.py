@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 import arabic_reshaper
 from bidi.algorithm import get_display
 from persiantools import characters, digits
-
+import random
 from bson import ObjectId
 import Fnc
 from ApiMethods import GetCustomerMomentaryAssets , GetCustomerByNationalCode
@@ -3971,3 +3971,29 @@ def service_data_assetcustomer (data) :
 
 
 
+def retaxid(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    taxid = data['taxid']
+    # print(taxid)
+    df = farasahmDb['invoiceMoadian'].find({})
+    for i in df:
+        txid_ = i['invoice']['header']['taxid']
+        if taxid == txid_:
+            mmrit = i['details']['seler']['idTax']
+            date = datetime.datetime.fromtimestamp(int(i['invoice']['header']['indatim'])/1000)
+            dateJalali = Fnc.gorgianIntToJalali(date)
+            inno = random.randint(1,99999)
+            new_taxid =Fnc.generate_tax_id(mmrit,dateJalali,inno)
+            i['invoice']['header']['taxid'] = new_taxid
+            _id = i['_id']
+            farasahmDb['invoiceMoadian'].delete_one({'_id':_id})
+            farasahmDb['invoiceMoadian'].insert_one(i)
+            
+
+    return json.dumps({'reply':True})
