@@ -4,6 +4,7 @@ from bson import ObjectId
 import json
 from persiantools.jdatetime import JalaliDate
 from datetime import datetime
+from Login import SendSms
 
 def clean_list(data):
     cleaned_data = []
@@ -237,6 +238,27 @@ def perViewContent(data):
 
     dict_registernobours = registernobours.to_dict('records')
     return json.dumps({'dict': dict_registernobours})
+
+
+def send_message(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    config  = data['config']
+    context = data['context']
+    phone_number = "  "
+    message_text = context
+
+    response = SendSms(phone_number, message_text)
+
+    if response.get('status') == 'OK':
+        return json.dumps({'reply': True, 'msg': 'پیام با موفقیت ارسال شد'})
+    else:
+        return json.dumps({'reply': False, 'msg': 'مشکلی در ارسال پیام به وجود آمد'})
+
 
 
 
