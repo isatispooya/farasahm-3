@@ -213,8 +213,12 @@ def column_marketing (data) :
     return json.dumps({'reply' : True , 'columns' : registernobours_column , 'dic' : dict_df , 'len' :len_df })
 
 
+
 def replace_placeholders(row , context):
     return context.replace("{{", "{").replace("}}", "}").format_map(row)
+
+
+
 
 def perViewContent(data):
     access = data['access'][0]
