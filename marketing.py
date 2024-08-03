@@ -4,6 +4,7 @@ from bson import ObjectId
 import json
 from persiantools.jdatetime import JalaliDate
 from datetime import datetime
+from Login import SendSms
 
 def clean_list(data):
     cleaned_data = []
@@ -118,6 +119,8 @@ def fillter_registernobours (config ) :
 
     df = df.reset_index(drop=True)
     df['درصد'] = df.groupby('symbol')['تعداد سهام'].transform(lambda x: x / x.sum() * 100)   
+    df['درصد']=  df['درصد'].apply(int) 
+    df['درصد']=  df['درصد'].apply(str) 
 
     if config['rate']['max']:
         df['درصد'] = df['درصد'].fillna(0)
@@ -213,8 +216,12 @@ def column_marketing (data) :
     return json.dumps({'reply' : True , 'columns' : registernobours_column , 'dic' : dict_df , 'len' :len_df })
 
 
+
 def replace_placeholders(row , context):
     return context.replace("{{", "{").replace("}}", "}").format_map(row)
+
+
+
 
 def perViewContent(data):
     access = data['access'][0]
@@ -237,6 +244,31 @@ def perViewContent(data):
 
     dict_registernobours = registernobours.to_dict('records')
     return json.dumps({'dict': dict_registernobours})
+
+
+def send_message(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    _id = ObjectId(data['_id'])
+    column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1})
+    if column is None:
+        return json.dumps({'reply': False, 'msg': 'یافت نشد'})
+    config  = column['config']
+    registernobours = fillter_registernobours(config['nobours'])
+    context = data['context']
+    registernobours['result'] = registernobours.apply(replace_placeholders, args=(context,), axis=1)
+    for i in registernobours.index :
+        text = registernobours['result'][i]
+        mobile = registernobours['شماره تماس'][i]
+        # SendSms(mobile,text)
+        SendSms('09011010959',text)
+        SendSms('09037976393',text)
+        break
+    return json.dumps({'reply' : True})
 
 
 
