@@ -21,19 +21,28 @@ def national_id (national_id , code) :
     return False
 
 
-
-def mobile(mobile_number, num1, num2 ):
+def mobilePerfix(mobile_number, num1 ):
     if isinstance(mobile_number, str):
         if len(mobile_number) >= 7:
             for i in num1 :
                 if isinstance(i, str) and i in mobile_number[1:4]:
                     return True
+    return False
+
+
+def mobileMidle(mobile_number, num2 ):
+    if isinstance(mobile_number, str):
+        if len(mobile_number) >= 7:
             for i in num2 :
                 if isinstance(i, str) and i in mobile_number[4:7]:
                     return True
-
     return False
 
+
+def name (name,abbreviation) :
+    if abbreviation in name :
+        return True
+    return False
 
 
 
@@ -65,7 +74,7 @@ def city_nobourse(data):
     return cleaned_city_list
 
 
-
+# customerofbroker لیست بانک های مشتریان کارگزاری از فایل 
 def bank_broker(data) :
     access = data['access'][0]
     symbol = data['access'][1]
@@ -77,7 +86,7 @@ def bank_broker(data) :
     bank = farasahmDb['customerofbroker'].distinct('BankName')
     return bank
 
-
+# customerofbroker لیست شعب  مشتریان کارگزاری از فایل 
 def broker_branch(data) :
     access = data['access'][0]
     symbol = data['access'][1]
@@ -117,36 +126,36 @@ def fillter_registernobours (config ) :
     df = pd.DataFrame(df)
     df = df.groupby(by='symbol').apply(filter_date_symbol)
 
-    df = df.reset_index(drop=True)
-    df['درصد'] = df.groupby('symbol')['تعداد سهام'].transform(lambda x: x / x.sum() * 100)   
-    df['درصد']=  df['درصد'].apply(int) 
-    df['درصد']=  df['درصد'].apply(str) 
-
-    if config['rate']['max']:
-        df['درصد'] = df['درصد'].fillna(0)
-        df['درصد'] = df['درصد'].astype(float)
-        max = float(config['rate']['max'])
-        df = df[df['درصد'] >= max]
-    if config['rate']['min']:
-        df['درصد'] = df['درصد'].fillna(0)
-        df['درصد'] = df['درصد'].astype(float)
-        min = float(config['rate']['min'])
-        df = df[df['درصد'] <= min]
 
 
     if len (config ['city']) >0 :
         df = df [df['صادره'].isin(config['city'])]
 
+
+
+
     if len (config['national_id']) >0 :
         df = df[df['کد ملی'].apply(lambda x:national_id(x, config['national_id']))]       
 
 
-    if 'mobile' in config and 'num1' in config['mobile'] and 'num2' in config['mobile']:
-        df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
-        df['شماره تماس'] = df['شماره تماس'].fillna("0")
-        df = df[df['شماره تماس'].apply(lambda x: mobile(x, config['mobile']['num1'], config['mobile']['num2']))]
+    df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
+    df['شماره تماس'] = df['شماره تماس'].fillna("0")
+    try:
+        if 'mobile' in config and 'num1' in config['mobile'] and 'num2' in config['mobile']:
+            if len(config['mobile']['num1'])>0:
+                df = df[df['شماره تماس'].apply(lambda x: mobilePerfix(x, config['mobile']['num1']))]
+            if len(config['mobile']['num2'])>0:
+                df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
+    except:
+        pass
+    
+
+    if config ['name'] :
+        df['نام و نام خانوادگی'] = df['نام و نام خانوادگی'].fillna(0)
+        df = df[df['نام و نام خانوادگی'].apply(lambda x :name(x,config['name']))]
 
 
+        
 
     if config['birthday']['from'] :
         from_date = JalaliDate.fromtimestamp(int(config['birthday']['from']/1000))
@@ -163,7 +172,6 @@ def fillter_registernobours (config ) :
         df['تاریخ تولد'] = df['تاریخ تولد'].apply(int)
         df = df[df['تاریخ تولد']<=to_date]
 
-
     if config['amount']['from'] :
         df['تعداد سهام'] = df['تعداد سهام'].fillna(0)
         df['تعداد سهام'] = df['تعداد سهام'].astype(int)
@@ -176,16 +184,38 @@ def fillter_registernobours (config ) :
         df = df[df['تعداد سهام'] <= to_amount]
 
 
-        
-    symbol_list = farasahmDb ['companyList'].find({'type' :'NoBourse'},{'_id':0 ,'symbol' : 1 , 'fullname' :1})
-    symbol_list = [x for x in symbol_list]
-    for i in symbol_list :
-        df['symbol'] = df['symbol'].replace(i['symbol'], i['fullname'])
+    try:
+
+        symbol_list = farasahmDb ['companyList'].find({'type' :'NoBourse'},{'_id':0 ,'symbol' : 1 , 'fullname' :1})
+        symbol_list = [x for x in symbol_list]
+        for i in symbol_list :
+            df['symbol'] = df['symbol'].replace(i['symbol'], i['fullname'])
+    except:
+        pass
+
+    df = df.reset_index(drop=True)
+    df['درصد'] = df.groupby('symbol')['تعداد سهام'].transform(lambda x: x / x.sum() * 100)   
+    df['درصد']=  df['درصد'].apply(int) 
+    df['درصد']=  df['درصد'].apply(str) 
+    if config['rate']['max']:
+        max_rate = float(config['rate']['max'])
+        df['درصد'] = df['درصد'].fillna(0)
+        df['درصد'] = df['درصد'].astype(float)
+        max = float(config['rate']['max'])
+        df = df[df['درصد'] >= max]
+    if config['rate']['min']:
+        df['درصد'] = df['درصد'].fillna(0)
+        df['درصد'] = df['درصد'].astype(float)
+        min = float(config['rate']['min'])
+        df = df[df['درصد'] >= min]
+    if 'rate' in df.columns:
+        df = df.drop(columns='rate')
+    if '_id' in df.columns:
+        df = df.drop(columns='_id')
     df = df.rename(columns = {'symbol' :'نام شرکت', 'rate' :'درصد'})
     df = df.fillna('')
-
+    print(df)
     return df
-
 
 
 
@@ -248,7 +278,6 @@ def perViewContent(data):
 
 def send_message(data):
     access = data['access'][0]
-    symbol = data['access'][1]
     _id = ObjectId(access)
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
@@ -257,17 +286,8 @@ def send_message(data):
     column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1})
     if column is None:
         return json.dumps({'reply': False, 'msg': 'یافت نشد'})
-    config  = column['config']
-    registernobours = fillter_registernobours(config['nobours'])
     context = data['context']
-    registernobours['result'] = registernobours.apply(replace_placeholders, args=(context,), axis=1)
-    for i in registernobours.index :
-        text = registernobours['result'][i]
-        mobile = registernobours['شماره تماس'][i]
-        # SendSms(mobile,text)
-        SendSms('09011010959',text)
-        SendSms('09037976393',text)
-        break
+    column  = farasahmDb ['marketing_config'].update_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'$set':{'status':True, 'context':context}})
     return json.dumps({'reply' : True})
 
 
@@ -287,14 +307,26 @@ def marketing_list (data):
 
 
 def fillter (data) :
+
     access = data['access'][0]
     symbol = data['access'][1]
     _id = ObjectId(access)
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    if not data['config']:
+        return json.dumps({"reply" : False , "msg" : 'تنظیمات ارسال نشده'})
+    if not data['title']:
+        return json.dumps({"reply" : False , "msg" : 'عنوان ارسال نشده'})
+    if len(data['title']) == 0:
+        return json.dumps({"reply" : False , "msg" : 'عنوان ارسال نشده'})
+    if not data['config']['send_time']:
+        return json.dumps({"reply" : False , "msg" : 'زمان اولین ارسال تنظیم نشده'})
+    if not data['config']['period']:
+        return json.dumps({"reply" : False , "msg" : 'دوره ارسال تنظیم نشده'})
+    if not data['config']['period'] in ['ones','daily','weekly','monthly']:
+        return json.dumps({"reply" : False , "msg" : 'دوره ارسال به درستی تنظیم نشده'})
     
-
     config = data['config']
     title = data['title']
     avalibale = farasahmDb['marketing_config'].find_one({"user" :access,"title":title})
@@ -307,9 +339,75 @@ def fillter (data) :
     len_registernobours  = len(df_registernobours)
     df_registernobours=df_registernobours.to_dict('records')
     date = datetime.now()
-    farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date})
-
-
+    farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
+    # print(df_registernobours)
     return json.dumps({"reply" : True , "df" : df_registernobours , "len" : len_registernobours} )
 
 
+
+
+
+
+def edit_config(data):
+    try:
+        access = data['access'][0]
+        symbol = data['access'][1]
+        _id = ObjectId(access)
+        acc = farasahmDb['user'].find_one({'_id': _id}, {'_id': 0})
+        if acc is None:
+            return json.dumps({'reply': False, 'msg': 'کاربر یافت نشد لطفا مجددا وارد شوید'})
+
+        config = data.get('config')
+        title = data.get('title')
+
+        send_time = config.get('send_time') if config else None
+        period = config.get('period') if config else None
+        
+        if not config or not title or send_time is None or period is None:
+            return json.dumps({'reply': False, 'msg': 'داده‌های ورودی ناقص است'})
+
+        existing_config = farasahmDb['marketing_config'].find_one({"user": access, "title": title})
+        if not existing_config:
+            return json.dumps({"reply": False, "msg": 'تنظیماتی با این عنوان یافت نشد'})
+
+        update_result = farasahmDb['marketing_config'].update_one(
+            {"user": access, "title": title},
+            {"$set": {"config": config, "send_time": send_time, "period": period, "date": datetime.now()}}
+        )
+        
+        if update_result.matched_count == 0:
+            return json.dumps({"reply": False, "msg": 'خطا در به‌روزرسانی تنظیمات'})
+
+        df_registernobours = fillter_registernobours(config['nobours'])
+        len_registernobours = len(df_registernobours)
+        df_registernobours = df_registernobours.to_dict('records')
+        
+        print(df_registernobours)
+        return json.dumps({"reply": True, "df": df_registernobours, "len": len_registernobours})
+    
+    except KeyError as e:
+        return json.dumps({'reply': False, 'msg': f"کلید {str(e)} در داده‌های ورودی یافت نشد"})
+    except Exception as e:
+        return json.dumps({'reply': False, 'msg': f"خطای غیرمنتظره: {str(e)}"})
+
+
+def delete_config(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id': _id}, {'_id': 0})
+    if acc is None:
+        return json.dumps({'reply': False, 'msg': 'کاربر یافت نشد لطفا مجددا وارد شوید'})
+
+    title = data['title']
+    
+    existing_config = farasahmDb['marketing_config'].find_one({"user": access, "title": title})
+    if not existing_config:
+        return json.dumps({"reply": False, "msg": 'تنظیماتی با این عنوان یافت نشد'})
+
+    delete_result = farasahmDb['marketing_config'].delete_one({"user": access, "title": title})
+
+    if delete_result.deleted_count == 1:
+        return json.dumps({"reply": True, "msg": "تنظیمات با موفقیت حذف شد"})
+    else:
+        return json.dumps({"reply": False, "msg": "تنظیمات یافت نشد یا قبلاً حذف شده است"})
