@@ -3971,7 +3971,7 @@ def service_data_assetcustomer (data) :
 
 
 
-def retaxid(data):
+def cloninvoce(data):
     access = data['access'][0]
     symbol = data['access'][1]
     symbolF = farasahmDb['menu'].find_one({'name':symbol})['symbol']
@@ -3980,7 +3980,6 @@ def retaxid(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     taxid = data['taxid']
-    # print(taxid)
     df = farasahmDb['invoiceMoadian'].find({})
     for i in df:
         txid_ = i['invoice']['header']['taxid']
@@ -3992,8 +3991,6 @@ def retaxid(data):
             new_taxid =Fnc.generate_tax_id(mmrit,dateJalali,inno)
             i['invoice']['header']['taxid'] = new_taxid
             _id = i['_id']
-            farasahmDb['invoiceMoadian'].delete_one({'_id':_id})
             farasahmDb['invoiceMoadian'].insert_one(i)
-            
-
     return json.dumps({'reply':True})
+
