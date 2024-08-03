@@ -268,7 +268,6 @@ def addcompany():
     postcode = request.form.get('postcode', '')
     return report.addcompany(access, key, name, idTax, idNum, address, call, postcode)
 
-
 @app.route('/getcompanymoadian',methods = ['POST', 'GET'])
 def getcompanymoadian():
     data = request.get_json()
@@ -324,6 +323,11 @@ def inquiryinvoce():
 def sendinvoce():
     data = request.get_json()
     return report.sendinvoce(data)
+
+@app.route('/moadian/cloninvoce',methods = ['POST', 'GET'])
+def cloninvoce():
+    data = request.get_json()
+    return report.cloninvoce(data)
 
 @app.route('/getlistcompanymoadian',methods = ['POST', 'GET'])
 def getlistcompanymoadian():
@@ -872,23 +876,11 @@ def symbol_nobours () :
     return marketing.symbol_nobours (data)
 
 
+
 @app.route('/marketing/fillter', methods = ['POST'])
 def fillter () :
     data = request.get_json()
     return marketing.fillter (data)
-
-
-
-@app.route('/marketing/editfillter', methods = ['POST'])
-def edit_config () :
-    data = request.get_json()
-    return marketing.edit_config (data)
-
-
-@app.route('/marketing/deleteconfig', methods = ['POST'])
-def delete_config () :
-    data = request.get_json()
-    return marketing.delete_config (data)
 
 
 @app.route('/marketing/bank', methods = ['POST'])
