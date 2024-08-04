@@ -5,6 +5,7 @@ import json
 from persiantools.jdatetime import JalaliDate
 from datetime import datetime
 from Login import SendSms
+import requests
 
 def clean_list(data):
     cleaned_data = []
@@ -116,6 +117,43 @@ def symbol_nobours (data) :
 
 
 
+# بیمه 
+def fillter_insurance (config) :
+    if not config['enabled'] :
+        return pd.DataFrame()
+    
+    if not config['accounting']['code'] :
+        code = '03'
+    else:
+        code = config['accounting']['code']
+
+    df = requests.post('https://bpis.fidip.ir/coustomer/balance/api', data=json.dumps({"key":"farasahm","code":code}),headers={'Content-Type': 'application/json'})
+    if df.status_code!=200:
+
+        return pd.DataFrame()
+    df = json.loads(df.content)['df']
+    if len(df)==0:
+        return pd.DataFrame()
+    df = pd.DataFrame(df)
+    df = df[['Mobile','Name','balanceAdjust']]
+    df['balanceAdjust'] = df['balanceAdjust']*-1
+
+    if config['accounting']['from'] :
+        frm = int(config['accounting']['from'])
+    else:
+        frm = df['balanceAdjust'].min()
+    if config['accounting']['to'] :
+        to = int(config['accounting']['to'])
+    else:
+        to = df['balanceAdjust'].max()
+    df = df[df['balanceAdjust']>=frm]
+    df = df[df['balanceAdjust']<=to]
+    return df
+
+
+
+
+# غیر بورسی
 def fillter_registernobours (config ) :
     if not config['enabled'] : 
         return pd.DataFrame()
@@ -214,7 +252,6 @@ def fillter_registernobours (config ) :
         df = df.drop(columns='_id')
     df = df.rename(columns = {'symbol' :'نام شرکت', 'rate' :'درصد'})
     df = df.fillna('')
-    print(df)
     return df
 
 
@@ -261,19 +298,24 @@ def perViewContent(data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     _id = ObjectId(data['_id'])
-    column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1})
+    column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1 , 'title' :1})
     if column is None:
         return json.dumps({'reply': False, 'msg': 'یافت نشد'})
     config  = column['config']
+    title = column['title']
+
+    df_registernobours = fillter_registernobours(config['nobours'])
+    len_registernobours  = len(df_registernobours)
     registernobours = fillter_registernobours(config['nobours'])
     registernobours = registernobours.head(n=2)
+
     context = data['context']
     registernobours['result'] = registernobours.apply(replace_placeholders, args=(context,), axis=1)
     if '_id' in registernobours.columns:
         registernobours['_id'] = registernobours['_id'].astype(str)
 
     dict_registernobours = registernobours.to_dict('records')
-    return json.dumps({'dict': dict_registernobours})
+    return json.dumps({'dict': dict_registernobours , 'config' :config  ,'title' : title, 'len' : len_registernobours})
 
 
 def send_message(data):
@@ -324,7 +366,7 @@ def fillter (data) :
         return json.dumps({"reply" : False , "msg" : 'زمان اولین ارسال تنظیم نشده'})
     if not data['config']['period']:
         return json.dumps({"reply" : False , "msg" : 'دوره ارسال تنظیم نشده'})
-    if not data['config']['period'] in ['ones','daily','weekly','monthly']:
+    if not data['config']['period'] in ['once','daily','weekly','monthly']:
         return json.dumps({"reply" : False , "msg" : 'دوره ارسال به درستی تنظیم نشده'})
     
     config = data['config']
@@ -336,12 +378,16 @@ def fillter (data) :
     if avalibale:
         return json.dumps({"reply" : False , "msg" : 'تنظیمات تکراری است'} )
     df_registernobours = fillter_registernobours(config['nobours'])
-    len_registernobours  = len(df_registernobours)
-    df_registernobours=df_registernobours.to_dict('records')
+    df_insurance = fillter_insurance(config['insurance'])
+
+    df = pd.concat([df_registernobours,df_insurance])
+    df = df.fillna('')
+
+    len_df  = len(df)
+    df = df.to_dict('records')
     date = datetime.now()
-    farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
-    # print(df_registernobours)
-    return json.dumps({"reply" : True , "df" : df_registernobours , "len" : len_registernobours} )
+    # farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
+    return json.dumps({"reply" : True , "df" : df , "len" : len_df } )
 
 
 
@@ -358,20 +404,21 @@ def edit_config(data):
             return json.dumps({'reply': False, 'msg': 'کاربر یافت نشد لطفا مجددا وارد شوید'})
 
         config = data.get('config')
-        title = data.get('title')
+        id = ObjectId(data['_id'])
+
 
         send_time = config.get('send_time') if config else None
         period = config.get('period') if config else None
         
-        if not config or not title or send_time is None or period is None:
+        if not config or not id or send_time is None or period is None:
             return json.dumps({'reply': False, 'msg': 'داده‌های ورودی ناقص است'})
 
-        existing_config = farasahmDb['marketing_config'].find_one({"user": access, "title": title})
+        existing_config = farasahmDb['marketing_config'].find_one({"user": access, "_id": id})
         if not existing_config:
             return json.dumps({"reply": False, "msg": 'تنظیماتی با این عنوان یافت نشد'})
 
         update_result = farasahmDb['marketing_config'].update_one(
-            {"user": access, "title": title},
+            {"user": access, "_id": id},
             {"$set": {"config": config, "send_time": send_time, "period": period, "date": datetime.now()}}
         )
         
@@ -382,7 +429,6 @@ def edit_config(data):
         len_registernobours = len(df_registernobours)
         df_registernobours = df_registernobours.to_dict('records')
         
-        print(df_registernobours)
         return json.dumps({"reply": True, "df": df_registernobours, "len": len_registernobours})
     
     except KeyError as e:
@@ -399,13 +445,13 @@ def delete_config(data):
     if acc is None:
         return json.dumps({'reply': False, 'msg': 'کاربر یافت نشد لطفا مجددا وارد شوید'})
 
-    title = data['title']
-    
-    existing_config = farasahmDb['marketing_config'].find_one({"user": access, "title": title})
+    id = ObjectId(data['_id'])
+
+    existing_config = farasahmDb['marketing_config'].find_one({"user": access, "_id": id})
     if not existing_config:
         return json.dumps({"reply": False, "msg": 'تنظیماتی با این عنوان یافت نشد'})
 
-    delete_result = farasahmDb['marketing_config'].delete_one({"user": access, "title": title})
+    delete_result = farasahmDb['marketing_config'].delete_one({"user": access, "_id": id})
 
     if delete_result.deleted_count == 1:
         return json.dumps({"reply": True, "msg": "تنظیمات با موفقیت حذف شد"})

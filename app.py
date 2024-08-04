@@ -909,6 +909,22 @@ def column_marketing () :
     data = request.get_json()
     return marketing.column_marketing (data)
 
+
+
+@app.route('/marketing/editfillter', methods = ['POST'])
+def edit_config () :
+    data = request.get_json()
+    return marketing.edit_config (data)
+
+
+
+@app.route('/marketing/deleteconfig', methods = ['POST'])
+def delete_config () :
+    data = request.get_json()
+    return marketing.delete_config (data)
+
+
+
 @app.route('/marketing/perviewcontext', methods = ['POST'])
 def perviewcontext () :
     data = request.get_json()
