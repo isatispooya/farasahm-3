@@ -1,7 +1,7 @@
 from setting import farasahmDb
 import json
 from datetime import datetime
-from marketing import fillter_registernobours, replace_placeholders
+from marketing import fillter_registernobours, replace_placeholders , fillter_insurance
 import pandas as pd
 from Login import SendSms
 from time import sleep
@@ -38,7 +38,9 @@ def check_config () :
 
 def send(config):
     context = config['context']
-    df = fillter_registernobours(config['config']['nobours'])
+    df_registernobours = fillter_registernobours(config['config']['nobours'])
+    df_insurance = fillter_insurance(config['config']['insurance'])
+    df = pd.concat([df_registernobours,df_insurance])
     df['result'] = df.apply(replace_placeholders, args=(context,), axis=1)
     df = df[['شماره تماس','result']]
     df = df.to_dict('records')

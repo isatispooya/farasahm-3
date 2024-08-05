@@ -116,43 +116,6 @@ def symbol_nobours (data) :
 
 
 
-
-# بیمه 
-def fillter_insurance (config) :
-    if not config['enabled'] :
-        return pd.DataFrame()
-    
-    if not config['accounting']['code'] :
-        code = '03'
-    else:
-        code = config['accounting']['code']
-
-    df = requests.post('https://bpis.fidip.ir/coustomer/balance/api', data=json.dumps({"key":"farasahm","code":code}),headers={'Content-Type': 'application/json'})
-    if df.status_code!=200:
-
-        return pd.DataFrame()
-    df = json.loads(df.content)['df']
-    if len(df)==0:
-        return pd.DataFrame()
-    df = pd.DataFrame(df)
-    df = df[['Mobile','Name','balanceAdjust']]
-    df['balanceAdjust'] = df['balanceAdjust']*-1
-
-    if config['accounting']['from'] :
-        frm = int(config['accounting']['from'])
-    else:
-        frm = df['balanceAdjust'].min()
-    if config['accounting']['to'] :
-        to = int(config['accounting']['to'])
-    else:
-        to = df['balanceAdjust'].max()
-    df = df[df['balanceAdjust']>=frm]
-    df = df[df['balanceAdjust']<=to]
-    return df
-
-
-
-
 # غیر بورسی
 def fillter_registernobours (config ) :
     if not config['enabled'] : 
@@ -164,17 +127,11 @@ def fillter_registernobours (config ) :
     df = pd.DataFrame(df)
     df = df.groupby(by='symbol').apply(filter_date_symbol)
 
-
-
     if len (config ['city']) >0 :
         df = df [df['صادره'].isin(config['city'])]
 
-
-
-
     if len (config['national_id']) >0 :
         df = df[df['کد ملی'].apply(lambda x:national_id(x, config['national_id']))]       
-
 
     df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
     df['شماره تماس'] = df['شماره تماس'].fillna("0")
@@ -186,14 +143,13 @@ def fillter_registernobours (config ) :
                 df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
     except:
         pass
-    
 
+    if len(df) ==0 :
+        return df
+    
     if config ['name'] :
         df['نام و نام خانوادگی'] = df['نام و نام خانوادگی'].fillna(0)
         df = df[df['نام و نام خانوادگی'].apply(lambda x :name(x,config['name']))]
-
-
-        
 
     if config['birthday']['from'] :
         from_date = JalaliDate.fromtimestamp(int(config['birthday']['from']/1000))
@@ -220,7 +176,6 @@ def fillter_registernobours (config ) :
         df['تعداد سهام'] = df['تعداد سهام'].astype(int)    
         to_amount = int(config['amount']['to'])
         df = df[df['تعداد سهام'] <= to_amount]
-
 
     try:
 
@@ -256,6 +211,44 @@ def fillter_registernobours (config ) :
 
 
 
+
+
+# بیمه 
+def fillter_insurance (config) :
+    if not config['enabled'] :
+        return pd.DataFrame()
+    
+    if not config['accounting']['code'] :
+        code = '03'
+    else:
+        code = config['accounting']['code']
+
+    df = requests.post('https://bpis.fidip.ir/coustomer/balance/api', data=json.dumps({"key":"farasahm","code":code}),headers={'Content-Type': 'application/json'})
+    if df.status_code!=200:
+
+        return pd.DataFrame()
+    df = json.loads(df.content)['df']
+    if len(df)==0:
+        return pd.DataFrame()
+    df = pd.DataFrame(df)
+    df = df[['Mobile','Name','balanceAdjust']]
+    df['balanceAdjust'] = df['balanceAdjust']*-1
+
+    if config['accounting']['from'] :
+        frm = int(config['accounting']['from'])
+    else:
+        frm = df['balanceAdjust'].min()
+    if config['accounting']['to'] :
+        to = int(config['accounting']['to'])
+    else:
+        to = df['balanceAdjust'].max()
+    df = df[df['balanceAdjust']>=frm]
+    df = df[df['balanceAdjust']<=to]
+    df = df.rename(columns = {'Mobile' :'شماره تماس' , 'Name' : 'نام و نام خانوادگی' , 'balanceAdjust' :'مانده تعدیلی'})
+
+    return df
+
+
 def column_marketing (data) :
     access = data['access'][0]
     symbol = data['access'][1]
@@ -268,19 +261,17 @@ def column_marketing (data) :
         return json.dumps({'reply': False, 'msg': 'یافت نشد'})
     config  = column['config']
     registernobours = fillter_registernobours(config['nobours'])
-
-    for i in registernobours.columns : 
+    insurance = fillter_insurance(config['insurance'])
+    df = pd.concat([registernobours,insurance])
+    for i in df.columns : 
         if i in ['index', '_id' , 'date'] :
-            registernobours = registernobours.drop(columns=i)
-
-
-    registernobours_column = ["{{" + str(x) + "}}" for x in registernobours.columns]
-
-    df = pd.DataFrame(registernobours)
+            df = df.drop(columns=i)
+    df_column = ["{{" + str(x) + "}}" for x in df.columns]
+    df = pd.DataFrame(df)
     len_df = len(df)
     dict_df = df.to_dict('records')
 
-    return json.dumps({'reply' : True , 'columns' : registernobours_column , 'dic' : dict_df , 'len' :len_df })
+    return json.dumps({'reply' : True , 'columns' : df_column , 'dic' : dict_df , 'len' :len_df })
 
 
 
@@ -305,17 +296,18 @@ def perViewContent(data):
     title = column['title']
 
     df_registernobours = fillter_registernobours(config['nobours'])
-    len_registernobours  = len(df_registernobours)
-    registernobours = fillter_registernobours(config['nobours'])
-    registernobours = registernobours.head(n=2)
-
+    df_insurance = fillter_insurance(config['insurance'])
+    df = pd.concat([df_registernobours,df_insurance])
+    len_df  = len(df)
+    # registernobours = fillter_registernobours(config['nobours'])
+    all_fillter = df.head(n=2)
     context = data['context']
-    registernobours['result'] = registernobours.apply(replace_placeholders, args=(context,), axis=1)
-    if '_id' in registernobours.columns:
-        registernobours['_id'] = registernobours['_id'].astype(str)
+    all_fillter['result'] = all_fillter.apply(replace_placeholders, args=(context,), axis=1)
+    if '_id' in all_fillter.columns:
+        all_fillter['_id'] = all_fillter['_id'].astype(str)
 
-    dict_registernobours = registernobours.to_dict('records')
-    return json.dumps({'dict': dict_registernobours , 'config' :config  ,'title' : title, 'len' : len_registernobours})
+    dict_all_fillter = all_fillter.to_dict('records')
+    return json.dumps({'dict': dict_all_fillter , 'config' :config  ,'title' : title, 'len' : len_df})
 
 
 def send_message(data):
@@ -343,8 +335,9 @@ def marketing_list (data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
 
-    marketing_list = farasahmDb ['marketing_config'].find({'user':access} , {'_id':1 ,'title' : 1})
-    marketing_list = [{'_id' : str(x['_id']),'title' : x['title'] } for x in marketing_list]
+    marketing_list = farasahmDb ['marketing_config'].find({'user':access} , {'_id':1 ,'title' : 1, 'status':1 , 'date' :1})
+    
+    marketing_list = [{'_id' : str(x['_id']),'title' : x['title'] , 'status' : x['status'] ,'date': JalaliDate(x['date']).strftime('%Y/%m/%d')} for x in marketing_list]
     return json.dumps (marketing_list)
 
 
@@ -378,16 +371,18 @@ def fillter (data) :
     if avalibale:
         return json.dumps({"reply" : False , "msg" : 'تنظیمات تکراری است'} )
     df_registernobours = fillter_registernobours(config['nobours'])
+
     df_insurance = fillter_insurance(config['insurance'])
 
     df = pd.concat([df_registernobours,df_insurance])
     df = df.fillna('')
-
     len_df  = len(df)
     df = df.to_dict('records')
     date = datetime.now()
-    # farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
-    return json.dumps({"reply" : True , "df" : df , "len" : len_df } )
+    farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
+    id = farasahmDb['marketing_config'].find_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':'' },{'_id':1})['_id']
+    id = str(id)
+    return json.dumps({"reply" : True , "df" : df , "len" : len_df ,'id' :id} )
 
 
 
@@ -426,10 +421,12 @@ def edit_config(data):
             return json.dumps({"reply": False, "msg": 'خطا در به‌روزرسانی تنظیمات'})
 
         df_registernobours = fillter_registernobours(config['nobours'])
-        len_registernobours = len(df_registernobours)
-        df_registernobours = df_registernobours.to_dict('records')
+        df_insurance = fillter_insurance(config['insurance'])
+        df = pd.concat([df_registernobours,df_insurance])
+        len_df = len(df)
+        df = df.to_dict('records')
         
-        return json.dumps({"reply": True, "df": df_registernobours, "len": len_registernobours})
+        return json.dumps({"reply": True, "df": df, "len": len_df})
     
     except KeyError as e:
         return json.dumps({'reply': False, 'msg': f"کلید {str(e)} در داده‌های ورودی یافت نشد"})
