@@ -936,6 +936,19 @@ def send_message () :
     return marketing.send_message (data)
 
 
+@app.route('/marketing/insuring_item', methods = ['POST'])
+def insuring_item () :
+    data = request.get_json()
+    return marketing.insuring_item (data)
+
+
+
+@app.route('/marketing/Insurance_field', methods = ['POST'])
+def Insurance_field () :
+    data = request.get_json()
+    return marketing.Insurance_field (data)
+
+
 @app.route('/fixincom/compareprice',methods = ['POST', 'GET'])
 def fixincom_compareprice():
     data = request.get_json()

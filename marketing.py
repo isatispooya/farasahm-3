@@ -7,6 +7,9 @@ from datetime import datetime
 from Login import SendSms
 import requests
 
+
+
+
 def clean_list(data):
     cleaned_data = []
     for i in data:
@@ -116,6 +119,10 @@ def symbol_nobours (data) :
 
 
 
+
+
+
+
 # غیر بورسی
 def fillter_registernobours (config ) :
     if not config['enabled'] : 
@@ -210,6 +217,50 @@ def fillter_registernobours (config ) :
     return df
 
 
+def get_data_customer ():
+    response = requests.post('https://bpis.fidip.ir/report/issuing/api', data=json.dumps({"key":"farasahm"}),headers={'Content-Type': 'application/json'})
+    if response.status_code != 200:
+        return pd.DataFrame()
+    df = response.content
+    df = json.loads(df)
+    df = pd.DataFrame(df['dict_df'])
+    return df
+
+
+
+def insuring_item(data):
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = get_data_customer()
+    if 'مورد بیمه' in df.columns:
+        df_list = df['مورد بیمه'].fillna('')
+        df_list = list(set(df_list))   
+        df_list = [i for i in df_list if i]  
+    
+        return   df_list
+    else:
+        return "مورد بیمه یافت نشد"
+
+
+def Insurance_field(data):
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = get_data_customer()
+    if 'رشته' in df.columns:
+        df_list = df['رشته'].fillna('')
+        df_list = df['رشته'].tolist()
+        df_list = [item.strip() for item in df_list]
+        df_list = list(set(df_list))   
+        df_list = [i for i in df_list if i]  
+        return   df_list
+    else:
+        return "رشته بیمه یافت نشد"
 
 
 
