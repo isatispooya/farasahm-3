@@ -930,6 +930,21 @@ def perviewcontext () :
     data = request.get_json()
     return marketing.perViewContent (data)
 
+
+
+@app.route('/marketing/editcontext', methods = ['POST'])
+def edit_context () :
+    data = request.get_json()
+    return marketing.edit_context (data)
+
+
+
+@app.route('/marketing/viewconfig', methods = ['POST'])
+def ViewConfig () :
+    data = request.get_json()
+    return marketing.ViewConfig (data)
+
+
 @app.route('/marketing/sendsms', methods = ['POST'])
 def send_message () :
     data = request.get_json()

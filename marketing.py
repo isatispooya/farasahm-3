@@ -6,7 +6,7 @@ from persiantools.jdatetime import JalaliDate
 from datetime import datetime
 from Login import SendSms
 import requests
-
+import math
 
 
 
@@ -138,16 +138,20 @@ def fillter_registernobours (config ) :
         df = df [df['صادره'].isin(config['city'])]
 
     if len (config['national_id']) >0 :
-        df = df[df['کد ملی'].apply(lambda x:national_id(x, config['national_id']))]       
+        df = df[df['کد ملی'].apply(lambda x:national_id(x, config['national_id']))]   
 
-    df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
-    df['شماره تماس'] = df['شماره تماس'].fillna("0")
+
+    if 'شماره تماس' in df.columns:
+        df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
+        df['شماره تماس'] = df['شماره تماس'].fillna("0")
     try:
         if 'mobile' in config and 'num1' in config['mobile'] and 'num2' in config['mobile']:
             if len(config['mobile']['num1'])>0:
                 df = df[df['شماره تماس'].apply(lambda x: mobilePerfix(x, config['mobile']['num1']))]
+
             if len(config['mobile']['num2'])>0:
                 df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
+
     except:
         pass
 
@@ -216,7 +220,7 @@ def fillter_registernobours (config ) :
     df = df.fillna('')
     return df
 
-
+# issuing & customer of pishkar 
 def get_data_customer ():
     response = requests.post('https://bpis.fidip.ir/report/issuing/api', data=json.dumps({"key":"farasahm"}),headers={'Content-Type': 'application/json'})
     if response.status_code != 200:
@@ -228,6 +232,8 @@ def get_data_customer ():
 
 
 
+
+# get مورد بیمه
 def insuring_item(data):
     access = data['access'][0]
     _id = ObjectId(access)
@@ -245,6 +251,8 @@ def insuring_item(data):
         return "مورد بیمه یافت نشد"
 
 
+
+# get رشته بیمه 
 def Insurance_field(data):
     access = data['access'][0]
     _id = ObjectId(access)
@@ -270,7 +278,7 @@ def fillter_insurance (config) :
         return pd.DataFrame()
     
     if not config['accounting']['code'] :
-        code = '03'
+        return pd.DataFrame()
     else:
         code = config['accounting']['code']
 
@@ -332,9 +340,8 @@ def replace_placeholders(row , context):
 
 
 
-def perViewContent(data):
+def ViewConfig(data):
     access = data['access'][0]
-    symbol = data['access'][1]
     _id = ObjectId(access)
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
@@ -345,20 +352,55 @@ def perViewContent(data):
         return json.dumps({'reply': False, 'msg': 'یافت نشد'})
     config  = column['config']
     title = column['title']
+    return json.dumps({'config' :config  ,'title' : title,})
 
+
+
+
+def perViewContent(data):
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    _id = ObjectId(data['_id'])
+    column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1 , 'title' :1, 'context' :1})
+    if column is None:
+        return json.dumps({'reply': False, 'msg': 'یافت نشد'})
+    config  = column['config']
+    title = column['title']
     df_registernobours = fillter_registernobours(config['nobours'])
     df_insurance = fillter_insurance(config['insurance'])
+
     df = pd.concat([df_registernobours,df_insurance])
     len_df  = len(df)
-    # registernobours = fillter_registernobours(config['nobours'])
-    all_fillter = df.head(n=2)
-    context = data['context']
-    all_fillter['result'] = all_fillter.apply(replace_placeholders, args=(context,), axis=1)
-    if '_id' in all_fillter.columns:
-        all_fillter['_id'] = all_fillter['_id'].astype(str)
 
-    dict_all_fillter = all_fillter.to_dict('records')
-    return json.dumps({'dict': dict_all_fillter , 'config' :config  ,'title' : title, 'len' : len_df})
+    # registernobours = fillter_registernobours(config['nobours'])
+
+
+    df['result'] = df.apply(replace_placeholders, args=(column['context'],), axis=1)
+    df['count_sms'] = [len(x)/70 for x in df['result']]
+    df['count_sms'] = df['count_sms'].apply(math.ceil)
+    count_sms = df['count_sms'].sum()
+    count_sms = int(count_sms)
+    if count_sms>0:
+        cost = [int(count_sms*78),'الی', int(count_sms*150)]
+    else:
+        cost = [0, 0]
+
+    df = df.drop(columns=['count_sms'])
+    context = column['context']
+    # df = df.head(n=2)
+    if '_id' in df.columns:
+        df['_id'] = df['_id'].astype(str)
+    if 'index' in df.columns:
+        df = df.drop(columns=['index'])
+    df = df.fillna('')
+    column = df.columns
+    column = list(column)
+    df = df.to_dict('records')
+    return json.dumps({'dict': df , 'config' :config  ,'title' : title, 'len' : len_df, 'count_sms':count_sms, 'cost':cost ,"column" :column , 'context' :context })
 
 
 def send_message(data):
@@ -374,6 +416,7 @@ def send_message(data):
     context = data['context']
     column  = farasahmDb ['marketing_config'].update_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'$set':{'status':True, 'context':context}})
     return json.dumps({'reply' : True})
+
 
 
 
@@ -421,21 +464,43 @@ def fillter (data) :
     avalibale = farasahmDb['marketing_config'].find_one({"user" :access,"config":config})
     if avalibale:
         return json.dumps({"reply" : False , "msg" : 'تنظیمات تکراری است'} )
-    df_registernobours = fillter_registernobours(config['nobours'])
-
-    df_insurance = fillter_insurance(config['insurance'])
-
-    df = pd.concat([df_registernobours,df_insurance])
-    df = df.fillna('')
-    len_df  = len(df)
-    df = df.to_dict('records')
+    # df_registernobours = fillter_registernobours(config['nobours'])
+    # df_insurance = fillter_insurance(config['insurance'])
+    # df = pd.concat([df_registernobours,df_insurance])
+    # df = df.fillna('')
+    # len_df  = len(df)
+    # df = df.to_dict('records')
     date = datetime.now()
     farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
     id = farasahmDb['marketing_config'].find_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':'' },{'_id':1})['_id']
     id = str(id)
-    return json.dumps({"reply" : True , "df" : df , "len" : len_df ,'id' :id} )
+    return json.dumps({"reply" : True , "df" : "df" , "len" : "len_df" ,'id' :id} )
 
 
+def edit_context (data) :
+
+    access = data['access'][0]
+    symbol = data['access'][1]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id': _id}, {'_id': 0})
+    if acc is None:
+        return json.dumps({'reply': False, 'msg': 'کاربر یافت نشد لطفا مجددا وارد شوید'})
+
+    context = data.get('context')
+    id = ObjectId(data['_id'])
+
+    if  not id or context is None :
+        return json.dumps({'reply': False, 'msg': 'داده‌های ورودی ناقص است'})
+    
+    update_result = farasahmDb['marketing_config'].update_one(
+        {"user": access, "_id": id},
+        {"$set": {"context": context}}
+    )
+    
+    if update_result.matched_count == 0:
+        return json.dumps({"reply": False, "msg": 'خطا در به‌روزرسانی تنظیمات'})
+    return json.dumps ({'reply' :True , 'context' : context})
+    
 
 
 
@@ -471,13 +536,14 @@ def edit_config(data):
         if update_result.matched_count == 0:
             return json.dumps({"reply": False, "msg": 'خطا در به‌روزرسانی تنظیمات'})
 
-        df_registernobours = fillter_registernobours(config['nobours'])
-        df_insurance = fillter_insurance(config['insurance'])
-        df = pd.concat([df_registernobours,df_insurance])
-        len_df = len(df)
-        df = df.to_dict('records')
+        # df_registernobours = fillter_registernobours(config['nobours'])
+        # df_insurance = fillter_insurance(config['insurance'])
+        # df = pd.concat([df_registernobours,df_insurance])
+        # df = df.fillna('')
+        # len_df = len(df)
+        # df = df.to_dict('records')
         
-        return json.dumps({"reply": True, "df": df, "len": len_df})
+        return json.dumps({"reply": True, "df": "df", "len": "len_df"})
     
     except KeyError as e:
         return json.dumps({'reply': False, 'msg': f"کلید {str(e)} در داده‌های ورودی یافت نشد"})
