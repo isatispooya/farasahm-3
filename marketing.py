@@ -44,8 +44,10 @@ def mobileMidle(mobile_number, num2 ):
 
 
 def name (name,abbreviation) :
-    if abbreviation in name :
-        return True
+    for i in abbreviation :
+
+        if i in name :
+            return True
     return False
 
 
@@ -378,7 +380,7 @@ def perViewContent(data):
 
     # registernobours = fillter_registernobours(config['nobours'])
 
-
+    df = df.fillna('')
     df['result'] = df.apply(replace_placeholders, args=(column['context'],), axis=1)
     df['count_sms'] = [len(x)/70 for x in df['result']]
     df['count_sms'] = df['count_sms'].apply(math.ceil)
@@ -429,9 +431,9 @@ def marketing_list (data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
 
-    marketing_list = farasahmDb ['marketing_config'].find({'user':access} , {'_id':1 ,'title' : 1, 'status':1 , 'date' :1})
+    marketing_list = farasahmDb ['marketing_config'].find({'user':access} , {'_id':1 ,'title' : 1, 'status':1 , 'date' :1 ,'period' :1})
     
-    marketing_list = [{'_id' : str(x['_id']),'title' : x['title'] , 'status' : x['status'] ,'date': JalaliDate(x['date']).strftime('%Y/%m/%d')} for x in marketing_list]
+    marketing_list = [{'_id' : str(x['_id']),'title' : x['title'] ,'period' : x['period'], 'status' : x['status'] ,'date': JalaliDate(x['date']).strftime('%Y/%m/%d') , 'time': x['date'].strftime('%H:%M:%S')} for x in marketing_list]
     return json.dumps (marketing_list)
 
 
