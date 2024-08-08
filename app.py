@@ -951,10 +951,10 @@ def send_message () :
     return marketing.send_message (data)
 
 
-@app.route('/marketing/insuring_item', methods = ['POST'])
-def insuring_item () :
+@app.route('/marketing/insurance_item', methods = ['POST'])
+def insurance_item () :
     data = request.get_json()
-    return marketing.insuring_item (data)
+    return marketing.insurance_item (data)
 
 
 
@@ -962,6 +962,20 @@ def insuring_item () :
 def Insurance_field () :
     data = request.get_json()
     return marketing.Insurance_field (data)
+
+
+@app.route('/marketing/insurance_companies', methods = ['POST'])
+def insurance_companies () :
+    data = request.get_json()
+    return marketing.insurance_companies (data)
+
+
+
+@app.route('/marketing/insurance_consultant', methods = ['POST'])
+def insurance_consultant () :
+    data = request.get_json()
+    return marketing.insurance_consultant (data)
+
 
 
 @app.route('/fixincom/compareprice',methods = ['POST', 'GET'])

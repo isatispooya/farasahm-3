@@ -1,4 +1,4 @@
-from setting import farasahmDb
+from setting import farasahmDb , pishkarDb
 import pandas as pd
 from bson import ObjectId
 import json
@@ -50,6 +50,11 @@ def name (name,abbreviation) :
             return True
     return False
 
+def comp(company , comp):
+    for i in comp :
+        if i == company :
+            return True
+    return False
 
 
 def filter_date_symbol(df):
@@ -118,10 +123,6 @@ def symbol_nobours (data) :
     symbol_list = farasahmDb ['companyList'].find({'type' :'NoBourse'},{'_id':0 ,'symbol' : 1 , 'fullname' :1})
     symbol_list = [x for x in symbol_list]
     return json.dumps(symbol_list)
-
-
-
-
 
 
 
@@ -222,35 +223,18 @@ def fillter_registernobours (config ) :
     df = df.fillna('')
     return df
 
-# issuing & customer of pishkar 
-def get_data_customer ():
-    response = requests.post('https://bpis.fidip.ir/report/issuing/api', data=json.dumps({"key":"farasahm"}),headers={'Content-Type': 'application/json'})
-    if response.status_code != 200:
-        return pd.DataFrame()
-    df = response.content
-    df = json.loads(df)
-    df = pd.DataFrame(df['dict_df'])
-    return df
-
-
 
 
 # get مورد بیمه
-def insuring_item(data):
+def insurance_item(data):
     access = data['access'][0]
     _id = ObjectId(access)
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    df = get_data_customer()
-    if 'مورد بیمه' in df.columns:
-        df_list = df['مورد بیمه'].fillna('')
-        df_list = list(set(df_list))   
-        df_list = [i for i in df_list if i]  
-    
-        return   df_list
-    else:
-        return "مورد بیمه یافت نشد"
+    insuring_item = pishkarDb['Fees'].distinct('مورد بیمه')
+    insuring_item = [i for i in insuring_item if i is not None and not (isinstance(i, float) and math.isnan(i))]
+    return   insuring_item
 
 
 
@@ -261,53 +245,92 @@ def Insurance_field(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    df = get_data_customer()
-    if 'رشته' in df.columns:
-        df_list = df['رشته'].fillna('')
-        df_list = df['رشته'].tolist()
-        df_list = [item.strip() for item in df_list]
-        df_list = list(set(df_list))   
-        df_list = [i for i in df_list if i]  
-        return   df_list
-    else:
-        return "رشته بیمه یافت نشد"
+    Insurance_field = pishkarDb['Fees'].distinct('رشته')
+    Insurance_field = list(set(item.strip() for item in Insurance_field))
+    return   Insurance_field
 
 
+# get شرکت های بیمه گر 
+def insurance_companies (data) :
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    insurance_companies = pishkarDb['AssingIssuing'].distinct('comp')
+    return insurance_companies
+
+
+# get  مشاوران بیمه 
+def insurance_consultant (data) :
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    consultant = pishkarDb['sub'].distinct('name')
+    return consultant
+ 
 
 # بیمه 
 def fillter_insurance (config) :
     if not config['enabled'] :
         return pd.DataFrame()
     
-    if not config['accounting']['code'] :
-        return pd.DataFrame()
-    else:
-        code = config['accounting']['code']
+    df =pishkarDb['customers'].find({},{'_id':0 , 'بيمه گذار' :1 , 'تلفن همراه' :1 , 'کد ملي بيمه گذار':1,'comp':1})
+    df = pd.DataFrame(df)
+    df = df.rename(columns={'بيمه گذار':'نام و نام خانوادگی','کد ملي بيمه گذار':'کد ملی','تلفن همراه':'شماره تماس','comp':'بیمه گر'})
+    df = df[df['نام و نام خانوادگی'].apply(lambda x :name(x,config['name']))]
 
-    df = requests.post('https://bpis.fidip.ir/coustomer/balance/api', data=json.dumps({"key":"farasahm","code":code}),headers={'Content-Type': 'application/json'})
-    if df.status_code!=200:
+    if len(config['company']) >0:
+        df = df[df['بیمه گر']].apply(lambda x:comp (x,config['company']))
 
+    if 'شماره تماس' in df.columns:
+        df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
+        df['شماره تماس'] = df['شماره تماس'].fillna("0")
+    try:
+        if 'mobile' in config and 'num1' in config['mobile'] and 'num2' in config['mobile']:
+            if len(config['mobile']['num1'])>0:
+                df = df[df['شماره تماس'].apply(lambda x: mobilePerfix(x, config['mobile']['num1']))]
+            if len(config['mobile']['num2'])>0:
+                df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
+    except:
+        pass
+
+    if len (config['national_id']) >0 :
+        df = df[df['کد ملی'].apply(lambda x:national_id(x, config['national_id']))]   
+    if len(df)==0 :
         return pd.DataFrame()
-    df = json.loads(df.content)['df']
-    if len(df)==0:
+    
+    if len(config['insurance']['insurance_item']) >0 :
+        df = pishkarDb['Fees'].find({'مورد بیمه':{'$in':config['insurance_item']}})
+    else :
+        df = pishkarDb['Fees'].find({})
         return pd.DataFrame()
     df = pd.DataFrame(df)
-    df = df[['Mobile','Name','balanceAdjust']]
-    df['balanceAdjust'] = df['balanceAdjust']*-1
+    df = df.groupby(by='insurance_item').apply(insurance_item)
 
-    if config['accounting']['from'] :
-        frm = int(config['accounting']['from'])
-    else:
-        frm = df['balanceAdjust'].min()
-    if config['accounting']['to'] :
-        to = int(config['accounting']['to'])
-    else:
-        to = df['balanceAdjust'].max()
-    df = df[df['balanceAdjust']>=frm]
-    df = df[df['balanceAdjust']<=to]
-    df = df.rename(columns = {'Mobile' :'شماره تماس' , 'Name' : 'نام و نام خانوادگی' , 'balanceAdjust' :'مانده تعدیلی'})
+    if len(config['insurance']['insurance_field'])>0 :
+        df = pishkarDb['Fees'].find({'رشته':{'$in':config['Insurance_field']}})
+    else :
+        df  =pishkarDb['Fees'].find({})
+        return pd.DataFrame()
+    df = pd.DataFrame(df)
+    df = df.groupby(by='Insurance_field').apply(Insurance_field)
+
+   
+
+    if len (config['insurance']['consultant']) >0 :
+        df = pishkarDb['sub'].find({'name' :{'$in':config['consultant']}})
+    else :
+        df = pishkarDb['sub'].find({})
+        return pd.DataFrame()
+    df = pd.DataFrame(df)
+    df = df.groupby(by='consultant').apply(insurance_consultant)
 
     return df
+
+
 
 
 def column_marketing (data) :
@@ -431,9 +454,8 @@ def marketing_list (data):
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
 
-    marketing_list = farasahmDb ['marketing_config'].find({'user':access} , {'_id':1 ,'title' : 1, 'status':1 , 'date' :1 ,'period' :1})
-    
-    marketing_list = [{'_id' : str(x['_id']),'title' : x['title'] ,'period' : x['period'], 'status' : x['status'] ,'date': JalaliDate(x['date']).strftime('%Y/%m/%d') , 'time': x['date'].strftime('%H:%M:%S')} for x in marketing_list]
+    marketing_list = farasahmDb ['marketing_config'].find({'user':access} , {'_id':1 ,'title' : 1, 'status':1 , 'date' :1 ,'period' :1 , 'config':1})
+    marketing_list = [{'_id' : str(x['_id']),'title' : x['title'] ,'period': x['config']['period'], 'status' : x['status'] ,'date': JalaliDate(x['date']).strftime('%Y/%m/%d') , 'time': x['date'].strftime('%H:%M:%S')} for x in marketing_list]
     return json.dumps (marketing_list)
 
 
