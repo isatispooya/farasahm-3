@@ -29,7 +29,7 @@ def mobilePerfix(mobile_number, num1 ):
     if isinstance(mobile_number, str):
         if len(mobile_number) >= 7:
             for i in num1 :
-                if isinstance(i, str) and i in mobile_number[1:4]:
+                if str(i) in mobile_number[:4]:
                     return True
     return False
 
@@ -44,6 +44,9 @@ def mobileMidle(mobile_number, num2 ):
 
 
 def name (name,abbreviation) :
+    if not abbreviation:
+        return True
+
     for i in abbreviation :
 
         if i in name :
@@ -142,7 +145,6 @@ def fillter_registernobours (config ) :
 
     if len (config['national_id']) >0 :
         df = df[df['کد ملی'].apply(lambda x:national_id(x, config['national_id']))]   
-
 
     if 'شماره تماس' in df.columns:
         df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
@@ -276,18 +278,19 @@ def insurance_consultant (data) :
 def fillter_insurance (config) :
     if not config['enabled'] :
         return pd.DataFrame()
+
     
     df =pishkarDb['customers'].find({},{'_id':0 , 'بيمه گذار' :1 , 'تلفن همراه' :1 , 'کد ملي بيمه گذار':1,'comp':1})
     df = pd.DataFrame(df)
     df = df.rename(columns={'بيمه گذار':'نام و نام خانوادگی','کد ملي بيمه گذار':'کد ملی','تلفن همراه':'شماره تماس','comp':'بیمه گر'})
     df = df[df['نام و نام خانوادگی'].apply(lambda x :name(x,config['name']))]
-
     if len(config['company']) >0:
-        df = df[df['بیمه گر']].apply(lambda x:comp (x,config['company']))
+        df = df.loc[df['بیمه گر'].apply(lambda x: comp(x, config['company']))]
 
     if 'شماره تماس' in df.columns:
         df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
         df['شماره تماس'] = df['شماره تماس'].fillna("0")
+    
     try:
         if 'mobile' in config and 'num1' in config['mobile'] and 'num2' in config['mobile']:
             if len(config['mobile']['num1'])>0:
@@ -296,38 +299,67 @@ def fillter_insurance (config) :
                 df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
     except:
         pass
-
-    if len (config['national_id']) >0 :
-        df = df[df['کد ملی'].apply(lambda x:national_id(x, config['national_id']))]   
-    if len(df)==0 :
+    if 'national_id' in config and len(config['national_id']) > 0:
+        if 'کد ملی' in df.columns:
+            df = df[df['کد ملی'].apply(lambda x: national_id(x, config['national_id']))]
+        else:
+            return "Error: 'کد ملی' column is missing in the DataFrame"
+    if df.empty:
         return pd.DataFrame()
     
-    if len(config['insurance']['insurance_item']) >0 :
-        df = pishkarDb['Fees'].find({'مورد بیمه':{'$in':config['insurance_item']}})
-    else :
-        df = pishkarDb['Fees'].find({})
+    df = df.dropna(subset=['نام و نام خانوادگی'])
+
+
+
+    if len(config['insurance_item']) > 0:
+        df_fees = pishkarDb['Fees'].find({'مورد بیمه': {'$in': config['insurance_item']}})
+    else:
+        df_fees = pishkarDb['Fees'].find({})
         return pd.DataFrame()
-    df = pd.DataFrame(df)
-    df = df.groupby(by='insurance_item').apply(insurance_item)
 
-    if len(config['insurance']['insurance_field'])>0 :
-        df = pishkarDb['Fees'].find({'رشته':{'$in':config['Insurance_field']}})
+    df_fees = pd.DataFrame(df_fees)
+
+    df_fees = df_fees.rename(columns={'مورد بیمه': 'insurance_item'})
+
+    if 'insurance_item' not in df_fees.columns:
+        return "Error: 'insurance_item' column is missing in df_fees."
+
+    df = pd.merge(df, df_fees, how='inner', left_on='نام و نام خانوادگی', right_on='بيمه گذار')
+
+    if 'insurance_item' not in df.columns:
+        return "Error: 'insurance_item' column is missing after merging."
+
+
+
+    if len(config['insurance_field']) > 0:
+        df = df[df['رشته'].apply(lambda x: x in config['insurance_field'])]
+
+        if df.empty:
+            return pd.DataFrame()
+    df = df[["نام و نام خانوادگی", "کد ملی_x", "بیمه گر","شماره تماس","رشته" ,"insurance_item" ,"شماره بيمه نامه"]]
+    df = df.rename(columns={'insurance_item':'مورد بیمه' , 'کد ملی_x':'کد ملی'})
+
+
+    df_assing = pishkarDb['assing'].find({}, {'consultant': 1, 'شماره بيمه نامه': 1, '_id': 0})
+    df_assing = pd.DataFrame(df_assing)
+
+    df_consultant =  pishkarDb['cunsoltant'].find({},{'_id':0 , 'nationalCode':1 , 'fristName':1 , 'lastName':1})
+    df_consultant = pd.DataFrame(df_consultant)
+    df_consultant['name'] = df_consultant['fristName'] + '' + df_consultant['lastName']
+    dff = pd.merge(df_consultant, df_assing, how='inner', left_on='nationalCode', right_on='consultant')
+    dff = dff[['nationalCode', 'name', 'شماره بيمه نامه']]
+    dff = dff.drop(columns='nationalCode' , axis=1)
+    df = pd.merge(dff , df ,how ='inner' , on ='شماره بيمه نامه' )
+
+
+    if len (config['consultant']) >0 :
+        df_cons= pishkarDb['sub'].find({'name' :{'$in':config['consultant']}})
     else :
-        df  =pishkarDb['Fees'].find({})
+        df_cons = pishkarDb['sub'].find({})
         return pd.DataFrame()
-    df = pd.DataFrame(df)
-    df = df.groupby(by='Insurance_field').apply(Insurance_field)
-
-   
-
-    if len (config['insurance']['consultant']) >0 :
-        df = pishkarDb['sub'].find({'name' :{'$in':config['consultant']}})
-    else :
-        df = pishkarDb['sub'].find({})
-        return pd.DataFrame()
-    df = pd.DataFrame(df)
-    df = df.groupby(by='consultant').apply(insurance_consultant)
-
+    df_cons = pd.DataFrame(df_cons)
+    df = pd.merge(df,df_cons , how ='inner' , on= 'name')
+    print(df)
     return df
 
 
@@ -488,17 +520,18 @@ def fillter (data) :
     avalibale = farasahmDb['marketing_config'].find_one({"user" :access,"config":config})
     if avalibale:
         return json.dumps({"reply" : False , "msg" : 'تنظیمات تکراری است'} )
-    # df_registernobours = fillter_registernobours(config['nobours'])
-    # df_insurance = fillter_insurance(config['insurance'])
-    # df = pd.concat([df_registernobours,df_insurance])
-    # df = df.fillna('')
-    # len_df  = len(df)
-    # df = df.to_dict('records')
+    df_registernobours = fillter_registernobours(config['nobours'])
+    df_insurance = fillter_insurance(config['insurance'])
+    df = pd.concat([df_registernobours,df_insurance])
+    df = df.fillna('')
+    len_df  = len(df)
+    df = df.to_dict('records')
+    
     date = datetime.now()
-    farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
-    id = farasahmDb['marketing_config'].find_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':'' },{'_id':1})['_id']
-    id = str(id)
-    return json.dumps({"reply" : True , "df" : "df" , "len" : "len_df" ,'id' :id} )
+    #farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
+    # id = farasahmDb['marketing_config'].find_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':'' },{'_id':1})['_id']
+    id = 'd'#str(id)
+    return json.dumps({"reply" : True , "df" : df , "len" : len_df ,'id' :id} )
 
 
 def edit_context (data) :
