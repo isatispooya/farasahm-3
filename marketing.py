@@ -129,6 +129,10 @@ def symbol_nobours (data) :
 
 
 
+def replace_placeholders(row , context):
+    return context.replace("{{", "{").replace("}}", "}").format_map(row)
+
+
 # غیر بورسی
 def fillter_registernobours (config ) :
     if not config['enabled'] : 
@@ -338,7 +342,6 @@ def fillter_insurance(config):
     df = df[["نام و نام خانوادگی", "کد ملی_x", "بیمه گر", "شماره تماس", "رشته", "insurance_item", "شماره بيمه نامه"]]
     df = df.rename(columns={'insurance_item': 'مورد بیمه', 'کد ملی_x': 'کد ملی'})
 
-
     df_assing = pishkarDb['assing'].find({}, {'consultant': 1, 'شماره بيمه نامه': 1, '_id': 0})
     df_assing = pd.DataFrame(df_assing)
 
@@ -354,32 +357,26 @@ def fillter_insurance(config):
     if df.empty :
         return pd.DataFrame()
     df = df.drop(columns='شماره بيمه نامه' , axis=1)
-    if len(df) > 100000 :
-        return json.dumps({'message': 'تنظیمات با موفقیت ذخیره شد. به علت حجم بالای داده، قابل نمایش نیست.'})
-
-    print(df)
     return df
 
 
-
+# آپدیت status
 def set_status (data) :
     access = data['access'][0]
     _id = ObjectId(access)
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    
     status = farasahmDb['marketing_config'].find_one({'user': access, '_id': ObjectId(data['_id'])}, {'_id': 0, 'status': 1})
 
-    
     if status is None:
         return json.dumps({"reply": False, "msg": 'تنظیمات یافت نشد'})
-
+    
+    new_status  = data.get('new_status')
     update_result = farasahmDb['marketing_config'].update_one(
         {"user": access, "_id": ObjectId(data['_id'])},
-        {"$set": {"status": status['status']}}
+        {"$set": {"status": new_status}}
     )
-
     if update_result.matched_count == 0:
         return json.dumps({"reply": False, "msg": 'خطا در به‌روزرسانی تنظیمات'})
 
@@ -416,10 +413,6 @@ def column_marketing (data) :
 
     return json.dumps({'reply' : True , 'columns' : df_column , 'dic' : dict_df , 'len' :len_df })
 
-
-
-def replace_placeholders(row , context):
-    return context.replace("{{", "{").replace("}}", "}").format_map(row)
 
 
 
@@ -550,6 +543,8 @@ def fillter (data) :
     df_registernobours = fillter_registernobours(config['nobours'])
     df_insurance = fillter_insurance(config['insurance'])
     df = pd.concat([df_registernobours,df_insurance])
+    if len(df) > 100000 :
+        return json.dumps({'reply' : False , 'msg': 'تنظیمات با موفقیت ذخیره شد. به علت حجم بالای داده، قابل نمایش نیست.'})
     df = df.fillna('')
     len_df  = len(df)
     df = df.to_dict('records')
