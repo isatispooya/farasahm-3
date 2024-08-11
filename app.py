@@ -978,6 +978,15 @@ def insurance_consultant () :
 
 
 
+
+
+@app.route('/marketing/set_status', methods = ['POST'])
+def set_status () :
+    data = request.get_json()
+    return marketing.set_status (data)
+
+
+
 @app.route('/fixincom/compareprice',methods = ['POST', 'GET'])
 def fixincom_compareprice():
     data = request.get_json()
