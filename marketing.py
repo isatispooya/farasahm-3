@@ -274,9 +274,14 @@ def insurance_consultant (data) :
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    consultant = pishkarDb['sub'].distinct('name')
-    return consultant
+    consultant = pishkarDb['cunsoltant'].find({},{'_id':0,'fristName':1 , 'lastName':1 , 'nationalCode':1})
+    df = pd.DataFrame(consultant)
+    df['name'] = df['fristName'] + ' ' + df['lastName']
+    df = df.drop(columns=['fristName' , 'lastName'])
+    df = df.to_dict('records')
+    return df
  
+
 
 # بیمه 
 def fillter_insurance(config):
@@ -346,17 +351,30 @@ def fillter_insurance(config):
     df_assing = pd.DataFrame(df_assing)
 
     if len(config['consultant']) > 0:
-        df_cons = pd.DataFrame(list(pishkarDb['cunsoltant'].find({}, {'_id': 0, 'nationalCode': 1, 'fristName': 1, 'lastName': 1})))
+        df_cons = pd.DataFrame(list(pishkarDb['cunsoltant'].find({}, {'_id': 0, 'nationalCode': 1})))
     else:
         df_cons = pd.DataFrame(list(pishkarDb['cunsoltant'].find({})))
-    df_cons['مشاور'] = df_cons['fristName'] + ' ' + df_cons['lastName']
-    df_cons = pd.merge(df_assing, df_cons, how='inner', left_on='consultant', right_on='nationalCode')
+    df_cons = df_cons.rename(columns={'nationalCode':'مشاور'})
+    df_cons = pd.merge(df_assing, df_cons, how='inner', left_on='consultant', right_on='مشاور')
     df_cons = df_cons[['مشاور', 'شماره بيمه نامه']]
     df = pd.merge(df_cons, df, how='inner', on='شماره بيمه نامه')
-    df  = df[df['مشاور'].apply(lambda x : x in config['consultant'])]
+    df = df.drop(columns='شماره بيمه نامه' , axis=1)
+    df['مشاور'] = df['مشاور'].astype(str)
+    config['consultant'] = [str(x) for x in config['consultant']]
+    df = df[df['مشاور'].isin(config['consultant'])]
+
+    print(df)
     if df.empty :
         return pd.DataFrame()
-    df = df.drop(columns='شماره بيمه نامه' , axis=1)
+
+    # if config['payment']['min'] :
+    #     print(config['insurance']['payment']['min'])
+    #     df_pey = pishkarDb['Fees'].find({},{'_id' :0 ,'کل کارمزد محاسبه شده':1})
+    #     df_pey = pd.DataFrame(df_pey)
+    #     df_pey = df_pey.rename(columns = {'کل کارمزد محاسبه شده' :'کارمزد'})
+    #     print(df_pey)
+
+
     return df
 
 
@@ -543,8 +561,8 @@ def fillter (data) :
     df_registernobours = fillter_registernobours(config['nobours'])
     df_insurance = fillter_insurance(config['insurance'])
     df = pd.concat([df_registernobours,df_insurance])
-    if len(df) > 100000 :
-        return json.dumps({'reply' : False , 'msg': 'تنظیمات با موفقیت ذخیره شد. به علت حجم بالای داده، قابل نمایش نیست.'})
+    # if len(df) > 100000 :
+    #     return json.dumps({'reply' : False , 'msg': 'تنظیمات با موفقیت ذخیره شد. به علت حجم بالای داده، قابل نمایش نیست.'})
     df = df.fillna('')
     len_df  = len(df)
     df = df.to_dict('records')
