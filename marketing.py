@@ -292,20 +292,22 @@ def fillter_insurance(config):
     df = pd.DataFrame(df)
     df = df.rename(columns={'بيمه گذار': 'نام و نام خانوادگی', 'کد ملي بيمه گذار': 'کد ملی', 'تلفن همراه': 'شماره تماس', 'comp': 'بیمه گر'})
     
-    df = df[df['نام و نام خانوادگی'].apply(lambda x: name(x, config['name']))]
+    if 'name' in config and len(config['name']) > 0:
+        df = df[df['نام و نام خانوادگی'].apply(lambda x: name(x, config['name']))]
     
-    if len(config['company']) > 0:
+    if 'company' in config and len(config['company']) > 0:
         df = df.loc[df['بیمه گر'].apply(lambda x: comp(x, config['company']))]
+
 
     if 'شماره تماس' in df.columns:
         df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
         df['شماره تماس'] = df['شماره تماس'].fillna("0")
 
     try:
-        if 'mobile' in config and 'num1' in config['mobile'] and 'num2' in config['mobile']:
-            if len(config['mobile']['num1']) > 0:
+        if 'mobile' in config:
+            if 'num1' in config['mobile'] and  len(config['mobile']['num1']) > 0 :
                 df = df[df['شماره تماس'].apply(lambda x: mobilePerfix(x, config['mobile']['num1']))]
-            if len(config['mobile']['num2']) > 0:
+            if 'num2' in config['mobile'] and  len(config['mobile']['num2']) > 0:
                 df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
     except Exception as e:
         print(f"Error processing mobile filtering: {e}")
@@ -316,9 +318,10 @@ def fillter_insurance(config):
         else:
             print("Warning: 'کد ملی' column is missing in the DataFrame")
     
-    if df.empty:
-        print("No matching customers found.")
-        return pd.DataFrame()
+    # if df.empty:
+    #     print("No matching customers found.")
+    #     return pd.DataFrame()
+
     
     df = df.dropna(subset=['نام و نام خانوادگی'])
 
@@ -329,50 +332,82 @@ def fillter_insurance(config):
 
     df_fees = pd.DataFrame(df_fees)
     df_fees = df_fees.rename(columns={'مورد بیمه': 'insurance_item'})
-
-    if 'insurance_item' not in df_fees.columns:
-        return "Error: 'insurance_item' column is missing in df_fees."
+    
+    for i in ['ردیف', 'تاریخ ثبت محاسبه', 'تا تاریخ محاسبه', 'نمایندگی', 'نوع نمایندگی', 'کد اقتصادی', 'کد ملی', 'واحد صدور', 'کد کاربر', 'شماره ثبت', 'شناسه ملی',
+        'کل کارمزد تشویقی محاسبه شده', 'کارمزد تشویقی قابل پرداخت', 'کارمزد تشویقی پرداخت شده در محاسبه های قبل', 'هزينه صدور پرداخت شده در محاسبه هاي قبل',
+        'کل هزینه صدور محاسبه شده', 'کل هزینه صدور تعدیلی محاسبه شده', 'هزینه صدور تعدیلی پرداخت شده در محاسبه های قبل', 'هزینه صدورتعدیلی پرداخت شده',
+        'کل کارمزد تعدیلی محاسبه شده', ' كارمزد تعديلي پرداخت شده در محاسبه هاي قبل', 'كارمزد تعديلي قابل پرداخت', 'هزينه صدور قابل پرداخت', 'کل مبلغ وصول شده',
+        'شرح', 'كارمزد پرداخت شده در محاسبه هاي قبل', 'کل کارمزد محاسبه شده', 'ماليات', 'ماليات ارزش افزوده', 'عوارض ارزش افزوده',
+        'username','_id','بازارياب الحاقيه آخر','کسورات تامین اجتماعی',':شماره ثبت',':شناسه ملی','بازاریاب الحاقیه آخر']:
+        if i in df_fees.columns:
+            df_fees = df_fees.drop(columns=[i])
 
     df = pd.merge(df, df_fees, how='inner', left_on='نام و نام خانوادگی', right_on='بيمه گذار')
 
     if 'insurance_item' not in df.columns:
         return "Error: 'insurance_item' column is missing after merging."
 
-    if len(config['insurance_field']) > 0:
+    if 'insurance_field' in config and len(config['insurance_field']) > 0:
         df = df[df['رشته'].apply(lambda x: x in config['insurance_field'])]
         if df.empty:
             print("No matching insurance fields found.")
             return pd.DataFrame()
     
-    df = df[["نام و نام خانوادگی", "کد ملی_x", "بیمه گر", "شماره تماس", "رشته", "insurance_item", "شماره بيمه نامه"]]
-    df = df.rename(columns={'insurance_item': 'مورد بیمه', 'کد ملی_x': 'کد ملی'})
 
-    df_assing = pishkarDb['assing'].find({}, {'consultant': 1, 'شماره بيمه نامه': 1, '_id': 0})
-    df_assing = pd.DataFrame(df_assing)
 
-    if len(config['consultant']) > 0:
-        df_cons = pd.DataFrame(list(pishkarDb['cunsoltant'].find({}, {'_id': 0, 'nationalCode': 1})))
-    else:
-        df_cons = pd.DataFrame(list(pishkarDb['cunsoltant'].find({})))
-    df_cons = df_cons.rename(columns={'nationalCode':'مشاور'})
-    df_cons = pd.merge(df_assing, df_cons, how='inner', left_on='consultant', right_on='مشاور')
-    df_cons = df_cons[['مشاور', 'شماره بيمه نامه']]
-    df = pd.merge(df_cons, df, how='inner', on='شماره بيمه نامه')
-    df = df.drop(columns='شماره بيمه نامه' , axis=1)
-    df['مشاور'] = df['مشاور'].astype(str)
-    config['consultant'] = [str(x) for x in config['consultant']]
-    df = df[df['مشاور'].isin(config['consultant'])]
+    if config['fee']:
+        if config['fee']['min'] or config['fee']['max']:
+            fee_costomer = df[['کد ملی','شماره بيمه نامه','كارمزد قابل پرداخت','UploadDate']]
+            fee_costomer = fee_costomer.drop_duplicates(subset=['شماره بيمه نامه','كارمزد قابل پرداخت','UploadDate'])
+            fee_costomer = fee_costomer[['کد ملی','كارمزد قابل پرداخت']]
+            fee_costomer = fee_costomer.groupby(by='کد ملی').sum()
+            df = df.drop(columns='كارمزد قابل پرداخت')
+            df = df.set_index('کد ملی').join(fee_costomer,how='right')
+            if config['fee']['min']:
+                df = df[df['كارمزد قابل پرداخت']>config['fee']['min']]
+            if config['fee']['max']:
+                df = df[df['كارمزد قابل پرداخت']<config['fee']['max']]
+            df = df.reset_index()
 
+
+    if config['payment']:
+        if config['payment']['min'] or config['payment']['max']:
+            fee_payment = df[['کد ملی','شماره بيمه نامه','مبلغ تسويه شده ','UploadDate']]
+            fee_payment = fee_payment.drop_duplicates(subset=['شماره بيمه نامه','مبلغ تسويه شده ','UploadDate'])
+            fee_payment = fee_payment[['کد ملی','مبلغ تسويه شده ']]
+            fee_payment = fee_payment.groupby(by='کد ملی').max()
+            df = df.drop(columns='مبلغ تسويه شده ')
+            df = df.set_index('کد ملی').join(fee_payment,how='right')
+            if config['payment']['min']:
+                df = df[df['مبلغ تسويه شده ']>config['payment']['min']]
+            if config['payment']['max']:
+                df = df[df['مبلغ تسويه شده ']<config['payment']['max']]
+            df = df.reset_index()
+
+
+    df = df[["نام و نام خانوادگی", "کد ملی", "بیمه گر", "شماره تماس", "رشته", "insurance_item", "شماره بيمه نامه",'كارمزد قابل پرداخت','مبلغ تسويه شده ']]
+    df = df.rename(columns={'insurance_item': 'مورد بیمه','كارمزد قابل پرداخت':'کارمزد','مبلغ تسويه شده ':'حق بیمه'})
+
+    if len(config['consultant']):
+        df_assing = pishkarDb['assing'].find({}, {'consultant': 1, 'شماره بيمه نامه': 1, '_id': 0})
+        df_assing = pd.DataFrame(df_assing)
+        df_cons = pd.DataFrame(list(pishkarDb['cunsoltant'].find({},{'fristName','lastName','nationalCode'})))
+        df_cons = pd.merge(df_assing, df_cons, how='inner', left_on='consultant', right_on='nationalCode')
+        df_cons['fullname_consultant'] = df_cons['fristName'].fillna('') + ' ' + df_cons['fristName'].fillna('')
+        df_cons = df_cons[['شماره بيمه نامه','consultant','fullname_consultant']]
+
+        df = pd.merge(df_cons, df, how='inner', on='شماره بيمه نامه')
+        df = df.drop(columns='شماره بيمه نامه' , axis=1)
+        config['consultant'] = [str(x) for x in config['consultant']]
+        df = df[df['consultant'].isin(config['consultant'])]
+        if df_cons.empty :
+            return pd.DataFrame()
+        df = df.drop(columns=['consultant'])
+    
+    df = df.drop_duplicates()
+    df = df.fillna('')
     print(df)
-    if df.empty :
-        return pd.DataFrame()
 
-    # if config['payment']['min'] :
-    #     print(config['insurance']['payment']['min'])
-    #     df_pey = pishkarDb['Fees'].find({},{'_id' :0 ,'کل کارمزد محاسبه شده':1})
-    #     df_pey = pd.DataFrame(df_pey)
-    #     df_pey = df_pey.rename(columns = {'کل کارمزد محاسبه شده' :'کارمزد'})
-    #     print(df_pey)
 
 
     return df
@@ -561,8 +596,8 @@ def fillter (data) :
     df_registernobours = fillter_registernobours(config['nobours'])
     df_insurance = fillter_insurance(config['insurance'])
     df = pd.concat([df_registernobours,df_insurance])
-    # if len(df) > 100000 :
-    #     return json.dumps({'reply' : False , 'msg': 'تنظیمات با موفقیت ذخیره شد. به علت حجم بالای داده، قابل نمایش نیست.'})
+    if len(df) > 100000 :
+        return json.dumps({'reply' : False , 'msg': 'تنظیمات با موفقیت ذخیره شد. به علت حجم بالای داده، قابل نمایش نیست.'})
     df = df.fillna('')
     len_df  = len(df)
     df = df.to_dict('records')
@@ -668,3 +703,4 @@ def delete_config(data):
         return json.dumps({"reply": True, "msg": "تنظیمات با موفقیت حذف شد"})
     else:
         return json.dumps({"reply": False, "msg": "تنظیمات یافت نشد یا قبلاً حذف شده است"})
+    
