@@ -446,7 +446,6 @@ def fillter_insurance(config):
     
     df = df.drop_duplicates()
     df = df.fillna('')
-    print(df)
     return df
 
 
@@ -642,11 +641,11 @@ def fillter (data) :
     if len(df) > 100000 :
         return json.dumps({'reply' : False , 'msg': 'تنظیمات با موفقیت ذخیره شد. به علت حجم بالای داده، قابل نمایش نیست.'})
     df = df.fillna('')
-    # if data ['config']['duplicate'] :
-    #     for i in data['config']['duplicate']:
-    #         if i in df.columns :
-    #             df  = df.drop_duplicates(subset=[i])
-
+    duplicate = [str(x).replace("{{","").replace("}}","") for x in data ['config']['duplicate']]
+    if duplicate :
+        for i in duplicate:
+            if i in df.columns :
+                df  = df.drop_duplicates(subset=[i])
     len_df  = len(df)
     df = df.to_dict('records')
 
