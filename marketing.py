@@ -511,11 +511,11 @@ def bours_trade_symbol (data) :
 def fillter_bours (config) :
     if not config['enabled'] : 
         return pd.DataFrame()
-    df = farasahmDb['customerofbroker'].find({},{'_id':0,'BirthDate':1, 'FirstName':1 , 'LastName':1,'Mobile':1,'NationalCode':1,'Sex':1,'AddressCity':1,'BrokerBranch':1 })
+    df = farasahmDb['customerofbroker'].find({},{'_id':0,'BirthDate':1, 'FirstName':1 , 'LastName':1,'Mobile':1,'NationalCode':1,'Sex':1,'AddressCity':1,'BrokerBranch':1 , 'PAMCode' :1 })
     df = pd.DataFrame(df)
     df['Name'] = df['FirstName'] + ' ' + df['LastName']
     df = df.drop(columns=['FirstName','LastName'])
-    df = df.rename(columns = {'AddressCity':'شهر','BirthDate':'تاریخ تولد','BrokerBranch':'شعبه','Mobile':'شماره تماس','NationalCode':'کد ملی','Sex':'جنسیت','Name':'نام و نام خانوادگی'})
+    df = df.rename(columns = {'AddressCity':'شهر','BirthDate':'تاریخ تولد','BrokerBranch':'شعبه','Mobile':'شماره تماس','NationalCode':'کد ملی','Sex':'جنسیت','Name':'نام و نام خانوادگی' , 'PAMCode' :'کد معاملاتی'})
     if 'name' in config and len(config['name']) > 0:
         df = df[df['نام و نام خانوادگی'].apply(lambda x: name(x, config['name']))]
 
@@ -544,7 +544,7 @@ def fillter_bours (config) :
         from_date = timestamp_to_gregorian(int(config['birthday']['from']))
         from_date_jalali = gregorian_to_jalali(from_date)
         
-        if from_date_jalali:  # بررسی کنید که مقدار None نیست
+        if from_date_jalali:  
             df['تاریخ تولد'] = df['تاریخ تولد'].fillna('')
             df['تاریخ تولد میلادی'] = df['تاریخ تولد'].apply(lambda x: x.split('T')[0] if 'T' in x else x)
             df['تاریخ تولد جلالی'] = df['تاریخ تولد میلادی'].apply(gregorian_to_jalali)
@@ -554,14 +554,39 @@ def fillter_bours (config) :
         to_date = timestamp_to_gregorian(int(config['birthday']['to']))
         to_date_jalali = gregorian_to_jalali(to_date)
         
-        if to_date_jalali:  # بررسی کنید که مقدار None نیست
+        if to_date_jalali:  
             df['تاریخ تولد'] = df['تاریخ تولد'].fillna('')
             df['تاریخ تولد میلادی'] = df['تاریخ تولد'].apply(lambda x: x.split('T')[0] if 'T' in x else x)
             df['تاریخ تولد جلالی'] = df['تاریخ تولد میلادی'].apply(gregorian_to_jalali)
             df = df[df['تاریخ تولد جلالی'] <= to_date_jalali]
 
-    df = df.drop(columns=['تاریخ تولد میلادی' , 'تاریخ تولد'])
+    df = df.drop(columns=['تاریخ تولد میلادی' , 'تاریخ تولد'], errors='ignore')
     df = df.rename(columns={'تاریخ تولد جلالی' :'تاریخ تولد'})
+
+    if 'branch' in config and len(config['branch']) > 0:
+        df = df[df['شعبه'].apply(lambda x: x in config['branch'])]
+        if df.empty:
+            print("No matching branch found.")
+            return pd.DataFrame()
+        
+    if 'city' in config and len(config['city']) > 0:
+        df = df[df['شهر'].apply(lambda x: x in config['city'])]
+        if df.empty:
+            print("No matching city found.")
+            return pd.DataFrame()
+        
+    # if 'gender' in config:
+    #     df = df[df['جنسیت'] == config['gender']]
+    #     if df.empty:
+    #         print("No matching gender found.")
+    #         return pd.DataFrame()
+        
+    customer_remain = farasahmDb['CustomerRemain'].find({},{'_id' :0,'TradeCode':1,'CurrentRemain':1,'Credit':1,'AdjustedRemain':1})
+    df_remain = pd.DataFrame(customer_remain)
+    df_remain = df_remain.rename(columns={'TradeCode':'کد معاملاتی','CurrentRemain':'مانده','Credit':'مانده اعتباری','AdjustedRemain':'مانده تعلیلی'})
+    df = pd.merge(df, df_remain, how='inner', left_on='کد معاملاتی', right_on='کد معاملاتی')
+
+ 
     print(df)
     print(len(df))
     return df
@@ -769,9 +794,9 @@ def fillter (data) :
 
     
     date = datetime.now()
-    farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
-    id = farasahmDb['marketing_config'].find_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':'' },{'_id':1})['_id']
-    id = str(id)
+    # farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
+    # id = farasahmDb['marketing_config'].find_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':'' },{'_id':1})['_id']
+    id = 1#str(id)
     return json.dumps({"reply" : True , "df" : df , "len" : len_df ,'id' :id} )
 
 
