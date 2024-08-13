@@ -7,6 +7,8 @@ from datetime import datetime
 from Login import SendSms
 import requests
 import math
+from persiantools.jdatetime import JalaliDateTime
+
 
 
 
@@ -335,11 +337,6 @@ def fillter_insurance(config):
         else:
             print("Warning: 'کد ملی' column is missing in the DataFrame")
     
-    # if df.empty:
-    #     print("No matching customers found.")
-    #     return pd.DataFrame()
-
-    
     df = df.dropna(subset=['نام و نام خانوادگی'])
 
     if len(config['insurance_item']) > 0:
@@ -448,6 +445,126 @@ def fillter_insurance(config):
     df = df.fillna('')
     return df
 
+
+# به میلادی timestamp تبدیبل  
+def timestamp_to_gregorian(timestamp):
+    return datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%dT%H:%M:%S')
+
+# تبدیل میلادی به جلالی
+def gregorian_to_jalali(gregorian_date_str):
+    try:
+        if 'T' in gregorian_date_str:
+            gregorian_datetime = datetime.strptime(gregorian_date_str, '%Y-%m-%dT%H:%M:%S')
+        else:
+            gregorian_datetime = datetime.strptime(gregorian_date_str, '%Y-%m-%d')
+        
+        jalali_datetime = JalaliDateTime.to_jalali(gregorian_datetime)
+        return jalali_datetime.strftime('%Y-%m-%d')
+    
+    except Exception as e:
+        print(f"Error converting date: {gregorian_date_str} - {e}")
+        return None
+    
+
+#   customerofbroker لیست شهرهای فایل 
+def bours_city (data) :
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    bours_city = farasahmDb['customerofbroker'].distinct('AddressCity')
+    bours_city = [i for i in bours_city if i != 0]
+    return bours_city
+
+
+
+
+#   customerofbroker لیست شعب فایل 
+def bours_branch (data) :
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    bours_branch = farasahmDb['customerofbroker'].distinct('BrokerBranch')
+    return bours_branch
+
+
+
+
+# این خیلی خیلی خیلی سنگینه اصلا نمیاره منتظرش نباشید 
+#   TradeListBroker لیست نماد های معلاملاتی فایل 
+def bours_trade_symbol (data) :
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    bours_trade_symbol = farasahmDb['TradeListBroker'].distinct('TradeSymbol')
+    return bours_branch
+
+
+
+
+# بورس
+def fillter_bours (config) :
+    if not config['enabled'] : 
+        return pd.DataFrame()
+    df = farasahmDb['customerofbroker'].find({},{'_id':0,'BirthDate':1, 'FirstName':1 , 'LastName':1,'Mobile':1,'NationalCode':1,'Sex':1,'AddressCity':1,'BrokerBranch':1 })
+    df = pd.DataFrame(df)
+    df['Name'] = df['FirstName'] + ' ' + df['LastName']
+    df = df.drop(columns=['FirstName','LastName'])
+    df = df.rename(columns = {'AddressCity':'شهر','BirthDate':'تاریخ تولد','BrokerBranch':'شعبه','Mobile':'شماره تماس','NationalCode':'کد ملی','Sex':'جنسیت','Name':'نام و نام خانوادگی'})
+    if 'name' in config and len(config['name']) > 0:
+        df = df[df['نام و نام خانوادگی'].apply(lambda x: name(x, config['name']))]
+
+    if 'شماره تماس' in df.columns:
+        df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
+        df['شماره تماس'] = df['شماره تماس'].fillna("0")
+        df['شماره تماس'] = df['شماره تماس'].apply(control_mobile)
+
+    try:
+        if 'mobile' in config:
+            if 'num1' in config['mobile'] and  len(config['mobile']['num1']) > 0 :
+                df = df[df['شماره تماس'].apply(lambda x: mobilePerfix(x, config['mobile']['num1']))]
+            if 'num2' in config['mobile'] and  len(config['mobile']['num2']) > 0:
+                df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
+    except Exception as e:
+        print(f"Error processing mobile filtering: {e}")
+    
+    if 'national_id' in config and len(config['national_id']) > 0:
+        if 'کد ملی' in df.columns:
+            df = df[df['کد ملی'].apply(lambda x: national_id(x, config['national_id']))]
+        else:
+            print("Warning: 'کد ملی' column is missing in the DataFrame")
+
+                    
+    if config['birthday']['from']:
+        from_date = timestamp_to_gregorian(int(config['birthday']['from']))
+        from_date_jalali = gregorian_to_jalali(from_date)
+        
+        if from_date_jalali:  # بررسی کنید که مقدار None نیست
+            df['تاریخ تولد'] = df['تاریخ تولد'].fillna('')
+            df['تاریخ تولد میلادی'] = df['تاریخ تولد'].apply(lambda x: x.split('T')[0] if 'T' in x else x)
+            df['تاریخ تولد جلالی'] = df['تاریخ تولد میلادی'].apply(gregorian_to_jalali)
+            df = df[df['تاریخ تولد جلالی'] >= from_date_jalali]
+
+    if config['birthday']['to']:
+        to_date = timestamp_to_gregorian(int(config['birthday']['to']))
+        to_date_jalali = gregorian_to_jalali(to_date)
+        
+        if to_date_jalali:  # بررسی کنید که مقدار None نیست
+            df['تاریخ تولد'] = df['تاریخ تولد'].fillna('')
+            df['تاریخ تولد میلادی'] = df['تاریخ تولد'].apply(lambda x: x.split('T')[0] if 'T' in x else x)
+            df['تاریخ تولد جلالی'] = df['تاریخ تولد میلادی'].apply(gregorian_to_jalali)
+            df = df[df['تاریخ تولد جلالی'] <= to_date_jalali]
+
+    df = df.drop(columns=['تاریخ تولد میلادی' , 'تاریخ تولد'])
+    df = df.rename(columns={'تاریخ تولد جلالی' :'تاریخ تولد'})
+    print(df)
+    print(len(df))
+    return df
 
 
 
@@ -637,7 +754,8 @@ def fillter (data) :
         return json.dumps({"reply" : False , "msg" : 'تنظیمات تکراری است'} )
     df_registernobours = fillter_registernobours(config['nobours'])
     df_insurance = fillter_insurance(config['insurance'])
-    df = pd.concat([df_registernobours,df_insurance])
+    df_bours = fillter_bours(config['bours'])
+    df = pd.concat([df_registernobours,df_insurance , df_bours ])
     if len(df) > 100000 :
         return json.dumps({'reply' : False , 'msg': 'تنظیمات با موفقیت ذخیره شد. به علت حجم بالای داده، قابل نمایش نیست.'})
     df = df.fillna('')

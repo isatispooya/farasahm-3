@@ -987,6 +987,29 @@ def set_status () :
 
 
 
+
+@app.route('/marketing/bours_city', methods = ['POST'])
+def bours_city () :
+    data = request.get_json()
+    return marketing.bours_city (data)
+
+
+
+
+@app.route('/marketing/bours_branch', methods = ['POST'])
+def bours_branch () :
+    data = request.get_json()
+    return marketing.bours_branch (data)
+
+
+
+@app.route('/marketing/bours_trade_symbol', methods = ['POST'])
+def bours_trade_symbol () :
+    data = request.get_json()
+    return marketing.bours_trade_symbol (data)
+
+
+
 @app.route('/fixincom/compareprice',methods = ['POST', 'GET'])
 def fixincom_compareprice():
     data = request.get_json()
