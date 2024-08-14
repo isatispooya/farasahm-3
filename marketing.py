@@ -370,7 +370,7 @@ def fillter_insurance(config):
 
 
     if config ['issuance_date'] :
-        if config['issuance_date']['from']  :
+        if config['issuance_date']['from'] and config['issuance_date']['from'] is not None  :
             from_timestamp = int(config['issuance_date']['from'])
             from_date = JalaliDate.fromtimestamp(from_timestamp / 1000)
             from_date = int(str(from_date).replace('-', ''))
@@ -379,8 +379,8 @@ def fillter_insurance(config):
             df['تاریخ صدور بیمه نامه'] = df['تاریخ صدور بیمه نامه'].apply(int)
             df = df[df['تاریخ صدور بیمه نامه'] >= from_date]
 
-    if config['issuance_date']:
-        if config['issuance_date']['to']:
+    
+        if config['issuance_date']['to'] and config['issuance_date']['to'] is not None:
             to_timestamp = int(config['issuance_date']['to'])
             to_date = JalaliDate.fromtimestamp(to_timestamp / 1000)
             to_date = int(str(to_date).replace('-', ''))
@@ -521,7 +521,6 @@ def fillter_bours (config) :
     df = df.rename(columns = {'AddressCity':'شهر','BirthDate':'تاریخ تولد','BrokerBranch':'شعبه','Mobile':'شماره تماس','NationalCode':'کد ملی','Sex':'جنسیت','Name':'نام و نام خانوادگی' , 'PAMCode' :'کد معاملاتی'})
     if 'name' in config and len(config['name']) > 0:
         df = df[df['نام و نام خانوادگی'].apply(lambda x: name(x, config['name']))]
-
     if 'شماره تماس' in df.columns:
         df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
         df['شماره تماس'] = df['شماره تماس'].fillna("0")
@@ -591,13 +590,14 @@ def fillter_bours (config) :
     df_remain = df_remain.rename(columns={'TradeCode':'کد معاملاتی','CurrentRemain':'مانده','Credit':'مانده اعتباری','AdjustedRemain':'مانده تعلیلی'})
     df = pd.merge(df, df_remain, how='inner', left_on='کد معاملاتی', right_on='کد معاملاتی')
     
-    if config['adjust_remain']['from'] :
+    if config['adjust_remain']['from'] and config['adjust_remain']['from'] is not None:
         df['مانده تعلیلی'] = df['مانده تعلیلی'].fillna(0)
         df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(float)
         # df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(int)
         from_adjust_remain = float(config['adjust_remain']['from'])
         df = df[df['مانده تعلیلی'] >= from_adjust_remain]
-    if config['adjust_remain']['to'] :
+
+    if config['adjust_remain']['to']  and config['adjust_remain']['to'] is not None :
         df['مانده تعلیلی'] = df['مانده تعلیلی'].fillna(0)
         df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(float)  
         # df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(int)  
@@ -635,7 +635,6 @@ def fillter_bours (config) :
 
 
     if config['credit_balance']['from'] :
-        print(config['credit_balance']['from'])
         df['مانده اعتباری'] = df['مانده اعتباری'].fillna(0)
         df['مانده اعتباری'] = df['مانده اعتباری'].astype(float)
         df['مانده اعتباری'] = df['مانده اعتباری'].astype(int)
@@ -731,7 +730,8 @@ def column_marketing (data) :
     config  = column['config']
     registernobours = fillter_registernobours(config['nobours'])
     insurance = fillter_insurance(config['insurance'])
-    df = pd.concat([registernobours,insurance])
+    bours = fillter_bours(config['bours'])
+    df = pd.concat([registernobours,insurance , bours])
     for i in df.columns : 
         if i in ['index', '_id' , 'date'] :
             df = df.drop(columns=i)
@@ -752,6 +752,7 @@ def ViewConfig(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    print(data)
     _id = ObjectId(data['_id'])
     column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1 , 'title' :1})
     if column is None:
@@ -770,6 +771,7 @@ def perViewContent(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    print(data)
     _id = ObjectId(data['_id'])
     column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1 , 'title' :1, 'context' :1})
     if column is None:
@@ -778,11 +780,12 @@ def perViewContent(data):
     title = column['title']
     df_registernobours = fillter_registernobours(config['nobours'])
     df_insurance = fillter_insurance(config['insurance'])
+    df_bours = fillter_bours(config['bours'])
 
-    df = pd.concat([df_registernobours,df_insurance])
+    df = pd.concat([df_registernobours,df_insurance , df_bours])
     len_df  = len(df)
 
-    # registernobours = fillter_registernobours(config['nobours'])
+ 
 
     df = df.fillna('')
     df['result'] = df.apply(replace_placeholders, args=(column['context'],), axis=1)
@@ -887,12 +890,12 @@ def fillter (data) :
                 df  = df.drop_duplicates(subset=[i])
     len_df  = len(df)
     df = df.to_dict('records')
-
+    print(config)
     
     date = datetime.now()
-    # farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
-    # id = farasahmDb['marketing_config'].find_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':'' },{'_id':1})['_id']
-    id = 1#str(id)
+    farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
+    id = farasahmDb['marketing_config'].find_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':'' },{'_id':1})['_id']
+    id = str(id)
     return json.dumps({"reply" : True , "df" : df , "len" : len_df ,'id' :id} )
 
 
