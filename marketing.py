@@ -493,16 +493,19 @@ def bours_branch (data) :
 
 
 
-# این خیلی خیلی خیلی سنگینه اصلا نمیاره منتظرش نباشید 
-#   TradeListBroker لیست نماد های معلاملاتی فایل 
-def bours_trade_symbol (data) :
+
+
+
+
+#   assetsCoustomerBroker  لیست دارایی های  فایل 
+def bours_asset (data) :
     access = data['access'][0]
     _id = ObjectId(access)
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    bours_trade_symbol = farasahmDb['TradeListBroker'].distinct('TradeSymbol')
-    return bours_branch
+    bours_trade_symbol = farasahmDb['assetsCoustomerBroker'].distinct('Symbol')
+    return bours_trade_symbol
 
 
 
@@ -575,20 +578,113 @@ def fillter_bours (config) :
             print("No matching city found.")
             return pd.DataFrame()
         
-    # if 'gender' in config:
-    #     df = df[df['جنسیت'] == config['gender']]
-    #     if df.empty:
-    #         print("No matching gender found.")
-    #         return pd.DataFrame()
-        
+
+    if 'gender' in config and config['gender'] is not None and len(config['gender']) > 0:
+        df = df[df['جنسیت'].apply(lambda x: x in config ['gender'])]
+        if df.empty:
+            print("No matching gender found.")
+            return pd.DataFrame()
+
+
     customer_remain = farasahmDb['CustomerRemain'].find({},{'_id' :0,'TradeCode':1,'CurrentRemain':1,'Credit':1,'AdjustedRemain':1})
     df_remain = pd.DataFrame(customer_remain)
     df_remain = df_remain.rename(columns={'TradeCode':'کد معاملاتی','CurrentRemain':'مانده','Credit':'مانده اعتباری','AdjustedRemain':'مانده تعلیلی'})
     df = pd.merge(df, df_remain, how='inner', left_on='کد معاملاتی', right_on='کد معاملاتی')
+    
+    if config['adjust_remain']['from'] :
+        df['مانده تعلیلی'] = df['مانده تعلیلی'].fillna(0)
+        df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(float)
+        # df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(int)
+        from_adjust_remain = float(config['adjust_remain']['from'])
+        df = df[df['مانده تعلیلی'] >= from_adjust_remain]
+    if config['adjust_remain']['to'] :
+        df['مانده تعلیلی'] = df['مانده تعلیلی'].fillna(0)
+        df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(float)  
+        # df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(int)  
+        to_adjust_remain = float(config['adjust_remain']['to'])
+        df = df[df['مانده تعلیلی'] <= to_adjust_remain]
 
- 
+
+
+    if config['remain']['from'] :
+        df['مانده'] = df['مانده'].fillna(0)
+        df['مانده'] = df['مانده'].astype(float)
+        df['مانده'] = df['مانده'].astype(int)
+        from_remain = int(config['remain']['from'])
+        df = df[df['مانده'] >= from_remain]
+    if config['remain']['to'] :
+        df['مانده'] = df['مانده'].fillna(0)
+        df['مانده'] = df['مانده'].astype(float)  
+        df['مانده'] = df['مانده'].astype(int)  
+        to_remain = int(config['remain']['to'])
+        df = df[df['مانده'] <= to_remain]
+
+
+    if len(config['asset'])>0:
+        asset = farasahmDb['assetsCoustomerBroker'].find({},{'_id' :0 , 'TradeCode' :1 , 'VolumeInPrice':1 , 'Symbol' :1})
+        df_asset = pd.DataFrame(asset)
+
+        df_asset = df_asset.dropna()
+        df_asset = df_asset.rename(columns={'TradeCode':'کد معاملاتی' , 'Symbol' : 'نماد' , 'VolumeInPrice':'حجم معامله'})
+        df_asset['کد معاملاتی'] = df_asset['کد معاملاتی'].apply(str)
+        df['کد معاملاتی'] = df['کد معاملاتی'].apply(str)
+        df_asset_grouped = df_asset.groupby('کد معاملاتی').first().reset_index()
+        df = pd.merge(df, df_asset_grouped, on='کد معاملاتی', how='left')
+        df = df.dropna(subset='نماد')
+        df = df[df['نماد'].isin(config['asset'])]
+
+
+    if config['credit_balance']['from'] :
+        print(config['credit_balance']['from'])
+        df['مانده اعتباری'] = df['مانده اعتباری'].fillna(0)
+        df['مانده اعتباری'] = df['مانده اعتباری'].astype(float)
+        df['مانده اعتباری'] = df['مانده اعتباری'].astype(int)
+        from_credit_balance = int(config['credit_balance']['from'])
+        df = df[df['مانده اعتباری'] >= from_credit_balance]
+    if config['credit_balance']['to'] :
+        df['مانده اعتباری'] = df['مانده اعتباری'].fillna(0)
+        df['مانده اعتباری'] = df['مانده اعتباری'].astype(float)
+        df['مانده اعتباری'] = df['مانده اعتباری'].astype(int)
+        to_credit_balance = int(config['credit_balance']['to'])
+        df = df[df['مانده اعتباری'] <= to_credit_balance]
+
+# حجم بالای دیتا نمیشه فیلتر کرد 
+
+    # df_last_trade = farasahmDb['TradeListBroker'].find({},{'_id':0 , 'TradeCode':1 , 'TradeDate':1})
+    # df_last_trade = pd.DataFrame(df_last_trade)
+    # df_last_trade = df_last_trade.rename(columns={'TradeCode':'کد معاملاتی', 'TradeDate':'تاریخ اخرین معامله'})
+    # df_last_trade = df_last_trade.groupby('کد معاملاتی')['تاریخ اخرین معامله'].max().reset_index()
+    # df = pd.merge (df,df_last_trade, on='کد معاملاتی', how='inner')
+
+    # if config['latest_deals']['from']:
+    #     from_date = timestamp_to_gregorian(int(config['latest_deals']['from']))
+    #     from_date_jalali = gregorian_to_jalali(from_date)
+        
+    #     if from_date_jalali:  
+    #         df['تاریخ اخرین معامله'] = df['تاریخ اخرین معامله'].fillna('')
+    #         df['تاریخ اخرین معامله میلادی'] = df['تاریخ اخرین معامله'].apply(lambda x: x.split('T')[0] if 'T' in x else x)
+    #         df['تاریخ اخرین معامله جلالی'] = df['تاریخ اخرین معامله میلادی'].apply(gregorian_to_jalali)
+    #         df = df[df['تاریخ اخرین معامله جلالی'] >= from_date_jalali]
+
+    # if config['latest_deals']['to']:
+    #     to_date = timestamp_to_gregorian(int(config['latest_deals']['to']))
+    #     to_date_jalali = gregorian_to_jalali(to_date)
+        
+    #     if to_date_jalali:  
+    #         df['تاریخ اخرین معامله'] = df['تاریخ اخرین معامله'].fillna('')
+    #         df['تاریخ اخرین معامله میلادی'] = df['تاریخ اخرین معامله'].apply(lambda x: x.split('T')[0] if 'T' in x else x)
+    #         df['تاریخ اخرین معامله جلالی'] = df['تاریخ اخرین معامله میلادی'].apply(gregorian_to_jalali)
+    #         df = df[df['تاریخ اخرین معامله جلالی'] <= to_date_jalali]
+
+    # df = df.drop(columns=['تاریخ اخرین معامله میلادی' , 'تاریخ اخرین معامله'], errors='ignore')
+    # df = df.rename(columns={'تاریخ اخرین معامله جلالی' :'تاریخ اخرین معامله'})
+
+
+
+    print (len(df))
     print(df)
-    print(len(df))
+        
+ 
     return df
 
 

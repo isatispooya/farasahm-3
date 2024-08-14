@@ -1003,10 +1003,10 @@ def bours_branch () :
 
 
 
-@app.route('/marketing/bours_trade_symbol', methods = ['POST'])
-def bours_trade_symbol () :
+@app.route('/marketing/bours_asset', methods = ['POST'])
+def bours_asset () :
     data = request.get_json()
-    return marketing.bours_trade_symbol (data)
+    return marketing.bours_asset (data)
 
 
 
