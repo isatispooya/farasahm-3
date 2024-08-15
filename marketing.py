@@ -3,7 +3,7 @@ import pandas as pd
 from bson import ObjectId
 import json
 from persiantools.jdatetime import JalaliDate
-from datetime import datetime
+from datetime import datetime, timedelta
 from Login import SendSms
 import requests
 import math
@@ -11,7 +11,12 @@ from persiantools.jdatetime import JalaliDateTime
 
 
 
-
+def toInt(inp):
+    try:
+        return int(inp)
+    except:
+        return 0
+    
 def clean_list(data):
     cleaned_data = []
     for i in data:
@@ -197,14 +202,14 @@ def fillter_registernobours (config ) :
         from_date = int(str(from_date).replace('-',''))
         df['تاریخ تولد'] = df['تاریخ تولد'].fillna(0)
         df['تاریخ تولد'] = [str(x).replace('/','') for x in df['تاریخ تولد']]
-        df['تاریخ تولد'] = df['تاریخ تولد'].apply(int)
+        df['تاریخ تولد'] = df['تاریخ تولد'].apply(toInt)
         df = df[df['تاریخ تولد']>=from_date]
     if config['birthday']['to'] :
         to_date = JalaliDate.fromtimestamp(int(config['birthday']['to']/1000))
         to_date = int(str(to_date).replace('-',''))
         df['تاریخ تولد'] = df['تاریخ تولد'].fillna(0)
         df['تاریخ تولد'] = [str(x).replace('/','') for x in df['تاریخ تولد']]
-        df['تاریخ تولد'] = df['تاریخ تولد'].apply(int)
+        df['تاریخ تولد'] = df['تاریخ تولد'].apply(toInt)
         df = df[df['تاریخ تولد']<=to_date]
 
     if config['amount']['from'] :
@@ -294,6 +299,7 @@ def insurance_consultant (data) :
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
     consultant = pishkarDb['cunsoltant'].find({},{'_id':0,'fristName':1 , 'lastName':1 , 'nationalCode':1})
     df = pd.DataFrame(consultant)
+    df = df.drop_duplicates(subset=['nationalCode'])
     df['name'] = df['fristName'] + ' ' + df['lastName']
     df = df.drop(columns=['fristName' , 'lastName'])
     df = df.to_dict('records')
@@ -329,13 +335,12 @@ def fillter_insurance(config):
             if 'num2' in config['mobile'] and  len(config['mobile']['num2']) > 0:
                 df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
     except Exception as e:
-        print(f"Error processing mobile filtering: {e}")
+        pass
     
     if 'national_id' in config and len(config['national_id']) > 0:
         if 'کد ملی' in df.columns:
             df = df[df['کد ملی'].apply(lambda x: national_id(x, config['national_id']))]
-        else:
-            print("Warning: 'کد ملی' column is missing in the DataFrame")
+
     
     df = df.dropna(subset=['نام و نام خانوادگی'])
 
@@ -364,7 +369,6 @@ def fillter_insurance(config):
     if 'insurance_field' in config and len(config['insurance_field']) > 0:
         df = df[df['رشته'].apply(lambda x: x in config['insurance_field'])]
         if df.empty:
-            print("No matching insurance fields found.")
             return pd.DataFrame()
     
 
@@ -398,14 +402,14 @@ def fillter_insurance(config):
             fee_costomer = fee_costomer.groupby(by='کد ملی').sum()
             df = df.drop(columns='كارمزد قابل پرداخت')
             df = df.set_index('کد ملی').join(fee_costomer,how='right')
+
             if config['fee']['min']:
+                config['fee']['min'] = int(config['fee']['min'])
                 df = df[df['كارمزد قابل پرداخت']>config['fee']['min']]
             if config['fee']['max']:
+                config['fee']['max'] = int(config['fee']['max'])
                 df = df[df['كارمزد قابل پرداخت']<config['fee']['max']]
             df = df.reset_index()
-
-
-
 
     if config['payment']:
         if config['payment']['min'] or config['payment']['max']:
@@ -416,23 +420,22 @@ def fillter_insurance(config):
             df = df.drop(columns='مبلغ تسويه شده ')
             df = df.set_index('کد ملی').join(fee_payment,how='right')
             if config['payment']['min']:
+                config['payment']['min'] = int(config['payment']['min'])
                 df = df[df['مبلغ تسويه شده ']>config['payment']['min']]
             if config['payment']['max']:
+                config['payment']['max'] = int(config['payment']['max'])
                 df = df[df['مبلغ تسويه شده ']<config['payment']['max']]
             df = df.reset_index()
-
-
     df = df[["نام و نام خانوادگی", "کد ملی", "بیمه گر", "شماره تماس", "رشته", "insurance_item", "شماره بيمه نامه",'كارمزد قابل پرداخت','مبلغ تسويه شده ','تاریخ صدور بیمه نامه']]
     df = df.rename(columns={'insurance_item': 'مورد بیمه','كارمزد قابل پرداخت':'کارمزد','مبلغ تسويه شده ':'حق بیمه' , 'تاریخ صدور بیمه نامه' : 'تاریخ صدور'})
-
     if len(config['consultant']):
+        
         df_assing = pishkarDb['assing'].find({}, {'consultant': 1, 'شماره بيمه نامه': 1, '_id': 0})
         df_assing = pd.DataFrame(df_assing)
         df_cons = pd.DataFrame(list(pishkarDb['cunsoltant'].find({},{'fristName','lastName','nationalCode'})))
         df_cons = pd.merge(df_assing, df_cons, how='inner', left_on='consultant', right_on='nationalCode')
-        df_cons['fullname_consultant'] = df_cons['fristName'].fillna('') + ' ' + df_cons['fristName'].fillna('')
+        df_cons['fullname_consultant'] = df_cons['fristName'].fillna('') + ' ' + df_cons['lastName'].fillna('')
         df_cons = df_cons[['شماره بيمه نامه','consultant','fullname_consultant']]
-
         df = pd.merge(df_cons, df, how='inner', on='شماره بيمه نامه')
         df = df.drop(columns='شماره بيمه نامه' , axis=1)
         config['consultant'] = [str(x) for x in config['consultant']]
@@ -440,29 +443,75 @@ def fillter_insurance(config):
         if df_cons.empty :
             return pd.DataFrame()
         df = df.drop(columns=['consultant'])
+    if 'fullname_consultant' in df.columns:
+        df = df.rename(columns={'fullname_consultant':'مشاور'})
     
     df = df.drop_duplicates()
     df = df.fillna('')
     return df
 
+def round_to_nearest_half_hour(dt):
+    # ابتدا تعداد دقیقه‌ها را از آغاز ساعت محاسبه می‌کنیم
+    minutes = dt.minute
+
+    # دقیقه‌ها را به نزدیک‌ترین ۳۰ دقیقه گرد می‌کنیم
+    if minutes < 15:
+        rounded_minutes = 0
+    elif minutes < 45:
+        rounded_minutes = 30
+    else:
+        # اگر دقیقه‌ها بیشتر از 45 بود، به ساعت بعد می‌رویم
+        dt = dt + timedelta(hours=1)
+        rounded_minutes = 0
+
+    # ثانیه‌ها و میلی‌ثانیه‌ها را صفر می‌کنیم
+    rounded_dt = dt.replace(minute=rounded_minutes, second=0, microsecond=0)
+    return rounded_dt
 
 # به میلادی timestamp تبدیبل  
 def timestamp_to_gregorian(timestamp):
-    return datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%dT%H:%M:%S')
+    return datetime.fromtimestamp(int(timestamp) / 1000).strftime('%Y-%m-%dT%H:%M:%S')
 
-# تبدیل میلادی به جلالی
-def gregorian_to_jalali(gregorian_date_str):
+def timestamp_to_gregorian_round(timestamp):
+    timestamp = timestamp/1800
+    timestamp = int(timestamp)*1800
+    dt = datetime.fromtimestamp(int(timestamp) / 1000)
+    dt = round_to_nearest_half_hour(dt)
+    return dt.strftime('%Y-%m-%dT%H:%M:%S')
+
+def gregorian_to_jalali_round(gregorian_date_str):
+    gregorian_date_str = str(gregorian_date_str)
     try:
         if 'T' in gregorian_date_str:
+
             gregorian_datetime = datetime.strptime(gregorian_date_str, '%Y-%m-%dT%H:%M:%S')
         else:
             gregorian_datetime = datetime.strptime(gregorian_date_str, '%Y-%m-%d')
         
         jalali_datetime = JalaliDateTime.to_jalali(gregorian_datetime)
+
+        return jalali_datetime
+    
+    except Exception as e:
+        pass
+        return None
+    
+# تبدیل میلادی به جلالی
+def gregorian_to_jalali(gregorian_date_str):
+    gregorian_date_str = str(gregorian_date_str)
+    try:
+        if 'T' in gregorian_date_str:
+
+            gregorian_datetime = datetime.strptime(gregorian_date_str, '%Y-%m-%dT%H:%M:%S')
+        else:
+            gregorian_datetime = datetime.strptime(gregorian_date_str, '%Y-%m-%d')
+        
+        jalali_datetime = JalaliDateTime.to_jalali(gregorian_datetime)
+
         return jalali_datetime.strftime('%Y-%m-%d')
     
     except Exception as e:
-        print(f"Error converting date: {gregorian_date_str} - {e}")
+        pass
         return None
     
 
@@ -533,13 +582,11 @@ def fillter_bours (config) :
             if 'num2' in config['mobile'] and  len(config['mobile']['num2']) > 0:
                 df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
     except Exception as e:
-        print(f"Error processing mobile filtering: {e}")
+        pass
     
     if 'national_id' in config and len(config['national_id']) > 0:
         if 'کد ملی' in df.columns:
             df = df[df['کد ملی'].apply(lambda x: national_id(x, config['national_id']))]
-        else:
-            print("Warning: 'کد ملی' column is missing in the DataFrame")
 
                     
     if config['birthday']['from']:
@@ -568,41 +615,39 @@ def fillter_bours (config) :
     if 'branch' in config and len(config['branch']) > 0:
         df = df[df['شعبه'].apply(lambda x: x in config['branch'])]
         if df.empty:
-            print("No matching branch found.")
             return pd.DataFrame()
         
     if 'city' in config and len(config['city']) > 0:
         df = df[df['شهر'].apply(lambda x: x in config['city'])]
         if df.empty:
-            print("No matching city found.")
             return pd.DataFrame()
         
 
     if 'gender' in config and config['gender'] is not None and len(config['gender']) > 0:
         df = df[df['جنسیت'].apply(lambda x: x in config ['gender'])]
+        df['جنسیت'] = df['جنسیت'].replace('true', 'مرد').replace('false', 'زن')
         if df.empty:
-            print("No matching gender found.")
             return pd.DataFrame()
 
 
     customer_remain = farasahmDb['CustomerRemain'].find({},{'_id' :0,'TradeCode':1,'CurrentRemain':1,'Credit':1,'AdjustedRemain':1})
     df_remain = pd.DataFrame(customer_remain)
-    df_remain = df_remain.rename(columns={'TradeCode':'کد معاملاتی','CurrentRemain':'مانده','Credit':'مانده اعتباری','AdjustedRemain':'مانده تعلیلی'})
+    df_remain = df_remain.rename(columns={'TradeCode':'کد معاملاتی','CurrentRemain':'مانده','Credit':'مانده اعتباری','AdjustedRemain':'مانده تعدیلی'})
     df = pd.merge(df, df_remain, how='inner', left_on='کد معاملاتی', right_on='کد معاملاتی')
     
     if config['adjust_remain']['from'] and config['adjust_remain']['from'] is not None:
-        df['مانده تعلیلی'] = df['مانده تعلیلی'].fillna(0)
-        df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(float)
-        # df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(int)
+        df['مانده تعدیلی'] = df['مانده تعدیلی'].fillna(0)
+        df['مانده تعدیلی'] = df['مانده تعدیلی'].astype(float)
+        # df['مانده تعدیلی'] = df['مانده تعدیلی'].astype(int)
         from_adjust_remain = float(config['adjust_remain']['from'])
-        df = df[df['مانده تعلیلی'] >= from_adjust_remain]
+        df = df[df['مانده تعدیلی'] >= from_adjust_remain]
 
     if config['adjust_remain']['to']  and config['adjust_remain']['to'] is not None :
-        df['مانده تعلیلی'] = df['مانده تعلیلی'].fillna(0)
-        df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(float)  
-        # df['مانده تعلیلی'] = df['مانده تعلیلی'].astype(int)  
+        df['مانده تعدیلی'] = df['مانده تعدیلی'].fillna(0)
+        df['مانده تعدیلی'] = df['مانده تعدیلی'].astype(float)  
+        # df['مانده تعدیلی'] = df['مانده تعدیلی'].astype(int)  
         to_adjust_remain = float(config['adjust_remain']['to'])
-        df = df[df['مانده تعلیلی'] <= to_adjust_remain]
+        df = df[df['مانده تعدیلی'] <= to_adjust_remain]
 
 
 
@@ -680,8 +725,7 @@ def fillter_bours (config) :
 
 
 
-    print (len(df))
-    print(df)
+
         
  
     return df
@@ -738,6 +782,7 @@ def column_marketing (data) :
     df_column = ["{{" + str(x) + "}}" for x in df.columns]
     df = pd.DataFrame(df)
     len_df = len(df)
+    df = df.fillna('')
     dict_df = df.to_dict('records')
 
     return json.dumps({'reply' : True , 'columns' : df_column , 'dic' : dict_df , 'len' :len_df })
@@ -752,7 +797,6 @@ def ViewConfig(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    print(data)
     _id = ObjectId(data['_id'])
     column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1 , 'title' :1})
     if column is None:
@@ -771,7 +815,6 @@ def perViewContent(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    print(data)
     _id = ObjectId(data['_id'])
     column  = farasahmDb ['marketing_config'].find_one({'user' :access , '_id' : ObjectId(data['_id'])} , {'_id':0 , 'config' : 1 , 'title' :1, 'context' :1})
     if column is None:
@@ -806,6 +849,12 @@ def perViewContent(data):
     if 'index' in df.columns:
         df = df.drop(columns=['index'])
     df = df.fillna('')
+    duplicate = [str(x).replace("{{","").replace("}}","") for x in config['duplicate']]
+    if duplicate :
+        for i in duplicate:
+            if i in df.columns :
+                df  = df.drop_duplicates(subset=[i])
+    
     column = df.columns
     column = list(column)
     df = df.to_dict('records')
@@ -839,7 +888,7 @@ def marketing_list (data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
 
     marketing_list = farasahmDb ['marketing_config'].find({'user':access} , {'_id':1 ,'title' : 1, 'status':1 , 'date' :1 ,'period' :1 , 'config':1})
-    marketing_list = [{'_id' : str(x['_id']),'title' : x['title'] ,'period': x['config']['period'], 'status' : x['status'] ,'date': JalaliDate(x['date']).strftime('%Y/%m/%d') , 'time': x['date'].strftime('%H:%M:%S')} for x in marketing_list]
+    marketing_list = [{'_id' : str(x['_id']),'title' : x['title'] ,'period': x['config']['period'], 'status' : x['status'] ,'date': str(gregorian_to_jalali_round(timestamp_to_gregorian_round(x['config']['send_time']))) , 'time': str(gregorian_to_jalali_round(timestamp_to_gregorian_round(x['config']['send_time'])))} for x in marketing_list]
     return json.dumps (marketing_list)
 
 
@@ -868,7 +917,9 @@ def fillter (data) :
     send_time = int(send_time) / 1800
     data ['config']['send_time'] = (int(send_time)*1800) + 1800
 
+
     config = data['config']
+
     title = data['title']
     avalibale = farasahmDb['marketing_config'].find_one({"user" :access,"title":title})
     if avalibale:
@@ -890,7 +941,6 @@ def fillter (data) :
                 df  = df.drop_duplicates(subset=[i])
     len_df  = len(df)
     df = df.to_dict('records')
-    print(config)
     
     date = datetime.now()
     farasahmDb['marketing_config'].insert_one({"user" :access , "config" :config,"title":title,'date':date, 'status':False, 'context':''})
@@ -913,6 +963,8 @@ def edit_context (data) :
 
     if  not id or context is None :
         return json.dumps({'reply': False, 'msg': 'داده‌های ورودی ناقص است'})
+        
+
     
     update_result = farasahmDb['marketing_config'].update_one(
         {"user": access, "_id": id},
@@ -958,14 +1010,22 @@ def edit_config(data):
         if update_result.matched_count == 0:
             return json.dumps({"reply": False, "msg": 'خطا در به‌روزرسانی تنظیمات'})
 
-        # df_registernobours = fillter_registernobours(config['nobours'])
-        # df_insurance = fillter_insurance(config['insurance'])
-        # df = pd.concat([df_registernobours,df_insurance])
-        # df = df.fillna('')
-        # len_df = len(df)
-        # df = df.to_dict('records')
+        df_registernobours = fillter_registernobours(config['nobours'])
+        df_insurance = fillter_insurance(config['insurance'])
+        df_bours = fillter_bours(config['bours'])
+        df = pd.concat([df_registernobours,df_insurance , df_bours ])
+        df = df.fillna('')
+        duplicate = [str(x).replace("{{","").replace("}}","") for x in data ['config']['duplicate']]
+        if duplicate :
+            for i in duplicate:
+                if i in df.columns :
+                    df  = df.drop_duplicates(subset=[i])
+
+        len_df = len(df)
+
+        df = df.to_dict('records')
         
-        return json.dumps({"reply": True, "df": "df", "len": "len_df"})
+        return json.dumps({"reply": True, "df": df, "len": len_df})
     
     except KeyError as e:
         return json.dumps({'reply': False, 'msg': f"کلید {str(e)} در داده‌های ورودی یافت نشد"})
