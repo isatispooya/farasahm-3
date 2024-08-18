@@ -253,6 +253,7 @@ def getnav(data):
     history['rateAmary'] = [round(x,2) for x in history['rateAmary']]
     history['trade_volume'] = [int(x) for x in history['trade_volume']]
     history['date'] = [int(str(x).replace('/','')) for x in history['date']]
+    
     history = history.sort_values(by=['date'],ascending=False).reset_index()
     history = history.drop(columns='index')
     dic = {'diff':float(history['diff'].max()), 'rate':float(history['rate'].max()),'diffAmary':float(history['diffAmary'].max()), 'rateAmary':float(history['rateAmary'].max()),'volume':float(history['trade_volume'].max())}
@@ -310,16 +311,15 @@ def getcompare(data):
     etfs = pd.DataFrame(farasahmDb['sandoq'].find({'type':'sabet'},{'_id':0}))
     ts = etfs[etfs['symbol']=='خاتم']
     ts = ts.sort_values(by=['dateInt'],ascending=False)
-
     etfs = etfs.groupby(by='symbol').apply(Fnc.fund_compare_clu_ccp)
     etfs = etfs.reset_index().drop(columns=['level_1'])
-
     dic = {}
     for i in etfs.columns:
         if not i in ['symbol','update']:
             dic['i'] = etfs[i].max()
     etfs = etfs.dropna()
-            
+    etfs['update'] = [int(str(x).replace('/','').replace('-','')) for x in etfs['update']]
+    etfs['update'] = etfs['update'].max()
     df = etfs.to_dict('records')
     return json.dumps({'replay':True,'df':df,'dic':dic}) 
 
@@ -2330,9 +2330,11 @@ def saveinvoce(data):
         'body' : body,
         'payments' : []
     }
-    buyer = {'name':data['buyerName'],'postcode':data['buyerPost'],'postcode':data['buyerPost'],'address':data['buyerAddress'],'call':data['buyerTel']}
+    # buyer = {'name':data['buyerName'],'postcode':data['buyerPost'],'postcode':data['buyerPost'],'address':data['buyerAddress'],'call':data['buyerTel']}
+    buyer = {'name':'','postcode':'','postcode':'','address':'','call':''}
     buyer['idcode'] = str(invoceData['buyerId'])
-    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None, 'details':{'seler':sellerDic,'buyer':buyer,'text':data['textinv']}}
+    # dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None, 'details':{'seler':sellerDic,'buyer':buyer,'text':data['textinv']}}
+    dic = {'title':invoceData['title'],'date':datetime.datetime.now(),'invoice':invoice,'result':None,'inquiry':None, 'details':{'seler':sellerDic,'buyer':buyer,'text':''}}
     farasahmDb['invoiceMoadian'].insert_one(dic)
 
     return json.dumps({'reply':True})
@@ -3193,7 +3195,11 @@ def moadian_getinvoice(data):
             if i['result'] == None:
                 dic['result'] = 'ارسال نشده'
             else:
-                dic['result'] = i['inquiry']['status']
+
+                try:
+                    dic['result'] = i['inquiry']['status']
+                except:
+                    dic['result'] = 'نا مشخص'
             
             df.append(dic)
     df = pd.DataFrame(df)
@@ -3979,7 +3985,7 @@ def cloninvoce(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    taxid = data['taxid']
+    taxid = data['id']['taxid']
     df = farasahmDb['invoiceMoadian'].find({})
     for i in df:
         txid_ = i['invoice']['header']['taxid']
@@ -3991,6 +3997,33 @@ def cloninvoce(data):
             new_taxid =Fnc.generate_tax_id(mmrit,dateJalali,inno)
             i['invoice']['header']['taxid'] = new_taxid
             _id = i['_id']
+            
             farasahmDb['invoiceMoadian'].insert_one(i)
+            break
     return json.dumps({'reply':True})
+
+def setCard(inp):
+    if inp['all']:
+        return ['all']
+    carts_list = []
+    for i in inp.keys():
+        if i != 'all':
+            carts_list.append(i)
+    return {'card':carts_list}
+
+
+def setting_usermanage(data):
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id,'admin':True},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = farasahmDb['user'].find({},{'phone':1,'name':1,'enabled':1,'_id':0})
+    df = pd.DataFrame(df)
+    df['_children'] = df['enabled'].apply(setCard)
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
+
+
+
 
