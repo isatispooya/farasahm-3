@@ -40,16 +40,17 @@ def send(config):
     context = config['context']
     df_registernobours = fillter_registernobours(config['config']['nobours'])
     df_insurance = fillter_insurance(config['config']['insurance'])
-    df = pd.concat([df_registernobours,df_insurance])
+    df_bours = fillter_insurance(config['config']['bours'])
+    df = pd.concat([df_registernobours,df_insurance,df_bours])
     df['result'] = df.apply(replace_placeholders, args=(context,), axis=1)
     df = df[['شماره تماس','result']]
     df = df.to_dict('records')
     for i in df:
         now = datetime.now()
         if now.hour <= 21:
-            # SendSms(i['result'],i['شماره تماس'])
-            SendSms(i['result'],"09011010959")
-            SendSms(i['result'],"09037976393")
+            SendSms(i['result'],i['شماره تماس'])
+            # SendSms(i['result'],"09011010959")
+            # SendSms(i['result'],"09037976393")
             break
 
 
