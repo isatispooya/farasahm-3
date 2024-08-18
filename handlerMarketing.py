@@ -20,19 +20,19 @@ def check_config () :
             config['month'] = dt.month
             config['weekday'] = dt.strftime('%A')  
             config['hour'] = dt.hour  
-        if dt.hour == now.hour:
-            period = config.get('period')
-            if period == 'once':
-                if dt.date() == now.date():  
+            if dt.hour == now.hour:
+                period = config.get('period')
+                if period == 'once':
+                    if dt.date() == now.date():  
+                        send(config)
+                elif period == 'daily':
                     send(config)
-            elif period == 'daily':
-                send(config)
-            elif period == 'weekly':
-                if dt.weekday() == now.weekday(): 
-                    send(config)
-            elif period == 'monthly':
-                if dt.day == now.day:  
-                    send(config)
+                elif period == 'weekly':
+                    if dt.weekday() == now.weekday(): 
+                        send(config)
+                elif period == 'monthly':
+                    if dt.day == now.day:  
+                        send(config)
 
 
 
@@ -48,15 +48,13 @@ def send(config):
     for i in df:
         now = datetime.now()
         if now.hour <= 21:
-            SendSms(i['result'],i['شماره تماس'])
-            # SendSms(i['result'],"09011010959")
-            # SendSms(i['result'],"09037976393")
-            break
+            SendSms(i['شماره تماس'],i['result'])
+
 
 
 while True:
     check_config ()
-    sleep(60*30)
+    sleep(60*60)
 
 
 
