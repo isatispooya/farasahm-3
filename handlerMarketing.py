@@ -35,7 +35,6 @@ def check_config () :
                         send(config)
 
 
-
 def send(config):
     context = config['context']
     df_registernobours = fillter_registernobours(config['config']['nobours'])
@@ -44,11 +43,21 @@ def send(config):
     df = pd.concat([df_registernobours,df_insurance,df_bours])
     df['result'] = df.apply(replace_placeholders, args=(context,), axis=1)
     df = df[['شماره تماس','result']]
+    df = df[df.index>6]
     df = df.to_dict('records')
     for i in df:
         now = datetime.now()
+
         if now.hour <= 21:
-            SendSms(i['شماره تماس'],i['result'])
+            
+            mobile = str(i['شماره تماس'])
+            if '.' in mobile:
+                mobile = mobile.split('.')[0]
+            
+            mobile = '0' + str(int(mobile))
+            SendSms(mobile,i['result'])
+
+
 
 
 
