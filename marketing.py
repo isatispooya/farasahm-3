@@ -3,13 +3,20 @@ import pandas as pd
 from bson import ObjectId
 import json
 from persiantools.jdatetime import JalaliDate
-from datetime import datetime
+from datetime import datetime, timedelta
 from Login import SendSms
 import requests
 import math
+from persiantools.jdatetime import JalaliDateTime
 
 
 
+def toInt(inp):
+    try:
+        return int(inp)
+    except:
+        return 0
+    
 def clean_list(data):
     cleaned_data = []
     for i in data:
@@ -129,6 +136,23 @@ def symbol_nobours (data) :
 
 
 
+def replace_placeholders(row , context):
+    return context.replace("{{", "{").replace("}}", "}").format_map(row)
+
+
+def control_mobile (mobile):
+    try :
+        mobile = int(mobile)
+        mobile = str(mobile)
+        mobile = '0' + mobile
+        return mobile
+
+    except:
+        return mobile
+    
+
+
+
 # غیر بورسی
 def fillter_registernobours (config ) :
     if not config['enabled'] : 
@@ -139,9 +163,14 @@ def fillter_registernobours (config ) :
         df = farasahmDb['registerNoBours'].find({})
     df = pd.DataFrame(df)
     df = df.groupby(by='symbol').apply(filter_date_symbol)
-
+    df = df.reset_index(drop=True)
+    df['درصد'] = df.groupby('symbol')['تعداد سهام'].transform(lambda x: x / x.sum() * 100)   
+    df['درصد']=  df['درصد'].apply(int) 
+    df['درصد']=  df['درصد'].apply(str) 
+    
     if len (config ['city']) >0 :
         df = df [df['صادره'].isin(config['city'])]
+        
 
     if len (config['national_id']) >0 :
         df = df[df['کد ملی'].apply(lambda x:national_id(x, config['national_id']))]   
@@ -149,6 +178,8 @@ def fillter_registernobours (config ) :
     if 'شماره تماس' in df.columns:
         df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
         df['شماره تماس'] = df['شماره تماس'].fillna("0")
+        df['شماره تماس'] = df['شماره تماس'].apply(control_mobile)
+
     try:
         if 'mobile' in config and 'num1' in config['mobile'] and 'num2' in config['mobile']:
             if len(config['mobile']['num1'])>0:
@@ -156,7 +187,6 @@ def fillter_registernobours (config ) :
 
             if len(config['mobile']['num2'])>0:
                 df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
-
     except:
         pass
 
@@ -172,14 +202,14 @@ def fillter_registernobours (config ) :
         from_date = int(str(from_date).replace('-',''))
         df['تاریخ تولد'] = df['تاریخ تولد'].fillna(0)
         df['تاریخ تولد'] = [str(x).replace('/','') for x in df['تاریخ تولد']]
-        df['تاریخ تولد'] = df['تاریخ تولد'].apply(int)
+        df['تاریخ تولد'] = df['تاریخ تولد'].apply(toInt)
         df = df[df['تاریخ تولد']>=from_date]
     if config['birthday']['to'] :
         to_date = JalaliDate.fromtimestamp(int(config['birthday']['to']/1000))
         to_date = int(str(to_date).replace('-',''))
         df['تاریخ تولد'] = df['تاریخ تولد'].fillna(0)
         df['تاریخ تولد'] = [str(x).replace('/','') for x in df['تاریخ تولد']]
-        df['تاریخ تولد'] = df['تاریخ تولد'].apply(int)
+        df['تاریخ تولد'] = df['تاریخ تولد'].apply(toInt)
         df = df[df['تاریخ تولد']<=to_date]
 
     if config['amount']['from'] :
@@ -192,7 +222,6 @@ def fillter_registernobours (config ) :
         df['تعداد سهام'] = df['تعداد سهام'].astype(int)    
         to_amount = int(config['amount']['to'])
         df = df[df['تعداد سهام'] <= to_amount]
-
     try:
 
         symbol_list = farasahmDb ['companyList'].find({'type' :'NoBourse'},{'_id':0 ,'symbol' : 1 , 'fullname' :1})
@@ -203,9 +232,7 @@ def fillter_registernobours (config ) :
         pass
 
     df = df.reset_index(drop=True)
-    df['درصد'] = df.groupby('symbol')['تعداد سهام'].transform(lambda x: x / x.sum() * 100)   
-    df['درصد']=  df['درصد'].apply(int) 
-    df['درصد']=  df['درصد'].apply(str) 
+
     if config['rate']['max']:
         max_rate = float(config['rate']['max'])
         df['درصد'] = df['درصد'].fillna(0)
@@ -270,9 +297,15 @@ def insurance_consultant (data) :
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    consultant = pishkarDb['sub'].distinct('name')
-    return consultant
+    consultant = pishkarDb['cunsoltant'].find({},{'_id':0,'fristName':1 , 'lastName':1 , 'nationalCode':1})
+    df = pd.DataFrame(consultant)
+    df = df.drop_duplicates(subset=['nationalCode'])
+    df['name'] = df['fristName'] + ' ' + df['lastName']
+    df = df.drop(columns=['fristName' , 'lastName'])
+    df = df.to_dict('records')
+    return df
  
+
 
 # بیمه 
 def fillter_insurance(config):
@@ -283,33 +316,31 @@ def fillter_insurance(config):
     df = pd.DataFrame(df)
     df = df.rename(columns={'بيمه گذار': 'نام و نام خانوادگی', 'کد ملي بيمه گذار': 'کد ملی', 'تلفن همراه': 'شماره تماس', 'comp': 'بیمه گر'})
     
-    df = df[df['نام و نام خانوادگی'].apply(lambda x: name(x, config['name']))]
+    if 'name' in config and len(config['name']) > 0:
+        df = df[df['نام و نام خانوادگی'].apply(lambda x: name(x, config['name']))]
     
-    if len(config['company']) > 0:
+    if 'company' in config and len(config['company']) > 0:
         df = df.loc[df['بیمه گر'].apply(lambda x: comp(x, config['company']))]
+
 
     if 'شماره تماس' in df.columns:
         df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
         df['شماره تماس'] = df['شماره تماس'].fillna("0")
+        df['شماره تماس'] = df['شماره تماس'].apply(control_mobile)
 
     try:
-        if 'mobile' in config and 'num1' in config['mobile'] and 'num2' in config['mobile']:
-            if len(config['mobile']['num1']) > 0:
+        if 'mobile' in config:
+            if 'num1' in config['mobile'] and  len(config['mobile']['num1']) > 0 :
                 df = df[df['شماره تماس'].apply(lambda x: mobilePerfix(x, config['mobile']['num1']))]
-            if len(config['mobile']['num2']) > 0:
+            if 'num2' in config['mobile'] and  len(config['mobile']['num2']) > 0:
                 df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
     except Exception as e:
-        print(f"Error processing mobile filtering: {e}")
+        pass
     
     if 'national_id' in config and len(config['national_id']) > 0:
         if 'کد ملی' in df.columns:
             df = df[df['کد ملی'].apply(lambda x: national_id(x, config['national_id']))]
-        else:
-            print("Warning: 'کد ملی' column is missing in the DataFrame")
-    
-    if df.empty:
-        print("No matching customers found.")
-        return pd.DataFrame()
+
     
     df = df.dropna(subset=['نام و نام خانوادگی'])
 
@@ -320,66 +351,404 @@ def fillter_insurance(config):
 
     df_fees = pd.DataFrame(df_fees)
     df_fees = df_fees.rename(columns={'مورد بیمه': 'insurance_item'})
-
-    if 'insurance_item' not in df_fees.columns:
-        return "Error: 'insurance_item' column is missing in df_fees."
+    
+    for i in ['ردیف', 'تاریخ ثبت محاسبه', 'تا تاریخ محاسبه', 'نمایندگی', 'نوع نمایندگی', 'کد اقتصادی', 'کد ملی', 'واحد صدور', 'کد کاربر', 'شماره ثبت', 'شناسه ملی',
+        'کل کارمزد تشویقی محاسبه شده', 'کارمزد تشویقی قابل پرداخت', 'کارمزد تشویقی پرداخت شده در محاسبه های قبل', 'هزينه صدور پرداخت شده در محاسبه هاي قبل',
+        'کل هزینه صدور محاسبه شده', 'کل هزینه صدور تعدیلی محاسبه شده', 'هزینه صدور تعدیلی پرداخت شده در محاسبه های قبل', 'هزینه صدورتعدیلی پرداخت شده',
+        'کل کارمزد تعدیلی محاسبه شده', ' كارمزد تعديلي پرداخت شده در محاسبه هاي قبل', 'كارمزد تعديلي قابل پرداخت', 'هزينه صدور قابل پرداخت', 'کل مبلغ وصول شده',
+        'شرح', 'كارمزد پرداخت شده در محاسبه هاي قبل', 'کل کارمزد محاسبه شده', 'ماليات', 'ماليات ارزش افزوده', 'عوارض ارزش افزوده',
+        'username','_id','بازارياب الحاقيه آخر','کسورات تامین اجتماعی',':شماره ثبت',':شناسه ملی','بازاریاب الحاقیه آخر']:
+        if i in df_fees.columns:
+            df_fees = df_fees.drop(columns=[i])
 
     df = pd.merge(df, df_fees, how='inner', left_on='نام و نام خانوادگی', right_on='بيمه گذار')
 
     if 'insurance_item' not in df.columns:
         return "Error: 'insurance_item' column is missing after merging."
 
-    if len(config['insurance_field']) > 0:
+    if 'insurance_field' in config and len(config['insurance_field']) > 0:
         df = df[df['رشته'].apply(lambda x: x in config['insurance_field'])]
         if df.empty:
-            print("No matching insurance fields found.")
             return pd.DataFrame()
     
-    df = df[["نام و نام خانوادگی", "کد ملی_x", "بیمه گر", "شماره تماس", "رشته", "insurance_item", "شماره بيمه نامه"]]
-    df = df.rename(columns={'insurance_item': 'مورد بیمه', 'کد ملی_x': 'کد ملی'})
 
 
-    df_assing = pishkarDb['assing'].find({}, {'consultant': 1, 'شماره بيمه نامه': 1, '_id': 0})
-    df_assing = pd.DataFrame(df_assing)
+    if config ['issuance_date'] :
+        if config['issuance_date']['from'] and config['issuance_date']['from'] is not None  :
+            from_timestamp = int(config['issuance_date']['from'])
+            from_date = JalaliDate.fromtimestamp(from_timestamp / 1000)
+            from_date = int(str(from_date).replace('-', ''))
+            df['تاریخ صدور بیمه نامه'] = df['تاریخ صدور بیمه نامه'].fillna(0)
+            df['تاریخ صدور بیمه نامه'] = [str(x).replace('/', '') for x in df['تاریخ صدور بیمه نامه']]
+            df['تاریخ صدور بیمه نامه'] = df['تاریخ صدور بیمه نامه'].apply(int)
+            df = df[df['تاریخ صدور بیمه نامه'] >= from_date]
 
-    if len(config['consultant']) > 0:
-        df_cons = pd.DataFrame(list(pishkarDb['cunsoltant'].find({}, {'_id': 0, 'nationalCode': 1, 'fristName': 1, 'lastName': 1})))
+    
+        if config['issuance_date']['to'] and config['issuance_date']['to'] is not None:
+            to_timestamp = int(config['issuance_date']['to'])
+            to_date = JalaliDate.fromtimestamp(to_timestamp / 1000)
+            to_date = int(str(to_date).replace('-', ''))
+            df['تاریخ صدور بیمه نامه'] = df['تاریخ صدور بیمه نامه'].fillna(0)
+            df['تاریخ صدور بیمه نامه'] = [str(x).replace('/', '') for x in df['تاریخ صدور بیمه نامه']]
+            df['تاریخ صدور بیمه نامه'] = df['تاریخ صدور بیمه نامه'].apply(int)
+            df = df[df['تاریخ صدور بیمه نامه'] <= to_date]
+
+
+    if config['fee']:
+        if config['fee']['min'] or config['fee']['max']:
+            fee_costomer = df[['کد ملی','شماره بيمه نامه','كارمزد قابل پرداخت','UploadDate']]
+            fee_costomer = fee_costomer.drop_duplicates(subset=['شماره بيمه نامه','كارمزد قابل پرداخت','UploadDate'])
+            fee_costomer = fee_costomer[['کد ملی','كارمزد قابل پرداخت']]
+            fee_costomer = fee_costomer.groupby(by='کد ملی').sum()
+            df = df.drop(columns='كارمزد قابل پرداخت')
+            df = df.set_index('کد ملی').join(fee_costomer,how='right')
+
+            if config['fee']['min']:
+                config['fee']['min'] = int(config['fee']['min'])
+                df = df[df['كارمزد قابل پرداخت']>config['fee']['min']]
+            if config['fee']['max']:
+                config['fee']['max'] = int(config['fee']['max'])
+                df = df[df['كارمزد قابل پرداخت']<config['fee']['max']]
+            df = df.reset_index()
+
+    if config['payment']:
+        if config['payment']['min'] or config['payment']['max']:
+            fee_payment = df[['کد ملی','شماره بيمه نامه','مبلغ تسويه شده ','UploadDate']]
+            fee_payment = fee_payment.drop_duplicates(subset=['شماره بيمه نامه','مبلغ تسويه شده ','UploadDate'])
+            fee_payment = fee_payment[['کد ملی','مبلغ تسويه شده ']]
+            fee_payment = fee_payment.groupby(by='کد ملی').max()
+            df = df.drop(columns='مبلغ تسويه شده ')
+            df = df.set_index('کد ملی').join(fee_payment,how='right')
+            if config['payment']['min']:
+                config['payment']['min'] = int(config['payment']['min'])
+                df = df[df['مبلغ تسويه شده ']>config['payment']['min']]
+            if config['payment']['max']:
+                config['payment']['max'] = int(config['payment']['max'])
+                df = df[df['مبلغ تسويه شده ']<config['payment']['max']]
+            df = df.reset_index()
+    df = df[["نام و نام خانوادگی", "کد ملی", "بیمه گر", "شماره تماس", "رشته", "insurance_item", "شماره بيمه نامه",'كارمزد قابل پرداخت','مبلغ تسويه شده ','تاریخ صدور بیمه نامه']]
+    df = df.rename(columns={'insurance_item': 'مورد بیمه','كارمزد قابل پرداخت':'کارمزد','مبلغ تسويه شده ':'حق بیمه' , 'تاریخ صدور بیمه نامه' : 'تاریخ صدور'})
+    if len(config['consultant']):
+        
+        df_assing = pishkarDb['assing'].find({}, {'consultant': 1, 'شماره بيمه نامه': 1, '_id': 0})
+        df_assing = pd.DataFrame(df_assing)
+        df_cons = pd.DataFrame(list(pishkarDb['cunsoltant'].find({},{'fristName','lastName','nationalCode'})))
+        df_cons = pd.merge(df_assing, df_cons, how='inner', left_on='consultant', right_on='nationalCode')
+        df_cons['fullname_consultant'] = df_cons['fristName'].fillna('') + ' ' + df_cons['lastName'].fillna('')
+        df_cons = df_cons[['شماره بيمه نامه','consultant','fullname_consultant']]
+        df = pd.merge(df_cons, df, how='inner', on='شماره بيمه نامه')
+        df = df.drop(columns='شماره بيمه نامه' , axis=1)
+        config['consultant'] = [str(x) for x in config['consultant']]
+        df = df[df['consultant'].isin(config['consultant'])]
+        if df_cons.empty :
+            return pd.DataFrame()
+        df = df.drop(columns=['consultant'])
+    if 'fullname_consultant' in df.columns:
+        df = df.rename(columns={'fullname_consultant':'مشاور'})
+    
+    df = df.drop_duplicates()
+    df = df.fillna('')
+    return df
+
+def round_to_nearest_half_hour(dt):
+    # ابتدا تعداد دقیقه‌ها را از آغاز ساعت محاسبه می‌کنیم
+    minutes = dt.minute
+
+    # دقیقه‌ها را به نزدیک‌ترین ۳۰ دقیقه گرد می‌کنیم
+    if minutes < 15:
+        rounded_minutes = 0
+    elif minutes < 45:
+        rounded_minutes = 30
     else:
-        df_cons = pd.DataFrame(list(pishkarDb['cunsoltant'].find({})))
-    df_cons['مشاور'] = df_cons['fristName'] + ' ' + df_cons['lastName']
-    df_cons = pd.merge(df_assing, df_cons, how='inner', left_on='consultant', right_on='nationalCode')
-    df_cons = df_cons[['مشاور', 'شماره بيمه نامه']]
-    df = pd.merge(df_cons, df, how='inner', on='شماره بيمه نامه')
-    df  = df[df['مشاور'].apply(lambda x : x in config['consultant'])]
-    if df.empty :
-        return pd.DataFrame()
-    df = df.drop(columns='شماره بيمه نامه' , axis=1)
-    if len(df) > 100000 :
-        return json.dumps({'message': 'تنظیمات با موفقیت ذخیره شد. به علت حجم بالای داده، قابل نمایش نیست.'})
+        # اگر دقیقه‌ها بیشتر از 45 بود، به ساعت بعد می‌رویم
+        dt = dt + timedelta(hours=1)
+        rounded_minutes = 0
 
-    print(df)
+    # ثانیه‌ها و میلی‌ثانیه‌ها را صفر می‌کنیم
+    rounded_dt = dt.replace(minute=rounded_minutes, second=0, microsecond=0)
+    return rounded_dt
+
+# به میلادی timestamp تبدیبل  
+def timestamp_to_gregorian(timestamp):
+    return datetime.fromtimestamp(int(timestamp) / 1000).strftime('%Y-%m-%dT%H:%M:%S')
+
+def timestamp_to_gregorian_round(timestamp):
+    timestamp = timestamp/1800
+    timestamp = int(timestamp)*1800
+    dt = datetime.fromtimestamp(int(timestamp) / 1000)
+    dt = round_to_nearest_half_hour(dt)
+    return dt.strftime('%Y-%m-%dT%H:%M:%S')
+
+def gregorian_to_jalali_round(gregorian_date_str):
+    gregorian_date_str = str(gregorian_date_str)
+    try:
+        if 'T' in gregorian_date_str:
+
+            gregorian_datetime = datetime.strptime(gregorian_date_str, '%Y-%m-%dT%H:%M:%S')
+        else:
+            gregorian_datetime = datetime.strptime(gregorian_date_str, '%Y-%m-%d')
+        
+        jalali_datetime = JalaliDateTime.to_jalali(gregorian_datetime)
+
+        return jalali_datetime
+    
+    except Exception as e:
+        pass
+        return None
+    
+# تبدیل میلادی به جلالی
+def gregorian_to_jalali(gregorian_date_str):
+    gregorian_date_str = str(gregorian_date_str)
+    try:
+        if 'T' in gregorian_date_str:
+
+            gregorian_datetime = datetime.strptime(gregorian_date_str, '%Y-%m-%dT%H:%M:%S')
+        else:
+            gregorian_datetime = datetime.strptime(gregorian_date_str, '%Y-%m-%d')
+        
+        jalali_datetime = JalaliDateTime.to_jalali(gregorian_datetime)
+
+        return jalali_datetime.strftime('%Y-%m-%d')
+    
+    except Exception as e:
+        pass
+        return None
+    
+
+#   customerofbroker لیست شهرهای فایل 
+def bours_city (data) :
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    bours_city = farasahmDb['customerofbroker'].distinct('AddressCity')
+    bours_city = [i for i in bours_city if i != 0]
+    return bours_city
+
+
+
+
+#   customerofbroker لیست شعب فایل 
+def bours_branch (data) :
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    bours_branch = farasahmDb['customerofbroker'].distinct('BrokerBranch')
+    return bours_branch
+
+
+
+
+
+
+
+
+#   assetsCoustomerBroker  لیست دارایی های  فایل 
+def bours_asset (data) :
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    bours_trade_symbol = farasahmDb['assetsCoustomerBroker'].distinct('Symbol')
+    return bours_trade_symbol
+
+
+
+
+# بورس
+def fillter_bours (config) :
+    if not config['enabled'] : 
+        return pd.DataFrame()
+    df = farasahmDb['customerofbroker'].find({},{'_id':0,'BirthDate':1, 'FirstName':1 , 'LastName':1,'Mobile':1,'NationalCode':1,'Sex':1,'AddressCity':1,'BrokerBranch':1 , 'PAMCode' :1 })
+    df = pd.DataFrame(df)
+    df['Name'] = df['FirstName'] + ' ' + df['LastName']
+    df = df.drop(columns=['FirstName','LastName'])
+    df = df.rename(columns = {'AddressCity':'شهر','BirthDate':'تاریخ تولد','BrokerBranch':'شعبه','Mobile':'شماره تماس','NationalCode':'کد ملی','Sex':'جنسیت','Name':'نام و نام خانوادگی' , 'PAMCode' :'کد معاملاتی'})
+    if 'name' in config and len(config['name']) > 0:
+        df = df[df['نام و نام خانوادگی'].apply(lambda x: name(x, config['name']))]
+    if 'شماره تماس' in df.columns:
+        df['شماره تماس'] = df['شماره تماس'].astype(str).str.replace("98", "0")
+        df['شماره تماس'] = df['شماره تماس'].fillna("0")
+        df['شماره تماس'] = df['شماره تماس'].apply(control_mobile)
+
+    try:
+        if 'mobile' in config:
+            if 'num1' in config['mobile'] and  len(config['mobile']['num1']) > 0 :
+                df = df[df['شماره تماس'].apply(lambda x: mobilePerfix(x, config['mobile']['num1']))]
+            if 'num2' in config['mobile'] and  len(config['mobile']['num2']) > 0:
+                df = df[df['شماره تماس'].apply(lambda x: mobileMidle(x, config['mobile']['num2']))]
+    except Exception as e:
+        pass
+    
+    if 'national_id' in config and len(config['national_id']) > 0:
+        if 'کد ملی' in df.columns:
+            df = df[df['کد ملی'].apply(lambda x: national_id(x, config['national_id']))]
+
+                    
+    if config['birthday']['from']:
+        from_date = timestamp_to_gregorian(int(config['birthday']['from']))
+        from_date_jalali = gregorian_to_jalali(from_date)
+        
+        if from_date_jalali:  
+            df['تاریخ تولد'] = df['تاریخ تولد'].fillna('')
+            df['تاریخ تولد میلادی'] = df['تاریخ تولد'].apply(lambda x: x.split('T')[0] if 'T' in x else x)
+            df['تاریخ تولد جلالی'] = df['تاریخ تولد میلادی'].apply(gregorian_to_jalali)
+            df = df[df['تاریخ تولد جلالی'] >= from_date_jalali]
+
+    if config['birthday']['to']:
+        to_date = timestamp_to_gregorian(int(config['birthday']['to']))
+        to_date_jalali = gregorian_to_jalali(to_date)
+        
+        if to_date_jalali:  
+            df['تاریخ تولد'] = df['تاریخ تولد'].fillna('')
+            df['تاریخ تولد میلادی'] = df['تاریخ تولد'].apply(lambda x: x.split('T')[0] if 'T' in x else x)
+            df['تاریخ تولد جلالی'] = df['تاریخ تولد میلادی'].apply(gregorian_to_jalali)
+            df = df[df['تاریخ تولد جلالی'] <= to_date_jalali]
+
+    df = df.drop(columns=['تاریخ تولد میلادی' , 'تاریخ تولد'], errors='ignore')
+    df = df.rename(columns={'تاریخ تولد جلالی' :'تاریخ تولد'})
+
+    if 'branch' in config and len(config['branch']) > 0:
+        df = df[df['شعبه'].apply(lambda x: x in config['branch'])]
+        if df.empty:
+            return pd.DataFrame()
+        
+    if 'city' in config and len(config['city']) > 0:
+        df = df[df['شهر'].apply(lambda x: x in config['city'])]
+        if df.empty:
+            return pd.DataFrame()
+        
+
+    if 'gender' in config and config['gender'] is not None and len(config['gender']) > 0:
+        df = df[df['جنسیت'].apply(lambda x: x in config ['gender'])]
+        df['جنسیت'] = df['جنسیت'].replace('true', 'مرد').replace('false', 'زن')
+        if df.empty:
+            return pd.DataFrame()
+
+
+    customer_remain = farasahmDb['CustomerRemain'].find({},{'_id' :0,'TradeCode':1,'CurrentRemain':1,'Credit':1,'AdjustedRemain':1})
+    df_remain = pd.DataFrame(customer_remain)
+    df_remain = df_remain.rename(columns={'TradeCode':'کد معاملاتی','CurrentRemain':'مانده','Credit':'مانده اعتباری','AdjustedRemain':'مانده تعدیلی'})
+    df = pd.merge(df, df_remain, how='inner', left_on='کد معاملاتی', right_on='کد معاملاتی')
+    
+    if config['adjust_remain']['from'] and config['adjust_remain']['from'] is not None:
+        df['مانده تعدیلی'] = df['مانده تعدیلی'].fillna(0)
+        df['مانده تعدیلی'] = df['مانده تعدیلی'].astype(float)
+        # df['مانده تعدیلی'] = df['مانده تعدیلی'].astype(int)
+        from_adjust_remain = float(config['adjust_remain']['from'])
+        df = df[df['مانده تعدیلی'] >= from_adjust_remain]
+
+    if config['adjust_remain']['to']  and config['adjust_remain']['to'] is not None :
+        df['مانده تعدیلی'] = df['مانده تعدیلی'].fillna(0)
+        df['مانده تعدیلی'] = df['مانده تعدیلی'].astype(float)  
+        # df['مانده تعدیلی'] = df['مانده تعدیلی'].astype(int)  
+        to_adjust_remain = float(config['adjust_remain']['to'])
+        df = df[df['مانده تعدیلی'] <= to_adjust_remain]
+
+
+
+    if config['remain']['from'] :
+        df['مانده'] = df['مانده'].fillna(0)
+        df['مانده'] = df['مانده'].astype(float)
+        df['مانده'] = df['مانده'].astype(int)
+        from_remain = int(config['remain']['from'])
+        df = df[df['مانده'] >= from_remain]
+    if config['remain']['to'] :
+        df['مانده'] = df['مانده'].fillna(0)
+        df['مانده'] = df['مانده'].astype(float)  
+        df['مانده'] = df['مانده'].astype(int)  
+        to_remain = int(config['remain']['to'])
+        df = df[df['مانده'] <= to_remain]
+
+
+    if len(config['asset'])>0:
+        asset = farasahmDb['assetsCoustomerBroker'].find({},{'_id' :0 , 'TradeCode' :1 , 'VolumeInPrice':1 , 'Symbol' :1})
+        df_asset = pd.DataFrame(asset)
+
+        df_asset = df_asset.dropna()
+        df_asset = df_asset.rename(columns={'TradeCode':'کد معاملاتی' , 'Symbol' : 'نماد' , 'VolumeInPrice':'حجم معامله'})
+        df_asset['کد معاملاتی'] = df_asset['کد معاملاتی'].apply(str)
+        df['کد معاملاتی'] = df['کد معاملاتی'].apply(str)
+        df_asset_grouped = df_asset.groupby('کد معاملاتی').first().reset_index()
+        df = pd.merge(df, df_asset_grouped, on='کد معاملاتی', how='left')
+        df = df.dropna(subset='نماد')
+        df = df[df['نماد'].isin(config['asset'])]
+
+
+    if config['credit_balance']['from'] :
+        df['مانده اعتباری'] = df['مانده اعتباری'].fillna(0)
+        df['مانده اعتباری'] = df['مانده اعتباری'].astype(float)
+        df['مانده اعتباری'] = df['مانده اعتباری'].astype(int)
+        from_credit_balance = int(config['credit_balance']['from'])
+        df = df[df['مانده اعتباری'] >= from_credit_balance]
+    if config['credit_balance']['to'] :
+        df['مانده اعتباری'] = df['مانده اعتباری'].fillna(0)
+        df['مانده اعتباری'] = df['مانده اعتباری'].astype(float)
+        df['مانده اعتباری'] = df['مانده اعتباری'].astype(int)
+        to_credit_balance = int(config['credit_balance']['to'])
+        df = df[df['مانده اعتباری'] <= to_credit_balance]
+
+# حجم بالای دیتا نمیشه فیلتر کرد 
+
+    # df_last_trade = farasahmDb['TradeListBroker'].find({},{'_id':0 , 'TradeCode':1 , 'TradeDate':1})
+    # df_last_trade = pd.DataFrame(df_last_trade)
+    # df_last_trade = df_last_trade.rename(columns={'TradeCode':'کد معاملاتی', 'TradeDate':'تاریخ اخرین معامله'})
+    # df_last_trade = df_last_trade.groupby('کد معاملاتی')['تاریخ اخرین معامله'].max().reset_index()
+    # df = pd.merge (df,df_last_trade, on='کد معاملاتی', how='inner')
+
+    # if config['latest_deals']['from']:
+    #     from_date = timestamp_to_gregorian(int(config['latest_deals']['from']))
+    #     from_date_jalali = gregorian_to_jalali(from_date)
+        
+    #     if from_date_jalali:  
+    #         df['تاریخ اخرین معامله'] = df['تاریخ اخرین معامله'].fillna('')
+    #         df['تاریخ اخرین معامله میلادی'] = df['تاریخ اخرین معامله'].apply(lambda x: x.split('T')[0] if 'T' in x else x)
+    #         df['تاریخ اخرین معامله جلالی'] = df['تاریخ اخرین معامله میلادی'].apply(gregorian_to_jalali)
+    #         df = df[df['تاریخ اخرین معامله جلالی'] >= from_date_jalali]
+
+    # if config['latest_deals']['to']:
+    #     to_date = timestamp_to_gregorian(int(config['latest_deals']['to']))
+    #     to_date_jalali = gregorian_to_jalali(to_date)
+        
+    #     if to_date_jalali:  
+    #         df['تاریخ اخرین معامله'] = df['تاریخ اخرین معامله'].fillna('')
+    #         df['تاریخ اخرین معامله میلادی'] = df['تاریخ اخرین معامله'].apply(lambda x: x.split('T')[0] if 'T' in x else x)
+    #         df['تاریخ اخرین معامله جلالی'] = df['تاریخ اخرین معامله میلادی'].apply(gregorian_to_jalali)
+    #         df = df[df['تاریخ اخرین معامله جلالی'] <= to_date_jalali]
+
+    # df = df.drop(columns=['تاریخ اخرین معامله میلادی' , 'تاریخ اخرین معامله'], errors='ignore')
+    # df = df.rename(columns={'تاریخ اخرین معامله جلالی' :'تاریخ اخرین معامله'})
+
+
+
+
+        
+ 
     return df
 
 
 
+# آپدیت status
 def set_status (data) :
     access = data['access'][0]
     _id = ObjectId(access)
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    
     status = farasahmDb['marketing_config'].find_one({'user': access, '_id': ObjectId(data['_id'])}, {'_id': 0, 'status': 1})
 
-    
     if status is None:
         return json.dumps({"reply": False, "msg": 'تنظیمات یافت نشد'})
-
+    
+    new_status  = data.get('new_status')
     update_result = farasahmDb['marketing_config'].update_one(
         {"user": access, "_id": ObjectId(data['_id'])},
-        {"$set": {"status": status['status']}}
+        {"$set": {"status": new_status}}
     )
-
     if update_result.matched_count == 0:
         return json.dumps({"reply": False, "msg": 'خطا در به‌روزرسانی تنظیمات'})
 
@@ -405,21 +774,19 @@ def column_marketing (data) :
     config  = column['config']
     registernobours = fillter_registernobours(config['nobours'])
     insurance = fillter_insurance(config['insurance'])
-    df = pd.concat([registernobours,insurance])
+    bours = fillter_bours(config['bours'])
+    df = pd.concat([registernobours,insurance , bours])
     for i in df.columns : 
         if i in ['index', '_id' , 'date'] :
             df = df.drop(columns=i)
     df_column = ["{{" + str(x) + "}}" for x in df.columns]
     df = pd.DataFrame(df)
     len_df = len(df)
+    df = df.fillna('')
     dict_df = df.to_dict('records')
 
     return json.dumps({'reply' : True , 'columns' : df_column , 'dic' : dict_df , 'len' :len_df })
 
-
-
-def replace_placeholders(row , context):
-    return context.replace("{{", "{").replace("}}", "}").format_map(row)
 
 
 
@@ -456,11 +823,12 @@ def perViewContent(data):
     title = column['title']
     df_registernobours = fillter_registernobours(config['nobours'])
     df_insurance = fillter_insurance(config['insurance'])
+    df_bours = fillter_bours(config['bours'])
 
-    df = pd.concat([df_registernobours,df_insurance])
+    df = pd.concat([df_registernobours,df_insurance , df_bours])
     len_df  = len(df)
 
-    # registernobours = fillter_registernobours(config['nobours'])
+ 
 
     df = df.fillna('')
     df['result'] = df.apply(replace_placeholders, args=(column['context'],), axis=1)
@@ -481,6 +849,12 @@ def perViewContent(data):
     if 'index' in df.columns:
         df = df.drop(columns=['index'])
     df = df.fillna('')
+    duplicate = [str(x).replace("{{","").replace("}}","") for x in config['duplicate']]
+    if duplicate :
+        for i in duplicate:
+            if i in df.columns :
+                df  = df.drop_duplicates(subset=[i])
+    
     column = df.columns
     column = list(column)
     df = df.to_dict('records')
@@ -514,7 +888,7 @@ def marketing_list (data):
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
 
     marketing_list = farasahmDb ['marketing_config'].find({'user':access} , {'_id':1 ,'title' : 1, 'status':1 , 'date' :1 ,'period' :1 , 'config':1})
-    marketing_list = [{'_id' : str(x['_id']),'title' : x['title'] ,'period': x['config']['period'], 'status' : x['status'] ,'date': JalaliDate(x['date']).strftime('%Y/%m/%d') , 'time': x['date'].strftime('%H:%M:%S')} for x in marketing_list]
+    marketing_list = [{'_id' : str(x['_id']),'title' : x['title'] ,'period': x['config']['period'], 'status' : x['status'] ,'date': str(gregorian_to_jalali_round(timestamp_to_gregorian_round(x['config']['send_time']))) , 'time': str(gregorian_to_jalali_round(timestamp_to_gregorian_round(x['config']['send_time'])))} for x in marketing_list]
     return json.dumps (marketing_list)
 
 
@@ -539,7 +913,13 @@ def fillter (data) :
     if not data['config']['period'] in ['once','daily','weekly','monthly']:
         return json.dumps({"reply" : False , "msg" : 'دوره ارسال به درستی تنظیم نشده'})
     
+    send_time = data ['config']['send_time']
+    send_time = int(send_time) / 1800
+    data ['config']['send_time'] = (int(send_time)*1800) + 1800
+
+
     config = data['config']
+
     title = data['title']
     avalibale = farasahmDb['marketing_config'].find_one({"user" :access,"title":title})
     if avalibale:
@@ -549,8 +929,16 @@ def fillter (data) :
         return json.dumps({"reply" : False , "msg" : 'تنظیمات تکراری است'} )
     df_registernobours = fillter_registernobours(config['nobours'])
     df_insurance = fillter_insurance(config['insurance'])
-    df = pd.concat([df_registernobours,df_insurance])
+    df_bours = fillter_bours(config['bours'])
+    df = pd.concat([df_registernobours,df_insurance , df_bours ])
+    if len(df) > 100000 :
+        return json.dumps({'reply' : False , 'msg': 'تنظیمات با موفقیت ذخیره شد. به علت حجم بالای داده، قابل نمایش نیست.'})
     df = df.fillna('')
+    duplicate = [str(x).replace("{{","").replace("}}","") for x in data ['config']['duplicate']]
+    if duplicate :
+        for i in duplicate:
+            if i in df.columns :
+                df  = df.drop_duplicates(subset=[i])
     len_df  = len(df)
     df = df.to_dict('records')
     
@@ -575,6 +963,8 @@ def edit_context (data) :
 
     if  not id or context is None :
         return json.dumps({'reply': False, 'msg': 'داده‌های ورودی ناقص است'})
+        
+
     
     update_result = farasahmDb['marketing_config'].update_one(
         {"user": access, "_id": id},
@@ -620,14 +1010,22 @@ def edit_config(data):
         if update_result.matched_count == 0:
             return json.dumps({"reply": False, "msg": 'خطا در به‌روزرسانی تنظیمات'})
 
-        # df_registernobours = fillter_registernobours(config['nobours'])
-        # df_insurance = fillter_insurance(config['insurance'])
-        # df = pd.concat([df_registernobours,df_insurance])
-        # df = df.fillna('')
-        # len_df = len(df)
-        # df = df.to_dict('records')
+        df_registernobours = fillter_registernobours(config['nobours'])
+        df_insurance = fillter_insurance(config['insurance'])
+        df_bours = fillter_bours(config['bours'])
+        df = pd.concat([df_registernobours,df_insurance , df_bours ])
+        df = df.fillna('')
+        duplicate = [str(x).replace("{{","").replace("}}","") for x in data ['config']['duplicate']]
+        if duplicate :
+            for i in duplicate:
+                if i in df.columns :
+                    df  = df.drop_duplicates(subset=[i])
+
+        len_df = len(df)
+
+        df = df.to_dict('records')
         
-        return json.dumps({"reply": True, "df": "df", "len": "len_df"})
+        return json.dumps({"reply": True, "df": df, "len": len_df})
     
     except KeyError as e:
         return json.dumps({'reply': False, 'msg': f"کلید {str(e)} در داده‌های ورودی یافت نشد"})
@@ -655,3 +1053,4 @@ def delete_config(data):
         return json.dumps({"reply": True, "msg": "تنظیمات با موفقیت حذف شد"})
     else:
         return json.dumps({"reply": False, "msg": "تنظیمات یافت نشد یا قبلاً حذف شده است"})
+    

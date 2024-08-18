@@ -345,9 +345,12 @@ def get_trade_code () :
         need_update = list(trade_list-customer_list)
         for j in need_update:
             nc = str(j)[4:]
-            customer = GetCustomerByNationalCode(nc)
-            if len(customer)>0:
-                farasahmDb['customerofbroker'].insert_one(customer)
+            try:
+                customer = GetCustomerByNationalCode(nc)
+                if len(customer)>0:
+                    farasahmDb['customerofbroker'].insert_one(customer)
+            except:
+                pass
 
 
 
