@@ -994,8 +994,6 @@ def bours_city () :
     return marketing.bours_city (data)
 
 
-
-
 @app.route('/marketing/bours_branch', methods = ['POST'])
 def bours_branch () :
     data = request.get_json()

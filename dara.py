@@ -33,11 +33,10 @@ def applynationalcode(data):
     registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['UserInput']['nationalCode']},sort=[('date', -1)])
     if registerNoBours != None:
         VerificationPhone(registerNoBours['شماره تماس'])
-        phonPrivet = registerNoBours['شماره تماس']
-        phonPrivet = phonPrivet[:3]+'xxxxx'+phonPrivet[-3:]
-        return json.dumps({'replay':True,'status':'Registered','phonPrivet':phonPrivet})
+        # phonPrivet = registerNoBours['شماره تماس']
+        # phonPrivet = str(phonPrivet[:3])+'xxxxx'+str(phonPrivet[-3:])
+        return json.dumps({'replay':True,'status':'Registered','phonPrivet':'xxxx'})
     return json.dumps({'replay':True,'status':'NotFund'})
-
 
 def applycode(data):
     apply = farasahmDb['VerificationPhone'].find_one({'phone':data['inputPhone']['phone'],'code':str(data['inputPhone']['code'])})
@@ -62,8 +61,11 @@ def coderegistered(data):
         return json.dumps({'replay':False,'msg':'کاربر یافت نشد'})
     phone = registerNoBours['شماره تماس']
     cheakcode = farasahmDb['VerificationPhone'].find_one({'phone':phone,'code':data['Code']})
-    if cheakcode['code'] == None:
-        return json.dumps({'replay':False,'msg':'کد تایید صحیح نیست'})
+    try:
+        if cheakcode['code'] == None:
+            return json.dumps({'replay':False,'msg':'کد تایید صحیح نیست'})
+    except:
+            return json.dumps({'replay':False,'msg':'کد تایید صحیح نیست'})
     id = str(registerNoBours['_id'])
     return json.dumps({'replay':True,'cookie':id})
 
@@ -111,6 +113,7 @@ def getcompany(data):
     
     lastupDate = farasahmDb['register'].distinct('تاریخ گزارش')
     lastupDate = max(lastupDate)
+
     stockBourse = pd.DataFrame(farasahmDb['register'].find({"کد ملی": int(user['کد ملی']),'symbol':'visa','تاریخ گزارش':lastupDate},{'_id':0,'symbol':1,'سهام کل':1,'تاریخ گزارش':1}))
 
     if len(stockBourse)>0:
@@ -124,6 +127,10 @@ def getcompany(data):
         listStock = []
 
     stockNoBourse = pd.DataFrame(farasahmDb['registerNoBours'].find({"کد ملی": int(user['کد ملی'])},{'تعداد سهام':1,'_id':0,'date':1,'symbol':1}))
+    if len(stockNoBourse)== 0:
+        stockNoBourse = pd.DataFrame(farasahmDb['registerNoBours'].find({"کد ملی": str(user['کد ملی'])},{'تعداد سهام':1,'_id':0,'date':1,'symbol':1}))
+    print('ff'*25)
+    print(stockNoBourse)
     if len(stockNoBourse)>0:
         stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='hevisa']
         stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='yazdan']

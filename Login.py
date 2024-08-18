@@ -22,14 +22,20 @@ def SendSms(snd,txt):
     return resp
 
 
+
+
 def VerificationPhone(phone):
     code = str(random.randint(10000,99999))
+    phoneEdite = str(phone)
+    if '.' in phoneEdite:
+        phoneEdite = phoneEdite.split('.')[0]
+        phoneEdite = int(phoneEdite)
+    phoneEdite = '0' + str(phoneEdite)
     #farasahmDb['VerificationPhone'].delete_many({'phone':phone})
     farasahmDb['VerificationPhone'].insert_one({'phone':phone,'code':code,'datetime':datetime.datetime.now()})
     text = 'کد تایید فراسهم \n' + str(code)
-    res = SendSms(phone,text)
+    res = SendSms(phoneEdite,text)
     return json.dumps({'replay':True})
-
 
 
 
