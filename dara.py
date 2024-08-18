@@ -123,7 +123,7 @@ def getcompany(data):
     else:
         listStock = []
 
-    stockNoBourse = pd.DataFrame(farasahmDb['registerNoBours'].find({"کد ملی": str(user['کد ملی'])},{'تعداد سهام':1,'_id':0,'date':1,'symbol':1}))
+    stockNoBourse = pd.DataFrame(farasahmDb['registerNoBours'].find({"کد ملی": int(user['کد ملی'])},{'تعداد سهام':1,'_id':0,'date':1,'symbol':1}))
     if len(stockNoBourse)>0:
         stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='hevisa']
         stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='yazdan']
@@ -208,7 +208,10 @@ def getsheet(data):
         BourseUser['company'] = company['fullname']
         return json.dumps({'replay': True, 'sheet': BourseUser})
     
-    userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': user['کد ملی'], 'symbol':symbol},sort=[('date',-1)])
+    lastDate = max(farasahmDb['registerNoBours'].distinct('date'))
+    userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': user['کد ملی'], 'symbol':symbol, 'date':lastDate})
+    if userNoBourse == None:
+        userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': int(user['کد ملی']), 'symbol':symbol, 'date':lastDate})
     userNoBourse['stockword'] = digits.to_word(userNoBourse['تعداد سهام']) 
     userNoBourse['company'] = company['fullname']
     userNoBourse['fullName'] = userNoBourse['نام و نام خانوادگی']
@@ -452,7 +455,10 @@ def getSheetpngAdmin(data):
     draw.text((x, y), text, fill=(0,0,0), font=font50)
 
     #فیلد ها فرزند
-    text = arabic_reshaper.reshape('فرزند' + '      ' + resulte['نام پدر'])
+    try:
+        text = arabic_reshaper.reshape('فرزند' + '      ' + resulte['نام پدر'])
+    except:
+        text = arabic_reshaper.reshape('فرزند' + '      ')
     text_width = draw.textlength(text, font=font50)
     x = image_width - text_width - 1400 
     y = 1100
