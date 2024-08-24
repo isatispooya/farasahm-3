@@ -6,6 +6,7 @@ import datetime
 from persiantools.jdatetime import JalaliDate
 import requests
 from persiantools import characters
+import pymongo
 
 
 def todayIntJalali():
@@ -341,7 +342,6 @@ def get_trade_code () :
         trade_list = [x['TradeCode'] for x in trade_list]
         trade_list = set(trade_list)
         customer_list = set(farasahmDb['customerofbroker'].distinct('TradeCode'))
-
         need_update = list(trade_list-customer_list)
         for j in need_update:
             nc = str(j)[4:]
@@ -349,9 +349,11 @@ def get_trade_code () :
                 customer = GetCustomerByNationalCode(nc)
                 if len(customer)>0:
                     farasahmDb['customerofbroker'].insert_one(customer)
-            except:
+            except pymongo.errors.DuplicateKeyError:
                 pass
+            except Exception as e:
+                print(f"Error processing TradeCode {j}: {e}")
 
 
 
-
+get_trade_code()
