@@ -616,12 +616,13 @@ def fillter_bours (config) :
         df = df[df['شعبه'].apply(lambda x: x in config['branch'])]
         if df.empty:
             return pd.DataFrame()
+
         
     if 'city' in config and len(config['city']) > 0:
         df = df[df['شهر'].apply(lambda x: x in config['city'])]
         if df.empty:
             return pd.DataFrame()
-        
+
 
     if 'gender' in config and config['gender'] is not None and len(config['gender']) > 0:
         df = df[df['جنسیت'].apply(lambda x: x in config ['gender'])]
@@ -630,10 +631,11 @@ def fillter_bours (config) :
             return pd.DataFrame()
 
 
+
     customer_remain = farasahmDb['CustomerRemain'].find({},{'_id' :0,'TradeCode':1,'CurrentRemain':1,'Credit':1,'AdjustedRemain':1})
     df_remain = pd.DataFrame(customer_remain)
     df_remain = df_remain.rename(columns={'TradeCode':'کد معاملاتی','CurrentRemain':'مانده','Credit':'مانده اعتباری','AdjustedRemain':'مانده تعدیلی'})
-    df = pd.merge(df, df_remain, how='inner', left_on='کد معاملاتی', right_on='کد معاملاتی')
+    df = pd.merge(df, df_remain, how='left', left_on='کد معاملاتی', right_on='کد معاملاتی')
     
     if config['adjust_remain']['from'] and config['adjust_remain']['from'] is not None:
         df['مانده تعدیلی'] = df['مانده تعدیلی'].fillna(0)
@@ -668,7 +670,6 @@ def fillter_bours (config) :
     if len(config['asset'])>0:
         asset = farasahmDb['assetsCoustomerBroker'].find({},{'_id' :0 , 'TradeCode' :1 , 'VolumeInPrice':1 , 'Symbol' :1})
         df_asset = pd.DataFrame(asset)
-
         df_asset = df_asset.dropna()
         df_asset = df_asset.rename(columns={'TradeCode':'کد معاملاتی' , 'Symbol' : 'نماد' , 'VolumeInPrice':'حجم معامله'})
         df_asset['کد معاملاتی'] = df_asset['کد معاملاتی'].apply(str)
@@ -677,7 +678,6 @@ def fillter_bours (config) :
         df = pd.merge(df, df_asset_grouped, on='کد معاملاتی', how='left')
         df = df.dropna(subset='نماد')
         df = df[df['نماد'].isin(config['asset'])]
-
 
     if config['credit_balance']['from'] :
         df['مانده اعتباری'] = df['مانده اعتباری'].fillna(0)
