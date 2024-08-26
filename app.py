@@ -1018,6 +1018,16 @@ def setting_usermanage():
     data = request.get_json()
     return report.setting_usermanage(data)
 
+@app.route('/dara/balancestock',methods = ['POST'])
+def dara_balance_stock():
+    data = request.get_json()
+    return dara.balance_stock(data)
+
+@app.route('/report/balancestock',methods = ['POST'])
+def report_balance_stock():
+    data = request.get_json()
+    return report.balance_stock(data)
+
 if __name__ == '__main__':
     #serve(app, host="0.0.0.0", port=8080,threads= 8)
     app.run(host='0.0.0.0',port=8000, debug=True)

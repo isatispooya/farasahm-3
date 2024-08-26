@@ -22,6 +22,7 @@ def zipToDf(zip):
     df = pd.read_csv(df, sep='|')
     return df
 
+
 columnsDaily = ['نماد', 'نماد کدال', 'نام نماد', 'شماره اعلامیه', 'تاریخ معامله','کد خریدار', 'کد سهامداری خریدار تبدیل نشده', 'نام خانوادگی خریدار','نام خریدار', 'سری شناسنامه خریدار', 'سریال شناسنامه خریدار','کد ملی خریدار', 'ش ثبت/ش .شناسنامه خریدار', 'محل صدور خریدار','نام پدر خریدار', 'نوع خریدار', 'نوع سهام خریدار', 'کد فروشنده','کد سهامداری فروشنده تبدیل نشده', 'نام خانوادگی فروشنده', 'نام فروشنده','سری شناسنامه فروشنده', 'سریال شناسنامه فروشنده', 'کد ملی فروشنده','ش ثبت/ش .شناسنامه فروشنده', 'محل صدور فروشنده', 'نام پدر فروشنده','نوع فروشنده', 'نوع سهام فروشنده', 'تعداد سهم', 'قیمت هر سهم','کد کارگزار خریدار', 'نام کارگزار خریدار', 'کد کارگزار فروشنده','نام کارگزار فروشنده']
 columnsRegister = ['نماد', 'نماد کدال', 'تاریخ گزارش', 'کد سهامداری','کدسهامداری تبدیل نشده', 'سهام کل', 'سهام سپرده', 'سهام غیرسپرده','نام خانوادگی ', 'نام', 'fullName', 'کد ملی', 'شماره ثبت/شناسنامه',       'تاریخ تولد', 'نام پدر', 'محل صدور', 'سری', 'سریال', 'جنسیت', 'نوع','نوع سهامدار', 'نوع سهام', 'شناسه ملی', 'فرمت قدیم کد سهامداری','سود کدهای وثیقه']
 
@@ -30,10 +31,16 @@ def Update(access,daily,registerdaily):
     dfRegister = zipToDf(registerdaily)
     if len(dfDaily)==0: return json.dumps({'replay':False,'msg':'فایل معاملات خالی است'})
     if len(dfRegister)==0: return json.dumps({'replay':False,'msg':'فایل رجیستر خالی است'})
+    if 'نماد کدال' not in dfRegister.columns:
+        dfRegister['نماد کدال'] = [str(x).replace('ذویسات','ویسا').replace('ذبازرگا','بازرگام') for x in dfRegister['نماد']]
+    if 'نماد کدال' not in dfDaily.columns:
+        dfDaily['نماد کدال'] = [str(x).replace('ذویسات','ویسا').replace('ذبازرگا','بازرگام') for x in dfDaily['نماد']]
     for i in columnsDaily:
-        if i not in dfDaily.columns:return json.dumps({'replay':False,'msg':f'فایل معاملات فاقد ستون {i} است'})
+        if i not in dfDaily.columns:
+            return json.dumps({'replay':False,'msg':f'فایل معاملات فاقد ستون {i} است'})
     for i in columnsRegister:
-        if i not in dfRegister.columns:return json.dumps({'replay':False,'msg':f'فایل رجیستر فاقد ستون {i} است'})
+        if i not in dfRegister.columns:
+            return json.dumps({'replay':False,'msg':f'فایل رجیستر فاقد ستون {i} است'})
     dateDaily = list(set(dfDaily['تاریخ معامله']))
     dateregister = list(set(dfRegister['تاریخ گزارش']))
     if dateDaily != dateregister: return json.dumps({'replay':False,'msg':'تاریخ گزارش فایل ها برابر نیست'})

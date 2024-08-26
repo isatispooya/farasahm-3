@@ -18,7 +18,7 @@ psswrd ='5246043adeleh'
 
 def SendSms(snd,txt):
     resp = requests.get(url=f'http://tsms.ir/url/tsmshttp.php?from={frm}&to={snd}&username={usrnm}&password={psswrd}&message={txt}').json()
-    print(txt)
+    print('-'*15,'\n',snd,':\n',txt)
     return resp
 
 
@@ -30,7 +30,7 @@ def VerificationPhone(phone):
     if '.' in phoneEdite:
         phoneEdite = phoneEdite.split('.')[0]
         phoneEdite = int(phoneEdite)
-    phoneEdite = '0' + str(phoneEdite)
+    phoneEdite = '0' + str(int(phoneEdite))
     #farasahmDb['VerificationPhone'].delete_many({'phone':phone})
     farasahmDb['VerificationPhone'].insert_one({'phone':phone,'code':code,'datetime':datetime.datetime.now()})
     text = 'کد تایید فراسهم \n' + str(code)

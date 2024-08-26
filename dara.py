@@ -33,8 +33,6 @@ def applynationalcode(data):
     registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['UserInput']['nationalCode']},sort=[('date', -1)])
     if registerNoBours != None:
         VerificationPhone(registerNoBours['شماره تماس'])
-        # phonPrivet = registerNoBours['شماره تماس']
-        # phonPrivet = str(phonPrivet[:3])+'xxxxx'+str(phonPrivet[-3:])
         return json.dumps({'replay':True,'status':'Registered','phonPrivet':'xxxx'})
     return json.dumps({'replay':True,'status':'NotFund'})
 
@@ -111,10 +109,15 @@ def getcompany(data):
     if user['replay']==False:
         return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
     
-    lastupDate = farasahmDb['register'].distinct('تاریخ گزارش')
-    lastupDate = max(lastupDate)
 
+    lastupDate = pd.DataFrame(farasahmDb['register'].find({'symbol':'visa'},{'_id':0,'تاریخ گزارش':1}))
+
+    lastupDate = lastupDate['تاریخ گزارش'].to_list()
+    lastupDate = max(lastupDate)
     stockBourse = pd.DataFrame(farasahmDb['register'].find({"کد ملی": int(user['کد ملی']),'symbol':'visa','تاریخ گزارش':lastupDate},{'_id':0,'symbol':1,'سهام کل':1,'تاریخ گزارش':1}))
+    if len(stockBourse) ==0:
+        stockBourse = pd.DataFrame(farasahmDb['register'].find({"کد ملی": str(user['کد ملی']),'symbol':'visa','تاریخ گزارش':lastupDate},{'_id':0,'symbol':1,'سهام کل':1,'تاریخ گزارش':1}))
+        
 
     if len(stockBourse)>0:
         stockBourse = stockBourse[stockBourse['تاریخ گزارش'] == stockBourse['تاریخ گزارش'].max()]
@@ -129,8 +132,7 @@ def getcompany(data):
     stockNoBourse = pd.DataFrame(farasahmDb['registerNoBours'].find({"کد ملی": int(user['کد ملی'])},{'تعداد سهام':1,'_id':0,'date':1,'symbol':1}))
     if len(stockNoBourse)== 0:
         stockNoBourse = pd.DataFrame(farasahmDb['registerNoBours'].find({"کد ملی": str(user['کد ملی'])},{'تعداد سهام':1,'_id':0,'date':1,'symbol':1}))
-    print('ff'*25)
-    print(stockNoBourse)
+
     if len(stockNoBourse)>0:
         stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='hevisa']
         stockNoBourse = stockNoBourse[stockNoBourse['symbol']!='yazdan']
@@ -144,7 +146,6 @@ def getcompany(data):
     allStockCompany = allStockCompany[allStockCompany['symbol']!='bazargam']
     allStockCompany = allStockCompany.set_index('symbol')
     allStockCompany = allStockCompany.rename(columns={'تعداد سهام':'allStockCompany'})
-
     allCompany = allCompany.set_index('symbol')
     allCompany = allCompany.join(allStockCompany)
     allCompany = allCompany[allCompany.index != 'hevisa']
@@ -158,7 +159,7 @@ def getcompany(data):
     df = df.sort_values(by=['تعداد سهام'],ascending=False)
     df = df.rename(columns={'تعداد سهام':'amount'})
     df = df.reset_index()
-    df['allStockCompany_alpha'] = df['allStockCompany'].apply(int)
+    df['allStockCompany_alpha'] = df['allStockCompany'].apply(int)*1
     df['allStockCompany_alpha'] = df['allStockCompany_alpha'].apply(digits.to_word)
     df['amount_alpha'] = df['amount'].apply(int)
     df['amount_alpha'] = df['amount_alpha'].apply(digits.to_word)
@@ -251,13 +252,14 @@ def static(data):
     df_comp = pd.DataFrame(farasahmDb['registerNoBours'].find({'symbol':symbol}))
     df_comp = df_comp.fillna('')
     df_comp = df_comp.sort_values(by=['date'])
-    df_comp = df_comp.drop_duplicates(subset=['date','کد ملی'],keep='last')
+    # df_comp = df_comp.drop_duplicates(subset=['date','کد ملی'],keep='last')
     
     if len(df_comp)==0:
         return json.dumps({'replay':False, 'msg': 'not found'}) 
     df_comp = df_comp[df_comp['date']==df_comp['date'].max()]
     
     Shareholders = len(df_comp)
+    df_comp['تعداد سهام'] = df_comp['تعداد سهام'].apply(int)
     number_shares = df_comp['تعداد سهام'].sum()
     Shareholder = farasahmDb['registerNoBours'].find_one({'symbol':symbol,'کد ملی':user['کد ملی']})
     amount = Shareholder['تعداد سهام']
@@ -540,3 +542,27 @@ def getSheetpngAdmin(data):
     image.save('public/sheet1_download.png')
     return send_file("public/sheet1_download.png", as_attachment=True, mimetype="image/png")
 
+
+def balance_stock(data):
+    user = CookieToUser(data)
+    if user['replay']==False:
+        return json.dumps({'replay':False,'msg':'لطفا مجددا وارد شوید'})
+    nc = user['کد ملی']
+    symbol = user['symbol']
+    df = farasahmDb['registerNoBours'].find({'کد ملی':nc, 'symbol':symbol})
+    df = pd.DataFrame(df)
+    fullname = df['نام و نام خانوادگی'].iloc[df.index.min()]
+    dfs = pd.DataFrame(farasahmDb['transactions'].find({'sell':fullname}))
+    dfb = pd.DataFrame(farasahmDb['transactions'].find({'buy':fullname}))
+    dft = pd.concat([dfb,dfs])
+    dft['type'] = 'نقل و انتقال'
+    if len(dft)>0:
+        dtf = dft[['type','date']].set_index('date')
+        df = df.set_index('date').join(dtf, how='left')
+        df = df.reset_index()        
+        df['type'] = df['type'].fillna('')
+    df = df.sort_values('date',ascending=False)
+    df = df.drop_duplicates(subset=['تعداد سهام'],keep='first')
+    df = df[['date','تعداد سهام']]
+    df = df.to_dict('records')
+    return df

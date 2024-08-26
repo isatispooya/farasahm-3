@@ -40,7 +40,6 @@ while True:
         farasahmDb['TradeListBroker'].delete_many({"_id": {"$in": unique_ids}})
         dropimg = dropimg +1
         
-
     
     len_batch = len(batch)/1000000
     processed_count += len_batch

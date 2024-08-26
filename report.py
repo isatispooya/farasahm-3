@@ -4003,12 +4003,14 @@ def cloninvoce(data):
     return json.dumps({'reply':True})
 
 def setCard(inp):
+    menu = farasahmDb['menu'].find({},{'_id':0,'name':1,'symbol':1})
+    menu = {x['name']:x['symbol'] for x in menu}
     if inp['all']:
-        return ['all']
+        return {'card':['همه']}
     carts_list = []
     for i in inp.keys():
         if i != 'all':
-            carts_list.append(i)
+            carts_list.append(menu[i])
     return {'card':carts_list}
 
 
@@ -4027,3 +4029,41 @@ def setting_usermanage(data):
 
 
 
+def setting_usermanage(data):
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id,'admin':True},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    df = farasahmDb['user'].find({},{'phone':1,'name':1,'enabled':1,'_id':0})
+    df = pd.DataFrame(df)
+    df['_children'] = df['enabled'].apply(setCard)
+    df = df.to_dict('records')
+    return json.dumps({'reply':True,'df':df})
+
+
+def balance_stock(data):
+    access = data['access'][0]
+    _id = ObjectId(access)
+    acc = farasahmDb['user'].find_one({'_id':_id,'admin':True},{'_id':0})
+    if acc == None:
+        return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
+    nc = data['nc']
+    symbol = data['symbol']
+    df = farasahmDb['registerNoBours'].find({'کد ملی':nc, 'symbol':symbol})
+    df = pd.DataFrame(df)
+    fullname = df['نام و نام خانوادگی'].iloc[df.index.min()]
+    dfs = pd.DataFrame(farasahmDb['transactions'].find({'sell':fullname}))
+    dfb = pd.DataFrame(farasahmDb['transactions'].find({'buy':fullname}))
+    dft = pd.concat([dfb,dfs])
+    dft['type'] = 'نقل و انتقال'
+    if len(dft)>0:
+        dtf = dft[['type','date']].set_index('date')
+        df = df.set_index('date').join(dtf, how='left')
+        df = df.reset_index()        
+        df['type'] = df['type'].fillna('')
+    df = df.sort_values('date',ascending=False)
+    df = df.drop_duplicates(subset=['تعداد سهام'],keep='first')
+    df = df[['date','تعداد سهام']]
+    df = df.to_dict('records')
+    return df
