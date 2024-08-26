@@ -349,11 +349,30 @@ def get_trade_code () :
                 customer = GetCustomerByNationalCode(nc)
                 if len(customer)>0:
                     farasahmDb['customerofbroker'].insert_one(customer)
+                    print(nc)
             except pymongo.errors.DuplicateKeyError:
+                print('-'*25)
                 pass
             except Exception as e:
+                print('*'*25)
                 print(f"Error processing TradeCode {j}: {e}")
 
 
 
-get_trade_code()
+
+import multiprocessing
+
+
+if __name__ == "__main__":
+    # تعداد پراسس‌های مورد نظر
+    num_processes = 10
+
+    # یک Pool از پراسس‌ها ایجاد می‌کنیم
+    with multiprocessing.Pool(num_processes) as pool:
+        # لیستی از پراسس‌های غیرهمزمان ایجاد می‌کنیم
+        results = [pool.apply_async(get_trade_code) for _ in range(num_processes)]
+
+        # نتایج را از پراسس‌ها می‌گیریم
+        output = [result.get() for result in results]
+    
+    print(output)
