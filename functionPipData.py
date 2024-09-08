@@ -347,9 +347,13 @@ def get_trade_code () :
             nc = str(j)[4:]
             try:
                 customer = GetCustomerByNationalCode(nc)
-                if len(customer)>0:
-                    farasahmDb['customerofbroker'].insert_one(customer)
-                    print(nc)
+                if len(customer)>0 :
+                    
+                    duplicate = farasahmDb['customerofbroker'].find_one({'PAMCode':j})
+                    if duplicate == None:
+                        farasahmDb['customerofbroker'].insert_one(customer)
+                        print(nc)
+                        
             except pymongo.errors.DuplicateKeyError:
                 print('-'*25)
                 pass
@@ -361,11 +365,9 @@ def get_trade_code () :
 
 
 import multiprocessing
-
-
 if __name__ == "__main__":
     # تعداد پراسس‌های مورد نظر
-    num_processes = 10
+    num_processes = 4
 
     # یک Pool از پراسس‌ها ایجاد می‌کنیم
     with multiprocessing.Pool(num_processes) as pool:
@@ -374,5 +376,3 @@ if __name__ == "__main__":
 
         # نتایج را از پراسس‌ها می‌گیریم
         output = [result.get() for result in results]
-    
-    print(output)

@@ -31,6 +31,10 @@ def Update(access,daily,registerdaily):
     dfRegister = zipToDf(registerdaily)
     if len(dfDaily)==0: return json.dumps({'replay':False,'msg':'فایل معاملات خالی است'})
     if len(dfRegister)==0: return json.dumps({'replay':False,'msg':'فایل رجیستر خالی است'})
+    dfDaily = dfDaily.rename(columns={
+        'کد ملی خریدار':'کد/شناسه ملی خریدار',
+        'کد ملی فروشنده':'کد/شناسه ملی فروشنده',
+        })
     if 'نماد کدال' not in dfRegister.columns:
         dfRegister['نماد کدال'] = [str(x).replace('ذویسات','ویسا').replace('ذبازرگا','بازرگام') for x in dfRegister['نماد']]
     if 'نماد کدال' not in dfDaily.columns:
