@@ -31,14 +31,30 @@ def applynationalcode(data):
     if captchas == False:
         return json.dumps({'replay':False,'msg':'کد تصویر صحیح نیست'})
     registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['UserInput']['nationalCode']},sort=[('date', -1)])
-    if registerNoBours != None:
+    if registerNoBours == None:
+        return json.dumps({'replay':False,'msg':'کد ملی شما یافت نشد'})
+    #-------------
+    sejami = farasahmDb['sejam'].find_one({'uniqueIdentifier':data['UserInput']['nationalCode']})
+    if not sejami:
+        url = "http://31.40.4.92:8870/otp"
+        payload = json.dumps({
+        "uniqueIdentifier": data['UserInput']['nationalCode']
+        })
+        headers = {
+        'X-API-KEY': 'zH7n^K8s#D4qL!rV9tB@2xEoP1W%0uNc',
+        'Content-Type': 'application/json'
+        }
+        response = requests.request("POST", url, headers=headers, data=payload)
+        if response.status_code >=300 :
+            return json.dumps ({'replay':False,'msg' :'شما سجامی نیستید'})
+        return json.dumps ({'replay':True,'status':'sejam','registered' :False , 'msg' : 'کد تایید از طریق سامانه سجام ارسال شد'})
+    #------------
+    else:
         VerificationPhone(registerNoBours['شماره تماس'])
         return json.dumps({'replay':True,'status':'Registered','phonPrivet':'xxxx'})
-    return json.dumps({'replay':True,'status':'NotFund'})
 
 def applycode(data):
     apply = farasahmDb['VerificationPhone'].find_one({'phone':data['inputPhone']['phone'],'code':str(data['inputPhone']['code'])})
-
     if apply != None:
         filter_query = {'nationalCode': data['inputPhone']['nationalCode']}
         update_query = {'$set': {'phone':data['inputPhone']['phone'],'nationalCode':data['inputPhone']['nationalCode'],'dateStart':datetime.datetime.now()}}
@@ -57,13 +73,46 @@ def coderegistered(data):
     registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['nationalCode']},sort=[('date', -1)], limit=1)
     if registerNoBours == None:
         return json.dumps({'replay':False,'msg':'کاربر یافت نشد'})
-    phone = registerNoBours['شماره تماس']
-    cheakcode = farasahmDb['VerificationPhone'].find_one({'phone':phone,'code':data['Code']})
-    try:
-        if cheakcode['code'] == None:
+    if data['sejam']:
+        url = "http://31.40.4.92:8870/information"
+        payload = json.dumps({
+        "uniqueIdentifier": data['nationalCode'],
+        "otp": data['Code']
+        })
+        headers = {
+        'X-API-KEY': 'zH7n^K8s#D4qL!rV9tB@2xEoP1W%0uNc',
+        'Content-Type': 'application/json'
+        }
+        response = requests.request("POST", url, headers=headers, data=payload)
+        if response.status_code>=300:
+            return json.dumps({'replay':False,'msg':'کد تایید سجام صحیح نیست'})
+        try:
+            data = response.json()['data']
+            farasahmDb['sejam'].insert_one(data)
+        except:
             return json.dumps({'replay':False,'msg':'کد تایید صحیح نیست'})
-    except:
-            return json.dumps({'replay':False,'msg':'کد تایید صحیح نیست'})
+        farasahmDb['registerNoBours'].update_many(
+            {'کد ملی':data['uniqueIdentifier']},
+            {'$set':{
+                'نام و نام خانوادگی':data['privatePerson']['firstName']+' '+data['privatePerson']['lastName'],
+                'نام پدر':data['privatePerson']['fatherName'],
+                'شماره تماس':data['mobile'],
+                'صادره':data['privatePerson']['placeOfIssue'],
+                'شماره حساب':data['accounts'][0]['sheba'],
+                'بانک':data['accounts'][0]['bank']['name'],
+                'کدبورسی':data['tradingCodes'][0]['code'],
+                'شماره شناسنامه':data['privatePerson']['shNumber'],
+                }
+             }
+            )
+    else:        
+        phone = registerNoBours['شماره تماس']
+        cheakcode = farasahmDb['VerificationPhone'].find_one({'phone':phone,'code':data['Code']})
+        try:
+            if cheakcode['code'] == None:
+                return json.dumps({'replay':False,'msg':'کد تایید صحیح نیست'})
+        except:
+                return json.dumps({'replay':False,'msg':'کد تایید صحیح نیست'})
     id = str(registerNoBours['_id'])
     return json.dumps({'replay':True,'cookie':id})
 
