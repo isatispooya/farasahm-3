@@ -10,7 +10,7 @@ from GuardPyCaptcha.Captch import GuardPyCaptcha
 import datetime
 key = 'KPms1b_Kibq5XR6M0d88rJTsjjgdlBFzbFN4irIxiHo='
 client = pymongo.MongoClient()
-farasahmDb = client['farasahm2']
+from setting import farasahmDb
 
 frm ='30001526'
 usrnm = 'isatispooya'

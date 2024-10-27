@@ -2,7 +2,6 @@
 from flask import Flask, request
 import json
 from flask_cors import CORS
-import pymongo
 import warnings
 import winreg as reg
 from waitress import serve
@@ -11,6 +10,7 @@ import Login
 import report
 import dara
 import marketing
+from setting import farasahmDb
 
 
 def addToReg(): 
@@ -23,8 +23,7 @@ addToReg()
 warnings.filterwarnings("ignore")
 
 
-client = pymongo.MongoClient()
-farasahmDb = client['farasahm2']
+
 userCl = farasahmDb['user']
 
 app = Flask(__name__)

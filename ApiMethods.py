@@ -3,12 +3,10 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 import Fnc
 import xml.etree.ElementTree as ET
-import encryption
-import pymongo
 import time
 import datetime
-client = pymongo.MongoClient()
-farasahmDb = client['farasahm2']
+from setting import farasahmDb
+
 
 url = "http://tbs.ipb.ir/TadbirPardaz.CustomerClubExternalService"
 

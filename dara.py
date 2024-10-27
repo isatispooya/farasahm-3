@@ -1,19 +1,12 @@
 
 import json
-import zipfile
 import pandas as pd
-from io import StringIO
-import pymongo
 from persiantools.jdatetime import JalaliDate
 from persiantools import digits
 import datetime
-from Login import adminCheck
-from sklearn.linear_model import LinearRegression
-from Login import decrypt , encrypt, SendSms
-import random
+from Login import encrypt
 import requests
-from Login import VerificationPhone , decrypt, encrypt
-from ast import literal_eval
+from Login import VerificationPhone , encrypt
 from flask import send_file
 from PIL import Image, ImageDraw, ImageFont
 import arabic_reshaper
@@ -22,8 +15,8 @@ import Fnc
 from bson import ObjectId
 from GuardPyCaptcha.Captch import GuardPyCaptcha
 import numpy as np
-client = pymongo.MongoClient()
-farasahmDb = client['farasahm2']
+from setting import farasahmDb
+
 
 def applynationalcode(data):
     captchas = GuardPyCaptcha()
@@ -73,7 +66,8 @@ def coderegistered(data):
     registerNoBours = farasahmDb['registerNoBours'].find_one({'کد ملی':data['nationalCode']},sort=[('date', -1)], limit=1)
     if registerNoBours == None:
         return json.dumps({'replay':False,'msg':'کاربر یافت نشد'})
-    if data['sejam']:
+    sejami = farasahmDb['sejam'].find_one({'uniqueIdentifier':data['nationalCode']})
+    if not sejami:
         url = "http://31.40.4.92:8870/information"
         payload = json.dumps({
         "uniqueIdentifier": data['nationalCode'],
@@ -301,7 +295,6 @@ def static(data):
     df_comp = pd.DataFrame(farasahmDb['registerNoBours'].find({'symbol':symbol}))
     df_comp = df_comp.fillna('')
     df_comp = df_comp.sort_values(by=['date'])
-    # df_comp = df_comp.drop_duplicates(subset=['date','کد ملی'],keep='last')
     
     if len(df_comp)==0:
         return json.dumps({'replay':False, 'msg': 'not found'}) 

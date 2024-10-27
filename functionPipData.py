@@ -29,7 +29,6 @@ def GetAllTradeToDay():
     '''
     دریافت همه معاملات کارگزاری در روز جاری
     '''
-    DateInt = Fnc.todayIntJalali()
     doDay = Fnc.toDayJalaliListYMD()
     page = 1
     while True:

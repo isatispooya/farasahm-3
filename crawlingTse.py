@@ -1,6 +1,5 @@
 import requests
 import pandas as pd
-import pymongo
 from selenium import webdriver
 import warnings
 import time

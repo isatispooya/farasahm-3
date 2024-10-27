@@ -3,9 +3,9 @@ import datetime
 import pandas as pd
 import requests
 from persiantools.jdatetime import JalaliDate
-from persiantools import characters, digits
+from persiantools import characters
 import pymongo
-from pymongo import ASCENDING,DESCENDING
+from pymongo import DESCENDING
 import time
 import threading
 import Fnc

@@ -15,7 +15,7 @@ client = pymongo.MongoClient()
 from setting import farasahmDb
 
 def zipToDf(zip):
-    df = dfDaily = zipfile.ZipFile(zip, 'r')
+    df = zipfile.ZipFile(zip, 'r')
     df = df.read(df.namelist()[0])
     df = str(df, 'utf-8')
     df = StringIO(df)
@@ -374,7 +374,13 @@ def lastupdate(data):
     symbol = data['access'][1]
     resultList = farasahmDb['trade'].find({'symbol':symbol},{"تاریخ معامله":1})
     resultList =[x['تاریخ معامله'] for x in resultList]
-    if len(resultList) == 0: result = '-'
+    if len(resultList) == 0:
+        result = '-'
+        resultslash = 0
+        resultInt = 0
+        gorgia = 0
+        resultList = 0
+    
     else:
         result = max(resultList)
         resultInt = int(result)

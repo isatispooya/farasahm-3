@@ -1,7 +1,6 @@
 from cryptography.fernet import Fernet
 import json
 import base64
-import pandas as pd
 
 import random
 import string

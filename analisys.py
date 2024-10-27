@@ -1,13 +1,7 @@
 
-import json
-import zipfile
 import pandas as pd
-from io import StringIO
-import pymongo
-from persiantools.jdatetime import JalaliDate
-import datetime
-client = pymongo.MongoClient()
-farasahmDb = client['farasahm2']
+from setting import farasahmDb
+
 
 
 df = pd.DataFrame(farasahmDb['newComer'].find({'symbol':'visa'},{'_id':0,'date':1,'allVol':1,'allCntBuy':1,'newCnt':1,'allCntSel':1}))

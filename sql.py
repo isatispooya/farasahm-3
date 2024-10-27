@@ -15,7 +15,6 @@ tables = cursor.fetchall()
 
 query = f"SELECT * FROM PRS"
 df_prs = pd.read_sql(query, conn)
-# df_prs.to_excel('112.xlsx')
 query = f"SELECT * FROM ACC"
 df_ACC = pd.read_sql(query, conn)
 df_ACC = df_ACC[df_ACC['Code1']=='      110']
