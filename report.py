@@ -4,19 +4,17 @@ from sympy import symbols, Eq, solve
 
 import json
 import pandas as pd
-from io import StringIO
 import pymongo
 from persiantools.jdatetime import JalaliDate
 import jdatetime
 import datetime
-from dataManagment import lastupdate
 import numpy as np
 client = pymongo.MongoClient()
 from persiantools.jdatetime import JalaliDate
 from PIL import Image, ImageDraw, ImageFont
 import arabic_reshaper
 from bidi.algorithm import get_display
-from persiantools import characters, digits
+from persiantools import  digits
 import random
 from bson import ObjectId
 import Fnc
@@ -24,17 +22,10 @@ from ApiMethods import GetCustomerMomentaryAssets , GetCustomerByNationalCode
 import time
 from bson import Binary
 from moadian import Moadian
-from bson.son import SON
 from setting import rest_api_token 
 
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.pagesizes import landscape, A4
+from reportlab.lib.pagesizes import  A4
 from reportlab.pdfgen import canvas
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from setting import farasahmDb
 
 symbolTarget = ['نهال1', 'زرفام1', 'نفیس1', 'افران1', 'سپر1', 'کیان1', 'کمند1', 'پارند1', 'تصمیم1', 'دیبا1', 'تمشک1', 'امین یکم1', 'ارزش1', 'همای1', 'سرو1', 'هامرز1', 'آرام1', 'مانی1', 'آکورد1', 'کارا1', 'آگاس1', 'ثبات1', 'سپیدما1', 'توان1', 'گام0208151', 'اطلس1', 'هم وزن1', 'اعتماد1', 'کامیاب1', 'پاداش1', 'آوند1', 'ثنا1', 'کاج1', 'الماس1', 'لبخند1', 'آساس1', 'رماس1', 'نخل1', 'کاریس1', 'داریک1', 'کارین1', 'فیروزا1', 'انار1', 'فردا1', 'کهربا1', 'کاردان1', 'سلام1', 'آفاق1', 'دریا1', 'زیتون1', 'اراد501', 'گنج1', 'ویستا1', 'آسامید1', 'سام1', 'یاقوت1', 'ثهام1', 'آوا1', 'آتیمس1', 'داریوش1', 'تدبیر041', 'رشد1', 'فراز1', 'ثمین1', 'فیروزه1', 'وصندوق1', 'اوصتا1', 'اعتبار1', 'ساحل1', 'هیوا1', 'برلیان1', 'اکسیژن1', 'زرین1', 'دارا1', 'آسام1', 'رابین1', 'یارا1', 'آلتون1', 'درسا1', 'وبازار1', 'اخزا1031', 'اخزا1032', 'اخزا0022', 'اخزا0021', 'درین1', 'گام0208132', 'گام0208131', 'گنجینه1', 'پادا1', 'صنم', 'مروارید1', 'صنوین1', 'بذر1', 'صایند1', 'اوج1', 'اخزا0031', 'اخزا0032', 'گام0207132', 'افق ملت1', 'اگ0201551', 'پرتو1', 'اخزا9101', 'سپاس1', 'اخزا9091', 'اخزا1011', 'ثروتم1', 'اخزا0051', 'اخزا0071', 'عقیق1', 'سخند1', 'اخزا9081', 'گنجین1', 'تاراز1', 'اخزا0091', 'اراد502', 'اخزا9141', 'اخزا1061', 'اخزا1071', 'اخزا1012', 'اخزا0101', 'اخزا0102', 'پتروما1', 'مهریران1', 'ناب1', 'اخزا9102', 'رایکا1', 'اراد871', 'اخزا8211', 'اخزا0042', 'اخزا0072', 'اخزا0041', 'اخزا1041', 'اخزا0052', 'اراد991', 'اخزا0012', 'اخزا0011', 'اخزا8201', 'نیلی1', 'گام0207561', 'اخزا1042', 'گام0208152', 'شتاب1', 'آکام1', 'اخزا0061', 'اخزا0062', 'پایا1', 'گام0206132', 'جهش1', 'اخزا9142', 'اراد1121', 'اخزا1051', 'صنفت13121', 'اخزا0092', 'اخزا9082', 'اخزا1081', 'آلا1', 'صبا14041', 'اخزا1082', 'سیناد1', 'استیل1', 'فاخر1', 'اخزا1044', 'صپترو7051', 'اگ0205551', 'صنهال1', 'بازده1', 'پتروداریوش1', 'نشان1', 'طلوع1', 'صدف1', 'سمان1', 'پتروصبا1', 'هوشیار1', 'بهین رو1', 'ترمه2', 'توسکا1', 'اراد1371', 'تیام1', 'فلزفارابی1', 'اراد1071', 'آذرین1', 'متال1', 'کرمان4621', 'اخزا1072', 'اخزا1062', 'اراد992', 'جواهر1', 'خورشید1', 'صاف فیلم521', 'ماهور1', 'تابش1', 'اتوآگاه1', 'خلیج1', 'پیروز1', 'اخزا2021', 'اخزا2022', 'آفرین1', 'صترا5092']
@@ -918,11 +909,16 @@ def getpriority(data):
         df['popUp'] = 0
         df['value'] = 0
 
-    df = df.rename(columns={"popUp":"تعداد واریز","value":"ارزش واریز"})
     df = df.reset_index()
+    df = df.rename(columns={"popUp":"تعداد واریز","value":"ارزش واریز"})
+    try:
+        df = df.rename(columns={"index":"نام و نام خانوادگی"})
+    except:
+        pass
     df['_id'] = df['_id'].astype(str)
     df = df.fillna(0)
     df['countForward'] = df['حق تقدم استفاده شده'] + df['تعداد سهام']
+    print(df)
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df})
 
@@ -1020,7 +1016,7 @@ def preemptioncardjpg(data):
     draw.text((x_position_text, y_position_text), textRow4, fill=text_color, font=font,align='right')
     font_size = 11
     font = ImageFont.truetype(font_path, font_size)
-    textRow4 = 'لطفا با تکمیل نمودن فرم، آن را به امور سهام شرکت واقع در بلوار جمهوری ساختمان آنا طبقه 6 واحد 61 تحویل نمایید\nجهت کسب اطلاعات بیشتر با شماره 35233366-035'
+    textRow4 = 'لطفا با تکمیل نمودن فرم، آن را به امور سهام شرکت واقع در بلوار جمهوری ساختمان آنا طبقه 6 واحد 61 تحویل نمایید\nجهت کسب اطلاعات بیشتر با شماره 35236633-035'
     textRow4 = arabic_reshaper.reshape(textRow4)
     textRow4 = get_display(textRow4)
     text_width, text_height = draw.textsize(textRow4, font=font)
