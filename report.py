@@ -908,7 +908,6 @@ def getpriority(data):
     else:
         df['popUp'] = 0
         df['value'] = 0
-
     df = df.reset_index()
     df = df.rename(columns={"popUp":"تعداد واریز","value":"ارزش واریز"})
     try:
