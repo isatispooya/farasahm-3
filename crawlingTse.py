@@ -18,18 +18,23 @@ from setting import farasahmDb as farasahm_db
 class TseCrawling:
     def __init__(self):
         file_path = os.path.abspath(__file__)
-        self.options = webdriver.EdgeOptions()
         self.download_path = os.path.join(os.path.dirname(file_path), 'download')
+        os.makedirs(self.download_path, exist_ok=True)
+        self.options = webdriver.EdgeOptions()
         prefs = {
             "download.default_directory": self.download_path,
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
-            "safebrowsing.enabled": True
+            "safebrowsing.enabled": True,
+            "plugins.always_open_pdf_externally": True
         }
         self.options.add_experimental_option('prefs', prefs)
+        self.options.add_argument('--disable-gpu')
+        self.options.add_argument('--no-sandbox')
+        self.options.add_argument('--disable-dev-shm-usage')
         service = Service(executable_path='msedgedriver.exe')
-
-        self.driver = webdriver.Edge(service=service,options=self.options)
+        self.driver = webdriver.Edge(service=service, options=self.options)
+        self.driver.implicitly_wait(10)
 
     def fund_list(self):
         df = requests.get('http://members.tsetmc.com/tsev2/excel/MarketWatchPlus.aspx?d=0').content

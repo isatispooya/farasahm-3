@@ -856,10 +856,8 @@ def getsheetassembly(data):
 def getdatavotes(data):
     symbol = data['access'][1]
     assembly = farasahmDb['assembly'].find_one({'symbol':symbol},sort=[('date',-1)])
-
     del assembly['_id']
     del assembly['date']
-
     return json.dumps({'replay':True,'data':assembly})
 
 
@@ -959,7 +957,7 @@ def preemptioncardjpg(data):
     y_position_logo = 30  
     a4_image.paste(logo_image, (x_position_logo, y_position_logo))
     draw = ImageDraw.Draw(a4_image)
-    textRow1 = "سهامدار گرامی " + dt['نام و نام خانوادگی'] + " با کد/شناسه ملی " + digits.en_to_fa(str(dt['کد ملی'])) + ' دارای تعداد ' + digits.en_to_fa(str(dt['تعداد سهام'])) + 'سهم'
+    textRow1 = "سهامدار گرامی " + str(saham['نام و نام خانوادگی'])+ " با کد/شناسه ملی " + digits.en_to_fa(str(int(saham['کد ملی']))) + ' دارای تعداد ' + digits.en_to_fa(str(int(dt['تعداد سهام']))) + 'سهم'
     textRow1 = arabic_reshaper.reshape(textRow1)
     textRow1 = get_display(textRow1)
     font_size = 15
