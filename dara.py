@@ -259,11 +259,13 @@ def getsheet(data):
         BourseUser['company'] = company['fullname']
         return json.dumps({'replay': True, 'sheet': BourseUser})
     
-    lastDate = max(farasahmDb['registerNoBours'].distinct('date'))
+    lastDate = farasahmDb['registerNoBours'].distinct('date',{'symbol':symbol})
+    lastDate = max(lastDate)
     userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': user['کد ملی'], 'symbol':symbol, 'date':lastDate})
+    print(user['کد ملی'],symbol,lastDate)
     if userNoBourse == None:
         userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': int(user['کد ملی']), 'symbol':symbol, 'date':lastDate})
-    userNoBourse['stockword'] = digits.to_word(userNoBourse['تعداد سهام']) 
+    userNoBourse['stockword'] = digits.to_word(int(userNoBourse['تعداد سهام']))
     userNoBourse['company'] = company['fullname']
     userNoBourse['fullName'] = userNoBourse['نام و نام خانوادگی']
     userNoBourse['سهام کل'] = userNoBourse['تعداد سهام']
