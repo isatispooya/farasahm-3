@@ -262,7 +262,6 @@ def getsheet(data):
     lastDate = farasahmDb['registerNoBours'].distinct('date',{'symbol':symbol})
     lastDate = max(lastDate)
     userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': user['کد ملی'], 'symbol':symbol, 'date':lastDate})
-    print(user['کد ملی'],symbol,lastDate)
     if userNoBourse == None:
         userNoBourse = farasahmDb['registerNoBours'].find_one({'کد ملی': int(user['کد ملی']), 'symbol':symbol, 'date':lastDate})
     userNoBourse['stockword'] = digits.to_word(int(userNoBourse['تعداد سهام']))
