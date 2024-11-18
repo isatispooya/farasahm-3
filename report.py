@@ -1363,8 +1363,11 @@ def getestelamstocksheet(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'reply':False,'msg':'کاربر یافت نشد لطفا مجددا وارد شوید'})
-    df = pd.DataFrame(farasahmDb['registerNoBours'].find({'symbol':symbol}))
-    df = df.groupby(by=['کد ملی']).apply(perNameMaxdate)
+    df = farasahmDb['registerNoBours'].find({'symbol':symbol, 'نام و نام خانوادگی': {'$ne': None, '$exists': True}}, {'نام و نام خانوادگی':1, 'date':1, 'کد ملی':1, '_id':0}).sort('date',-1)
+    df = pd.DataFrame(df)
+    df = df[df['date']==df['date'].max()]
+    df = df.dropna(subset=['کد ملی','نام و نام خانوادگی'])
+    df = df.drop_duplicates(subset=['کد ملی'])
     df = df[['نام و نام خانوادگی','کد ملی']]
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
