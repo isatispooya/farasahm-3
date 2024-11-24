@@ -900,9 +900,15 @@ def getpriority(data):
     datePriority = data['datePriority']
     df = pd.DataFrame(farasahmDb['Priority'].find({'symbol':symbol,'تاریخ':datePriority},{'enable':0}))
     dfPay = pd.DataFrame(farasahmDb['PriorityPay'].find({"symbol":symbol,'capDate':datePriority},{'enable':0}))
+    dfPay = dfPay.rename(columns={'frm':'نام و نام خانوادگی'})
+    dfPay = dfPay[dfPay['نام و نام خانوادگی'] != '']
     if len(dfPay)>0:
-        dfPay = dfPay.groupby(by=['frm']).sum(numeric_only=True)
-        df = df.set_index('نام و نام خانوادگی').join(dfPay).fillna(0)
+        dfPay = dfPay.groupby(by=['نام و نام خانوادگی']).sum(numeric_only=True)
+        print(dfPay)
+        df = df.set_index('نام و نام خانوادگی')
+        print(df)
+        df = df.join(dfPay).fillna(0)
+        print(df)
     else:
         df['popUp'] = 0
         df['value'] = 0

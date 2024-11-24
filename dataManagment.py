@@ -31,7 +31,11 @@ def Update(access,daily,registerdaily):
     dfRegister = zipToDf(registerdaily)
     if len(dfDaily)==0: return json.dumps({'replay':False,'msg':'فایل معاملات خالی است'})
     if len(dfRegister)==0: return json.dumps({'replay':False,'msg':'فایل رجیستر خالی است'})
-    for i in [{'old':'کد ملی خریدار','new':'کد/شناسه ملی خریدار'},{'old':'کد ملی فروشنده','new':'کد/شناسه ملی فروشنده'},{'old':'نوع سهامدار','new':'نوع'}]:
+    for i in [
+        {'old':'کد ملی خریدار','new':'کد/شناسه ملی خریدار'},
+        {'old':'کد ملی فروشنده','new':'کد/شناسه ملی فروشنده'},
+        {'old':'نوع','new':'نوع سهامدار'}
+        ]:
         dfDaily = dfDaily.rename(columns={i['new']:i['old']})
         dfRegister = dfRegister.rename(columns={i['new']:i['old']})
     if 'نماد کدال' not in dfRegister.columns:
@@ -42,7 +46,7 @@ def Update(access,daily,registerdaily):
         if i not in dfDaily.columns:
             return json.dumps({'replay':False,'msg':f'فایل معاملات فاقد ستون {i} است'})
     for i in columnsRegister:
-        if i not in dfRegister.columns:
+        if i not in dfRegister.columns and i != 'نوع سهامدار':
             return json.dumps({'replay':False,'msg':f'فایل رجیستر فاقد ستون {i} است'})
     dateDaily = list(set(dfDaily['تاریخ معامله']))
     dateregister = list(set(dfRegister['تاریخ گزارش']))
@@ -62,15 +66,11 @@ def Update(access,daily,registerdaily):
     dfTradeStationSel = dfTradeStation.copy()[['کد فروشنده','نام کارگزار فروشنده']]
     dfTradeStationBy = dfTradeStationBy.drop_duplicates(subset=['کد خریدار'],keep='first')
     dfTradeStationSel = dfTradeStationSel.drop_duplicates(subset=['کد فروشنده'],keep='first')
-
     list_dfRegister = dfRegister['کد سهامداری'].to_list()
-
     conditional_by = dfTradeStationBy['کد خریدار'].isin(list_dfRegister)
     conditional_sl = dfTradeStationSel['کد فروشنده'].isin(list_dfRegister)
-
     dfTradeStationBy = dfTradeStationBy[conditional_by]
     dfTradeStationSel = dfTradeStationSel[conditional_sl]
-    
     dfTradeStationBy = dfTradeStationBy.rename(columns={'کد خریدار':'کد سهامداری','نام کارگزار خریدار':'اخرین کارگزاری خرید'})
     dfTradeStationSel = dfTradeStationSel.rename(columns={'کد فروشنده':'کد سهامداری','نام کارگزار فروشنده':'اخرین کارگزاری فروش'})
     dfRegister = dfRegister.set_index('کد سهامداری').join(dfTradeStationBy.set_index('کد سهامداری'),how='left')
@@ -85,8 +85,6 @@ def Update(access,daily,registerdaily):
         for m in members:
             dfRegister.loc[dfRegister["اخرین کارگزاری خرید"].str.contains(m), "اخرین کارگزاری خرید"] = m
             dfRegister.loc[dfRegister["اخرین کارگزاری فروش"].str.contains(m), "اخرین کارگزاری فروش"] = m
-
-
     farasahmDb['register'].insert_many(dfRegister.to_dict('records'))
     return json.dumps({'replay':True,'date':dateDaily})
 
