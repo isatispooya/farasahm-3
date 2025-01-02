@@ -17,6 +17,19 @@ usrnm = 'isatispooya'
 psswrd ='5246043adeleh'
 
 def SendSms(snd,txt):
+    snd = str(snd)
+    if snd.startswith('989'):
+        snd = '0' + snd[2:]
+        print(snd,1)
+    elif snd.startswith('+989'): 
+        snd = '0' + snd[3:]
+        print(snd,2)
+    elif snd.startswith('0989'):
+        snd = '0' + snd[3:]
+        print(snd,3)
+    elif snd.startswith('9'):
+        snd = '0' + snd
+        print(snd,4)
     resp = requests.get(url=f'http://tsms.ir/url/tsmshttp.php?from={frm}&to={snd}&username={usrnm}&password={psswrd}&message={txt}').json()
     print('-'*15,'\n',snd,':\n',txt)
     return resp

@@ -293,7 +293,6 @@ def sendsmsgroup(data):
     acc = farasahmDb['user'].find_one({'_id':_id},{'_id':0})
     if acc == None:
         return json.dumps({'replay':False})
-    print(data)
     return json.dumps({'replay':False})
     
 
@@ -829,7 +828,6 @@ def personalinassembly(data):
     else:
         df['opt'] = ''
     df = df.fillna('')
-    print(df)
     df = df.sort_values(by=['rate'],ascending=False)
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df})
@@ -900,15 +898,14 @@ def getpriority(data):
     datePriority = data['datePriority']
     df = pd.DataFrame(farasahmDb['Priority'].find({'symbol':symbol,'تاریخ':datePriority},{'enable':0}))
     dfPay = pd.DataFrame(farasahmDb['PriorityPay'].find({"symbol":symbol,'capDate':datePriority},{'enable':0}))
+    dfPay['frm'] = dfPay['frm'].apply(str).fillna('').replace(' ','')
+    dfPay['count'] = dfPay['count'].fillna(0)
+    dfPay['count'] = dfPay['count'].apply(int)
     dfPay = dfPay.rename(columns={'frm':'نام و نام خانوادگی'})
-    dfPay = dfPay[dfPay['نام و نام خانوادگی'] != '']
     if len(dfPay)>0:
         dfPay = dfPay.groupby(by=['نام و نام خانوادگی']).sum(numeric_only=True)
-        print(dfPay)
         df = df.set_index('نام و نام خانوادگی')
-        print(df)
         df = df.join(dfPay).fillna(0)
-        print(df)
     else:
         df['popUp'] = 0
         df['value'] = 0
@@ -921,7 +918,6 @@ def getpriority(data):
     df['_id'] = df['_id'].astype(str)
     df = df.fillna(0)
     df['countForward'] = df['حق تقدم استفاده شده'] + df['تعداد سهام']
-    print(df)
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df})
 
@@ -1019,7 +1015,7 @@ def preemptioncardjpg(data):
     draw.text((x_position_text, y_position_text), textRow4, fill=text_color, font=font,align='right')
     font_size = 11
     font = ImageFont.truetype(font_path, font_size)
-    textRow4 = 'لطفا با تکمیل نمودن فرم، آن را به امور سهام شرکت واقع در بلوار جمهوری ساختمان آنا طبقه 6 واحد 61 تحویل نمایید\nجهت کسب اطلاعات بیشتر با شماره 35236633-035'
+    textRow4 = 'لطفا با تکمیل نمودن فرم، آن را به امور سهام شرکت واقع در بلوار جمهوری ساختمان آنا طبقه 6 واحد 61 تحویل نمایید\nجهت کسب اطلاعات بیشتر با شماره 91090088-021 داخلی 111'
     textRow4 = arabic_reshaper.reshape(textRow4)
     textRow4 = get_display(textRow4)
     text_width, text_height = draw.textsize(textRow4, font=font)
@@ -1991,7 +1987,6 @@ def getpriceforward(data):
     df['diff_addon_cum'] = (df['diff_addon_cum'] - 1)*100
     df['week'] = df['week'].replace(0,'شنبه').replace(1,'یکشنبه').replace(2,'دوشنبه').replace(3,'سه شنبه').replace(6,'جمعه').replace(4,'چهارشنبه').replace(5,'پنج شنبه')
     # df= df.fillna('')
-    # print(df)
 
     df = df.to_dict('records')
     return json.dumps({'reply':True, 'df':df})
@@ -2034,7 +2029,6 @@ def getpriceforward(data):
     
 #     df['count_after_holli'] = df.apply(lambda row: Fnc.calculate_future_holidays(row, df), axis=1)
 #     df['count_befor_holli'] = df.apply(lambda row: Fnc.calculate_past_holidays(row, df), axis=1)
-#     print(df)
     
     
 #     dff = df[df['workday']==True]
@@ -2844,7 +2838,6 @@ def getratretasst(data):
     df = df.fillna(0)
     df = df.reset_index()
     df = df[['MarketInstrumentTitle', 'type', 'rate']]
-    print(df)
     df = df.to_dict('records')
     return json.dumps({'reply':True,'df':df})
 
@@ -3729,7 +3722,6 @@ def moadian_print(data):
     for c in columns:
         if c['name'] in ['جمع','مالیات و عوارض','مبلغ پس از تخفیف','تخفیف','مبلغ']:
             text = [int(x[c['name']]) for x in listDic]
-            print(dic)
             text = sum(text)
             text = Fnc.add_commas(text)
             text = Fnc.repairPersian(str(text))
@@ -3961,7 +3953,6 @@ def service_data_assetcustomer (data) :
         return json.dumps ({'reply':False , 'msg' :' کاربر در فراسهم ثبت نام نشده است'}),400
     
     customer = GetCustomerByNationalCode(nc) 
-    print(len(customer))
     if len(customer)<=1 :
         dic = {'broker':False,'asset':[{'Symbol': 'بتیس1', 'VolumeInPrice': '0'}, {'Symbol': 'خاتم1', 'VolumeInPrice': 0}, {'Symbol': 'ترمه1', 'VolumeInPrice': 0}, {'Symbol': 'ویسا1', 'VolumeInPrice': 0}]}
         return json.dumps (dic)

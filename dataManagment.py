@@ -665,11 +665,11 @@ def settransactionpriority(data):
         return json.dumps({'replay':False,'msg':'تعداد حق تقدم فروشنده کافی نیست'})
     
     frmBalance = frmBalance - int(transaction['count'])
+
     toBalance = farasahmDb['Priority'].find_one({'symbol':symbol,'نام و نام خانوادگی':transaction['to'], 'تاریخ':data['datePriority']})
     if toBalance == None:
         toBalance = farasahmDb['registerNoBours'].find_one({'symbol':symbol,'نام و نام خانوادگی':transaction['to']})
         if toBalance == None:
-            print(f"'{transaction['to']}'")
             return json.dumps({'replay':False,'msg':'خریدار یافت نشد'})
         PriorityDate = farasahmDb['Priority'].find_one({'symbol':symbol})
         farasahmDb['Priority'].update_one({'symbol':symbol,'نام و نام خانوادگی':transaction['frm'], 'تاریخ':data['datePriority']},{'$set':{'حق تقدم':frmBalance}})
@@ -712,6 +712,7 @@ def getprioritypay(data):
     df = pd.DataFrame(farasahmDb['PriorityPay'].find({'symbol':symbol, 'capDate':data['date']},{'_id':0,'symbol':0}))
     if len(df) ==0:
          return json.dumps({'replay':False,'msg':'یافت نشد'})
+    df = df.fillna('')
     df = df.to_dict('records')
     return json.dumps({'replay':True,'df':df})
 

@@ -99,6 +99,16 @@ def coderegistered(data):
                 }
              }
             )
+        farasahmDb['Priority'].update_many(
+            {'کد ملی':data['uniqueIdentifier']},
+            {'$set':{
+                'نام و نام خانوادگی':data['privatePerson']['firstName']+' '+data['privatePerson']['lastName'],
+                'نام پدر':data['privatePerson']['fatherName'],
+                'شماره تماس':data['mobile'],
+                'صادره':data['privatePerson']['placeOfIssue'],
+                }
+             }
+            )
     else:        
         phone = registerNoBours['شماره تماس']
         cheakcode = farasahmDb['VerificationPhone'].find_one({'phone':phone,'code':data['Code']})
