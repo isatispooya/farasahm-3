@@ -1,4 +1,3 @@
-
 from flask import Flask, request
 import json
 from flask_cors import CORS
@@ -47,6 +46,14 @@ def applyCode():
 def getApp():
     data = request.get_json()
     return Login.getApp(data)
+
+
+@app.route('/get_cookie_space', methods=['POST'])
+def get_cookie_space():
+    ApiKey = request.headers.get('X-API-Key')
+    data = request.get_json()
+    return Login.get_cookie_space(ApiKey, data)
+
 
 
 @app.route('/access',methods = ['POST', 'GET'])
@@ -439,6 +446,10 @@ def gettransactions():
 def addtradernobourse():
     data = request.get_json()
     return dataManagment.addtradernobourse(data)
+
+@app.route('/space', methods=['GET'])
+def space():
+    return dataManagment.space(request)
 
 @app.route('/delshareholders',methods = ['POST', 'GET'])
 def delshareholders():
@@ -1028,7 +1039,7 @@ def report_balance_stock():
     return report.balance_stock(data)
 
 if __name__ == '__main__':
-    #serve(app, host="0.0.0.0", port=8080,threads= 8)
-    app.run(host='0.0.0.0',port=8000, debug=True)
+    serve(app, host="0.0.0.0", port=8080,threads= 8)
+    #app.run(host='0.0.0.0',port=8000, debug=True)
 
 

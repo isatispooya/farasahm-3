@@ -1,4 +1,3 @@
-
 import json
 import zipfile
 import pandas as pd
@@ -11,6 +10,7 @@ import datetime
 from Login import adminCheck
 from sklearn.linear_model import LinearRegression
 import time
+import ApiMethods as Api
 client = pymongo.MongoClient()
 from setting import farasahmDb
 
@@ -34,7 +34,8 @@ def Update(access,daily,registerdaily):
     for i in [
         {'old':'کد ملی خریدار','new':'کد/شناسه ملی خریدار'},
         {'old':'کد ملی فروشنده','new':'کد/شناسه ملی فروشنده'},
-        {'old':'نوع','new':'نوع سهامدار'}
+        {'old':'نوع','new':'نوع سهامدار'},
+        {'old':'fullName','new':'نام کامل'},
         ]:
         dfDaily = dfDaily.rename(columns={i['new']:i['old']})
         dfRegister = dfRegister.rename(columns={i['new']:i['old']})
@@ -513,6 +514,20 @@ def addtradernobourse(data):
         dic['date'] = lastDate
         dic['تعداد سهام'] = 0
         farasahmDb['registerNoBours'].insert_one(dic)
+        dici={
+            "نام و نام خانوادگی":dic['نام و نام خانوادگی'],
+            "کد ملی":dic['کد ملی'],
+            "نام پدر":dic['نام پدر'],
+            "symbol":symbol,
+            "حق تقدم":0,
+            "حق تقدم استفاده شده":0,
+            "تعداد سهام":0,
+            "شماره تماس":dic['شماره تماس'],
+            "تاریخ":"1403/07/28",
+            "dateInt":14030728,
+        }
+        farasahmDb['Priority'].insert_one(dici)
+
     return json.dumps({'replay':True})
 
 
@@ -667,6 +682,9 @@ def settransactionpriority(data):
     frmBalance = frmBalance - int(transaction['count'])
 
     toBalance = farasahmDb['Priority'].find_one({'symbol':symbol,'نام و نام خانوادگی':transaction['to'], 'تاریخ':data['datePriority']})
+    if toBalance is None or 'کد ملی' not in toBalance.keys():
+        return json.dumps({'replay':False,'msg':'خریدار یافت نشد'})
+    print({'symbol':symbol,'نام و نام خانوادگی':transaction['to'], 'تاریخ':data['datePriority']})
     if toBalance == None:
         toBalance = farasahmDb['registerNoBours'].find_one({'symbol':symbol,'نام و نام خانوادگی':transaction['to']})
         if toBalance == None:
@@ -919,6 +937,46 @@ def delbankassetfund(data):
         return json.dumps({'reply':False,'msg':'این نوع دارایی قابل حذف نیست'})
     farasahmDb['bankBalance'].delete_many({'name':row['name'],'num':row['num']})
     return json.dumps({'reply':True})
+
+
+
+def space(data):
+    dataa = data.get_json()
+    dataa = json.loads(dataa)
+    x_api_key = dataa['x_api_key']
+    nc = dataa['national_id']
+
+    if not x_api_key or x_api_key != 'dj2n9#mK8$pL5@qR7vX4yH1wB9cF3tE6':
+        return json.dumps({'value': 0, 'protfolio': []})
+
+    if not nc:
+        return json.dumps({'value': 0, 'protfolio': []})
+        
+    CustomerByNationalCode = Api.GetCustomerByNationalCode(nc)
+    try:
+        PAMCode = CustomerByNationalCode['PAMCode']
+        asset = Api.GetCustomerMomentaryAssets(PAMCode)
+    except:
+        return json.dumps({'value': 0, 'protfolio': []})
+
+    df = pd.DataFrame(asset)
+
+    if len(df) == 0:
+        return json.dumps({'value': 0, 'protfolio': []})
+    df = df[['Symbol','VolumeInPrice']]
+    df['VolumeInPrice'] = pd.to_numeric(df['VolumeInPrice'], errors='coerce')
+    df['VolumeInPrice'] = df['VolumeInPrice'].fillna(0)
+
+    df = df.sort_values(by='VolumeInPrice', ascending=False).reset_index(drop=True)
+    if len(df) > 3:
+        first_3 = df.nlargest(3, 'VolumeInPrice')
+        others_sum = df.nsmallest(len(df)-3, 'VolumeInPrice')['VolumeInPrice'].sum()
+        df = pd.concat([first_3, pd.DataFrame({'Symbol': ['دیگر'], 'VolumeInPrice': [others_sum]})])
+
+    value = df['VolumeInPrice'].sum()
+    portfolio = df[['Symbol', 'VolumeInPrice']].to_dict('records')
+    
+    return json.dumps({'value': int(value), 'protfolio': portfolio})
 
 
 

@@ -6,7 +6,6 @@ import datetime
 from persiantools.jdatetime import JalaliDate
 import requests
 from persiantools import characters
-import pymongo
 
 
 def todayIntJalali():
@@ -29,6 +28,7 @@ def GetAllTradeToDay():
     '''
     دریافت همه معاملات کارگزاری در روز جاری
     '''
+    DateInt = Fnc.todayIntJalali()
     doDay = Fnc.toDayJalaliListYMD()
     page = 1
     while True:
@@ -341,37 +341,14 @@ def get_trade_code () :
         trade_list = [x['TradeCode'] for x in trade_list]
         trade_list = set(trade_list)
         customer_list = set(farasahmDb['customerofbroker'].distinct('TradeCode'))
+
         need_update = list(trade_list-customer_list)
         for j in need_update:
             nc = str(j)[4:]
-            try:
-                customer = GetCustomerByNationalCode(nc)
-                if len(customer)>0 :
-                    
-                    duplicate = farasahmDb['customerofbroker'].find_one({'PAMCode':j})
-                    if duplicate == None:
-                        farasahmDb['customerofbroker'].insert_one(customer)
-                        print(nc)
-                        
-            except pymongo.errors.DuplicateKeyError:
-                print('-'*25)
-                pass
-            except Exception as e:
-                print('*'*25)
-                print(f"Error processing TradeCode {j}: {e}")
+            customer = GetCustomerByNationalCode(nc)
+            if len(customer)>0:
+                farasahmDb['customerofbroker'].insert_one(customer)
 
 
 
 
-import multiprocessing
-if __name__ == "__main__":
-    # تعداد پراسس‌های مورد نظر
-    num_processes = 4
-
-    # یک Pool از پراسس‌ها ایجاد می‌کنیم
-    with multiprocessing.Pool(num_processes) as pool:
-        # لیستی از پراسس‌های غیرهمزمان ایجاد می‌کنیم
-        results = [pool.apply_async(get_trade_code) for _ in range(num_processes)]
-
-        # نتایج را از پراسس‌ها می‌گیریم
-        output = [result.get() for result in results]

@@ -10,7 +10,7 @@ from GuardPyCaptcha.Captch import GuardPyCaptcha
 import datetime
 key = 'KPms1b_Kibq5XR6M0d88rJTsjjgdlBFzbFN4irIxiHo='
 client = pymongo.MongoClient()
-from setting import farasahmDb
+from setting import farasahmDb, rest_api_token
 
 frm ='30001526'
 usrnm = 'isatispooya'
@@ -159,3 +159,17 @@ def getApp(data):
                             appMenu.append(item)
             app['menu'] = appMenu
     return json.dumps({'reply':True, 'app':app})
+
+
+
+
+def get_cookie_space(token, data):
+    mobile = '0' + data['mobile'][-10:]
+    print(mobile)
+    if token != rest_api_token:
+        return json.dumps({'reply': False, 'msg': 'کلید صحیح نیست'})
+    acc = farasahmDb['user'].find_one({'phone': mobile})
+    if acc is None:
+        return json.dumps({'reply': False, 'msg': 'شماره همراه صحیح نیست'})
+    cookieSpace = str(acc['_id'])
+    return json.dumps({'reply': True, 'cookie': cookieSpace})
